@@ -1,0 +1,16 @@
+{
+  "name": "Prom 2026 IIMA",
+  "short_name": "Prom 2026",
+  "description": "Anonymous matchmaking for IIM Ahmedabad Prom 2026",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0c14",
+  "theme_color": "#d4a855",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
