@@ -32,3 +32,5 @@ npx amplify sandbox set GOOGLE_CLIENT_SECRET <Google_Client_Secret>
 npx amplify sandbox (inside frontend package, amplify code is prom-connect/amplify/)
 
 (Sets up backend sandbox etc)
+
+PRODUCTION URL FOR NOW: https://main.d1emd9gkgd3wf8.amplifyapp.com/
