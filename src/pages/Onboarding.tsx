@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import SparkleBackground from "@/components/SparkleBackground";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
+import { fetchAuthSession } from "aws-amplify/auth";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -14,7 +17,8 @@ import {
   User,
   Heart,
   MessageCircle,
-  Camera
+  Camera,
+  X
 } from "lucide-react";
 
 type OnboardingStep = "type" | "basics" | "interests" | "prompts" | "preferences" | "photos" | "complete";
@@ -49,6 +53,8 @@ const prompts = [
   "Two truths and a lie about me...",
 ];
 
+const client = generateClient<Schema>();
+
 const Onboarding = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -77,8 +83,30 @@ const Onboarding = () => {
   const currentStepIndex = steps.indexOf(step);
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
 
-  const nextStep = () => {
+  const nextStep = async () => {
     const nextIndex = currentStepIndex + 1;
+    // When moving into the final "complete" step for individuals,
+    // persist the profile to the Amplify backend.
+    if (nextIndex === 5 && profile.type === "individual") {
+      try {
+        const session = await fetchAuthSession();
+        const email =
+          (session.tokens?.idToken?.payload.email as string | undefined) ??
+          "unknown@iima.ac.in";
+
+        await client.models.UserProfile.create({
+          email,
+          name: profile.name,
+          gender: profile.gender,
+          bio: profile.bio,
+          sexuality: profile.sexuality,
+        });
+      } catch (error) {
+        // For now, just log; can be replaced with toast UI
+        console.error("Failed to save user profile", error);
+      }
+    }
+
     if (nextIndex < steps.length) {
       setStep(steps[nextIndex]);
     }
@@ -448,20 +476,37 @@ const Onboarding = () => {
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
         <header className="p-4 flex items-center justify-between">
-          {currentStepIndex > 0 && step !== "complete" ? (
-            <Button variant="ghost" size="sm" onClick={prevStep}>
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
-          ) : (
-            <div />
-          )}
-          
-          {step !== "complete" && (
-            <span className="text-sm text-muted-foreground">
-              Step {currentStepIndex + 1} of {steps.length}
-            </span>
-          )}
+          <div className="flex-1">
+            {currentStepIndex > 0 && step !== "complete" ? (
+              <Button variant="ghost" size="sm" onClick={prevStep}>
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back
+              </Button>
+            ) : (
+              <div />
+            )}
+          </div>
+
+          <div className="flex-1 flex justify-center">
+            {step !== "complete" && (
+              <span className="text-sm text-muted-foreground">
+                Step {currentStepIndex + 1} of {steps.length}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 flex justify-end">
+            {step !== "complete" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Close
+              </Button>
+            )}
+          </div>
         </header>
 
         {/* Progress bar */}

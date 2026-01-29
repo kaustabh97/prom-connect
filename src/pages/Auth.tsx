@@ -3,14 +3,18 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import { Heart, Users } from "lucide-react";
+import { signInWithRedirect } from "aws-amplify/auth";
 
 const Auth = () => {
   const navigate = useNavigate();
 
-  const handleGoogleSignIn = () => {
-    // TODO: Implement Google OAuth with IIMA domain verification
-    // For now, navigate to onboarding
-    navigate("/onboarding");
+  const handleGoogleSignIn = async () => {
+    console.log("Signing in with Google")
+    try {
+      await signInWithRedirect({ provider: "Google" });
+    } catch (error) {
+      console.error("Error during Google sign-in", error);
+    }
   };
 
   return (
