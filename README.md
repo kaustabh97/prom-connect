@@ -1,26 +1,6 @@
-# Welcome to your Lovable project Hello
+# Hello
 
-## Project info
-
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## To run frontend and setup code
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
@@ -34,40 +14,21 @@ npm i
 
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
+
 ```
 
-**Edit a file directly in GitHub**
+## To run backend and setup AWS amplify Sandbox
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+https://aws.amazon.com/amplify/
 
-**Use GitHub Codespaces**
+npm install -g @aws-amplify/cli
+npx amplify@latest init
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+npx amplifty 
 
-## What technologies are used for this project?
+npx amplify sandbox set GOOGLE_CLIENT_ID <Google_Client_ID>
+npx amplify sandbox set GOOGLE_CLIENT_SECRET <Google_Client_Secret>
 
-This project is built with:
+npx amplify sandbox (inside frontend package, amplify code is prom-connect/amplify/)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+(Sets up backend sandbox etc)
