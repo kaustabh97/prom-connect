@@ -10,6 +10,8 @@ import Discover from "./pages/Discover";
 import Matches from "./pages/Matches";
 import NotFound from "./pages/NotFound";
 
+import { Amplify } from "aws-amplify";
+import outputs from "../amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
 
 const queryClient = new QueryClient();
