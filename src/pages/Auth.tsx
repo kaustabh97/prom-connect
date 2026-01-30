@@ -4,17 +4,65 @@ import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import { Heart, Users } from "lucide-react";
 import { signInWithRedirect } from "aws-amplify/auth";
+import { useEffect, useState } from "react";
+import { getUserProfile, logUserProfile, logOAuthConfig, type UserProfile } from "@/utils/auth";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [userInfo, setUserInfo] = useState<UserProfile | null>(null);
+
+  // Check if user is already signed in and handle OAuth redirect
+  useEffect(() => {
+    const checkUser = async () => {
+      // Log OAuth config on first load (for debugging)
+      await logOAuthConfig();
+      
+      // Check if we're returning from OAuth redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      
+      if (code || state) {
+        console.log("OAuth redirect detected:", { code: !!code, state: !!state });
+        console.log("Full URL:", window.location.href);
+      }
+      
+      const profile = await getUserProfile();
+      setUserInfo(profile);
+
+      // If we have a signed-in user, log full details to console
+      if (profile) {
+        await logUserProfile();
+      }
+      
+      // If user just signed in (coming back from OAuth), redirect to onboarding
+      if (profile && (code || state)) {
+        console.log("User signed in successfully, redirecting to onboarding...");
+        setTimeout(() => {
+          navigate("/onboarding");
+        }, 1000);
+      }
+    };
+    checkUser();
+  }, [navigate]);
 
   const handleGoogleSignIn = async () => {
-    console.log("Signing in with Google")
+    console.log("=== Initiating Google Sign-In ===");
+    console.log("Current URL:", window.location.href);
+    
     try {
       await signInWithRedirect({ provider: "Google" });
+      // User will be redirected to Cognito Hosted UI, then Google, then back
     } catch (error) {
       console.error("Error during Google sign-in", error);
     }
+  };
+
+  const handleViewProfile = async () => {
+    await logUserProfile();
+    // Refresh user info in UI
+    const profile = await getUserProfile();
+    setUserInfo(profile);
   };
 
   return (
@@ -50,6 +98,37 @@ const Auth = () => {
               </p>
             </div>
 
+            {/* Show user info if signed in */}
+            {userInfo && (
+              <div className="mb-6 p-4 glass rounded-xl border border-primary/20">
+                <h3 className="font-semibold mb-2 text-foreground">Signed in as:</h3>
+                {userInfo.picture && (
+                  <img 
+                    src={userInfo.picture} 
+                    alt="Profile" 
+                    className="w-16 h-16 rounded-full mx-auto mb-2"
+                  />
+                )}
+                <p className="text-sm text-muted-foreground">
+                  <strong>Email:</strong> {userInfo.email || "N/A"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Name:</strong> {userInfo.name || userInfo.username || "N/A"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong>User ID:</strong> {userInfo.userId}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3"
+                  onClick={handleViewProfile}
+                >
+                  View Full Profile (Console)
+                </Button>
+              </div>
+            )}
+
             {/* Sign in options */}
             <div className="space-y-4">
               <Button
@@ -57,6 +136,7 @@ const Auth = () => {
                 size="lg"
                 className="w-full"
                 onClick={handleGoogleSignIn}
+                disabled={!!userInfo}
               >
                 <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                   <path
@@ -76,7 +156,7 @@ const Auth = () => {
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                   />
                 </svg>
-                Continue with Google
+                {userInfo ? "Already Signed In" : "Continue with Google"}
               </Button>
 
               <div className="relative">

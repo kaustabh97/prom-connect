@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { fetchAuthSession } from "aws-amplify/auth";
+import { logUserProfile } from "@/utils/auth";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -20,6 +21,12 @@ import {
   Camera,
   X
 } from "lucide-react";
+
+import { Amplify } from "aws-amplify";
+import outputs from "../../amplify_outputs.json";
+import "@aws-amplify/ui-react/styles.css";
+
+Amplify.configure(outputs);
 
 type OnboardingStep = "type" | "basics" | "interests" | "prompts" | "preferences" | "photos" | "complete";
 
@@ -60,6 +67,22 @@ const Onboarding = () => {
   const [searchParams] = useSearchParams();
   const initialType = searchParams.get("type") as "individual" | "couple" | null;
   
+  // When arriving from Google/Cognito (code + state in URL), log the signed-in user details once
+  useEffect(() => {
+    const maybeLogUser = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      const state = params.get("state");
+
+      if (code || state) {
+        console.log("Onboarding: detected OAuth callback, logging user profile...");
+        await logUserProfile();
+      }
+    };
+
+    void maybeLogUser();
+  }, []);
+
   const [step, setStep] = useState<OnboardingStep>(initialType ? "basics" : "type");
   const [profile, setProfile] = useState<ProfileData>({
     type: initialType || "individual",
