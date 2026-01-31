@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
+import NavBar from "@/components/NavBar";
 import PromAsk from "@/components/PromAsk";
 import { 
   Heart, 
@@ -79,11 +80,14 @@ const Matches = () => {
   };
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
+      <NavBar />
+
+      <div className="flex-1 flex relative z-10">
 
       {/* Sidebar - Match List */}
-      <aside className={`relative z-10 w-full md:w-80 lg:w-96 border-r border-border/50 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+      <aside className={`w-full md:w-80 lg:w-96 border-r border-border/50 flex flex-col ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <header className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between mb-4">
@@ -160,7 +164,7 @@ const Matches = () => {
       </aside>
 
       {/* Chat Area */}
-      <main className={`relative z-10 flex-1 flex flex-col ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
+      <main className={`flex-1 flex flex-col ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
         {activeChat && activeMatch ? (
           <ChatView 
             match={activeMatch} 
@@ -180,6 +184,7 @@ const Matches = () => {
           </div>
         )}
       </main>
+      </div>
 
       {/* Reveal Modal */}
       <AnimatePresence>

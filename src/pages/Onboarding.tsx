@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import SparkleBackground from "@/components/SparkleBackground";
+import NavBar from "@/components/NavBar";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -580,48 +581,34 @@ const Onboarding = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
+      <NavBar />
 
-      <div className="relative z-10 min-h-dvh flex flex-col">
-        {/* Header */}
-        <header className="p-4 flex items-center justify-between">
-          <div className="flex-1">
-            {currentStepIndex > 0 && step !== "complete" ? (
-              <Button variant="ghost" size="sm" onClick={prevStep}>
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </Button>
-            ) : (
-              <div />
-            )}
-          </div>
+      <div className="relative z-10 flex-1 flex flex-col">
+        {/* Step Header */}
+        {step !== "complete" && (
+          <div className="px-4 pt-3 pb-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex-1">
+                {currentStepIndex > 0 ? (
+                  <Button variant="ghost" size="sm" onClick={prevStep}>
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Back
+                  </Button>
+                ) : (
+                  <div />
+                )}
+              </div>
 
-          <div className="flex-1 flex justify-center">
-            {step !== "complete" && (
               <span className="text-sm text-muted-foreground">
                 Step {currentStepIndex + 1} of {steps.length}
               </span>
-            )}
-          </div>
 
-          <div className="flex-1 flex justify-end">
-            {step !== "complete" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/")}
-              >
-                <X className="w-4 h-4 mr-1" />
-                Close
-              </Button>
-            )}
-          </div>
-        </header>
+              <div className="flex-1" />
+            </div>
 
-        {/* Progress bar */}
-        {step !== "complete" && (
-          <div className="px-4">
+            {/* Progress bar */}
             <div className="h-1 bg-muted rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-primary"

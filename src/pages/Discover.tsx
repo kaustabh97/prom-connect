@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
+import NavBar from "@/components/NavBar";
 import {
   BlindProfileCard,
   DiscoveryProgress,
@@ -195,10 +196,11 @@ const Discover = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
+      <NavBar />
 
-      <div className="relative z-10 min-h-dvh flex flex-col max-w-[400px] mx-auto px-4 pt-5 pb-6">
+      <div className="relative z-10 flex-1 flex flex-col max-w-[400px] mx-auto w-full px-4 pt-4 pb-6">
         {/* Header */}
         <header className="mb-4">
           <h1 className="font-display text-xl font-bold text-foreground">
