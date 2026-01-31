@@ -6,32 +6,39 @@ import SparkleBackground from "@/components/SparkleBackground";
 import FeatureCard from "@/components/FeatureCard";
 import CountdownTimer from "@/components/CountdownTimer";
 
-const HERO_FADE = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8 } };
-const FADE_IN_VIEW = { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
-
-const features = [
-  { icon: Shield, title: "Privacy First", description: "Your identity stays hidden until you both choose to reveal. No peeking allowed." },
-  { icon: Heart, title: "Mutual Reveals", description: "Only when both of you say 'yes' do the masks come off. It's magic, not creepy." },
-  { icon: Clock, title: "Time-Bound", description: "Built for Prom 2026. All data auto-deletes after the event. No digital footprints." },
-  { icon: Users, title: "Campus Verified", description: "Only IIMA students can join. Sign in with your institute email." },
-];
-
-const privacyItems = [
-  { title: "Anonymous by Default", desc: "Your identity is hidden until mutual reveal" },
-  { title: "Zero Knowledge", desc: "Even we can't see who matched with whom" },
-  { title: "Auto-Delete", desc: "All data purged 7 days after prom" },
-];
-
 const Landing = () => {
   const navigate = useNavigate();
 
-  const scrollToHowItWorks = () => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth" });
+  const features = [
+    {
+      icon: Shield,
+      title: "Privacy First",
+      description: "Your identity stays hidden until you both choose to reveal. No peeking allowed.",
+    },
+    {
+      icon: Heart,
+      title: "Mutual Reveals",
+      description: "Only when both of you say 'yes' do the masks come off. It's magic, not creepy.",
+    },
+    {
+      icon: Clock,
+      title: "Time-Bound",
+      description: "Built for Prom 2026. All data auto-deletes after the event. No digital footprints.",
+    },
+    {
+      icon: Users,
+      title: "Campus Verified",
+      description: "Only IIMA students can join. Sign in with your institute email.",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
       <SparkleBackground />
       
+      {/* Hero Section */}
       <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20">
+        {/* Floating decorative elements */}
         <motion.div
           className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl"
           animate={{ y: [0, 20, 0], scale: [1, 1.1, 1] }}
@@ -43,12 +50,14 @@ const Landing = () => {
           transition={{ duration: 10, repeat: Infinity }}
         />
 
+        {/* Main content */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="text-center max-w-4xl mx-auto z-10"
         >
+          {/* Badge */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -56,35 +65,47 @@ const Landing = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8"
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">IIM Ahmedabad Prom 2026</span>
+            <span className="text-sm font-medium text-muted-foreground">IIM Ahmedabad Exclusive</span>
           </motion.div>
 
-          <motion.div
-            {...HERO_FADE}
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            className="relative flex flex-col items-center justify-center gap-0 mb-6 text-center w-full min-h-[14rem] sm:min-h-[16rem] md:min-h-[18rem]"
+            className="font-display text-5xl md:text-7xl lg:text-8xl font-bold mb-6"
           >
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-80 h-80 sm:w-[22rem] sm:h-[22rem] md:w-96 md:h-96 lg:w-[28rem] lg:h-[28rem] overflow-hidden">
-              <img src="/dancing-couple-starry.png" alt="" role="presentation" className="w-full h-full object-contain" />
-            </div>
-            <h1 className="relative z-10 font-display text-[4rem] sm:text-[5rem] md:text-[6rem] lg:text-[7rem] xl:text-[8rem] font-bold px-4 pr-8 sm:pr-10 md:pr-12 w-full max-w-6xl mx-auto text-center leading-none">
-              <span className="font-pen text-gradient-gold font-semibold inline-block">
-                When the lights
-                <br />
-                stay on
-              </span>
-            </h1>
-          </motion.div>
+            <span className="text-foreground">Prom</span>{" "}
+            <span className="text-gradient-gold">2026</span>
+          </motion.h1>
 
-          <motion.p {...HERO_FADE} transition={{ delay: 0.5, duration: 0.8 }} className="text-xl md:text-2xl text-muted-foreground mb-4 font-light">
+          {/* Tagline */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.8 }}
+            className="text-xl md:text-2xl text-muted-foreground mb-4 font-light"
+          >
             Keep it anonymous. Keep it real.
           </motion.p>
 
-          <motion.p {...HERO_FADE} transition={{ delay: 0.6, duration: 0.8 }} className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto">
-            Find your prom date through genuine connections, not just profiles. Your identity stays hidden until you both choose to reveal.
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.8 }}
+            className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto"
+          >
+            Find your prom date through genuine connections, not just profiles. 
+            Your identity stays hidden until you both choose to reveal.
           </motion.p>
 
-          <motion.div {...HERO_FADE} transition={{ delay: 0.7, duration: 0.8 }} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          {/* CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.8 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+          >
             <Button
               variant="gold"
               size="xl"
@@ -111,11 +132,16 @@ const Landing = () => {
               </svg>
               Sign in with IIMA
             </Button>
-            <Button variant="gold-outline" size="xl" onClick={scrollToHowItWorks}>
+            <Button
+              variant="gold-outline"
+              size="xl"
+              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+            >
               How it works
             </Button>
           </motion.div>
 
+          {/* Countdown */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -127,9 +153,16 @@ const Landing = () => {
         </motion.div>
       </section>
 
+      {/* Features Section */}
       <section id="how-it-works" className="relative py-24 px-4">
         <div className="max-w-6xl mx-auto">
-          <motion.div {...FADE_IN_VIEW} className="text-center mb-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
             <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
               How the <span className="text-gradient-gold">Magic</span> Works
             </h2>
@@ -146,6 +179,7 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Privacy Promise Section */}
       <section className="relative py-24 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div
@@ -155,19 +189,29 @@ const Landing = () => {
             transition={{ duration: 0.6 }}
             className="glass rounded-3xl p-8 md:p-12 text-center relative overflow-hidden"
           >
+            {/* Decorative gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+            
             <div className="relative z-10">
               <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
                 <Shield className="w-8 h-8 text-primary" />
               </div>
+              
               <h3 className="font-display text-3xl md:text-4xl font-bold mb-4">
                 Our Privacy <span className="text-gradient-gold">Promise</span>
               </h3>
+              
               <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                Only you and your match see revealed profiles — organisers and other users cannot access these details. Your privacy is not a feature, it's a foundation.
+                Only you and your match see revealed profiles — organisers and other users 
+                cannot access these details. Your privacy is not a feature, it's a foundation.
               </p>
+
               <div className="grid sm:grid-cols-3 gap-6 text-left">
-                {privacyItems.map((item) => (
+                {[
+                  { title: "Anonymous by Default", desc: "Your identity is hidden until mutual reveal" },
+                  { title: "Zero Knowledge", desc: "Even we can't see who matched with whom" },
+                  { title: "Auto-Delete", desc: "All data purged 7 days after prom" },
+                ].map((item) => (
                   <div key={item.title} className="p-4 rounded-xl bg-card/50">
                     <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
                     <p className="text-sm text-muted-foreground">{item.desc}</p>
@@ -179,8 +223,14 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Final CTA */}
       <section className="relative py-24 px-4 text-center">
-        <motion.div {...FADE_IN_VIEW}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
           <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
             Ready to find your <span className="text-gradient-rose">prom date</span>?
           </h2>
@@ -194,6 +244,7 @@ const Landing = () => {
         </motion.div>
       </section>
 
+      {/* Footer */}
       <footer className="py-8 px-4 border-t border-border/50">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
           <p>© 2026 Prom IIMA. Built with 💛 for the campus.</p>
