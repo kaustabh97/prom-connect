@@ -14,7 +14,8 @@ import {
   DISCOVERY_CONFIG,
   MOCK_DISCOVERY_PROFILES,
 } from "@/lib/discovery";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, AlertTriangle } from "lucide-react";
+import { getUserProfile } from "@/utils/auth";
 
 // ============================================================================
 // MOCK API FUNCTIONS (replace with real API calls)
@@ -44,24 +45,34 @@ async function completeDiscovery(userId: string): Promise<void> {
 // DISCOVER PAGE COMPONENT
 // ============================================================================
 
-type DiscoveryState = "loading" | "active" | "complete";
+type DiscoveryState = "checking_auth" | "auth_required" | "loading" | "active" | "complete";
 
 const Discover = () => {
   const navigate = useNavigate();
 
   // Core state
-  const [state, setState] = useState<DiscoveryState>("loading");
+  const [state, setState] = useState<DiscoveryState>("checking_auth");
   const [profiles, setProfiles] = useState<DiscoveryProfile[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedTraitIds, setSelectedTraitIds] = useState<string[]>([]);
   const [submissions, setSubmissions] = useState<TraitSelection[]>([]);
+  const [viewerUserId, setViewerUserId] = useState<string>("current-user-id");
 
-  // Mock user ID (replace with real auth)
-  const viewerUserId = "current-user-id";
-
-  // Fetch profiles on mount
+  // Check auth and fetch profiles on mount
   useEffect(() => {
-    const load = async () => {
+    const init = async () => {
+      // First check authentication
+      const profile = await getUserProfile();
+      
+      if (!profile || !profile.email) {
+        setState("auth_required");
+        return;
+      }
+      
+      setViewerUserId(profile.userId);
+      setState("loading");
+      
+      // Then fetch profiles
       try {
         const fetched = await fetchDiscoveryProfiles();
         setProfiles(fetched);
@@ -70,7 +81,7 @@ const Discover = () => {
         console.error("Failed to fetch profiles:", err);
       }
     };
-    load();
+    init();
   }, []);
 
   // Current profile
@@ -138,6 +149,50 @@ const Discover = () => {
   // ============================================================================
   // RENDER
   // ============================================================================
+
+  // Show loading while checking auth
+  if (state === "checking_auth") {
+    return (
+      <div className="min-h-screen bg-gradient-midnight flex items-center justify-center">
+        <SparkleBackground />
+        <div className="relative z-10 text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth required screen
+  if (state === "auth_required") {
+    return (
+      <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+        <SparkleBackground />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 w-full max-w-sm"
+        >
+          <div className="glass rounded-2xl p-6 text-center border border-destructive/20">
+            <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <h2 className="font-display text-xl font-bold mb-2">Sign In Required</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              You need to sign in to discover profiles.
+            </p>
+            <Button 
+              variant="gold" 
+              className="w-full"
+              onClick={() => navigate("/auth")}
+            >
+              Go to Sign In
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">

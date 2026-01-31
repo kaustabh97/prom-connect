@@ -10,21 +10,33 @@ and "delete" any "Todo" records.
 const schema = a.schema({
   UserProfile: a
     .model({
+      // Basic info
       email: a.string().required(),
       name: a.string(),
       mobileNo: a.string(),
       age: a.integer(),
       gender: a.string(),
-      sexuality: a.string(),
+      sexualOrientation: a.string(),
       bio: a.string(),
       profilePicKey: a.string(), // Reference to the file in S3
+      
+      // Interests/tags
+      tags: a.string().array(),
+      
+      // Lifestyle preferences
+      alcoholPreference: a.string(),
+      smokingPreference: a.string(),
+      foodPreference: a.string(),
+      favouritePlace: a.string(),
+      teaOrCoffee: a.string(),
+      mountainOrBeach: a.string(),
+      
+      // Profile completion status
+      onboardingCompleted: a.boolean(),
     })
     .authorization((allow) => [
-      // // Allow the owner to manage their own profile
-      // allow.owner(),
-      // // Allow other signed-in users to read profiles
-      // allow.authenticated().to(['read'])
-      allow.guest()
+      // Allow public access via API key (for development)
+      allow.publicApiKey(),
     ]),
 });
 
@@ -32,7 +44,10 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'userPool',
+    defaultAuthorizationMode: 'apiKey',
+    apiKeyAuthorizationMode: {
+      expiresInDays: 30,
+    },
   },
 });
 

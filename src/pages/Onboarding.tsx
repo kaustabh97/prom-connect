@@ -9,7 +9,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { logUserProfile } from "@/utils/auth";
+import { getUserProfile } from "@/utils/auth";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -18,8 +18,10 @@ import {
   User,
   Heart,
   MessageCircle,
-  Camera,
-  X
+  X,
+  Lock,
+  Shield,
+  AlertTriangle
 } from "lucide-react";
 
 import { Amplify } from "aws-amplify";
@@ -28,22 +30,27 @@ import "@aws-amplify/ui-react/styles.css";
 
 Amplify.configure(outputs);
 
-type OnboardingStep = "type" | "basics" | "interests" | "prompts" | "preferences" | "photos" | "complete";
+type OnboardingStep = "type" | "basics" | "interests" | "prompts" | "complete";
+
+interface LifestyleAnswers {
+  alcohol: string;
+  smoking: string;
+  food: string;
+  favouritePlace: string;
+  teaOrCoffee: string;
+  mountainOrBeach: string;
+}
 
 interface ProfileData {
   type: "individual" | "couple";
   name: string;
   partnerName?: string;
+  age: number;
   gender: string;
-  sexuality: string[];
+  sexualOrientation: string;
   bio: string;
   tags: string[];
-  prompts: { question: string; answer: string }[];
-  preferences: {
-    extrovert: number;
-    hangoutTime: string;
-    lifestyle: string[];
-  };
+  lifestyle: LifestyleAnswers;
 }
 
 const availableTags = [
@@ -52,12 +59,13 @@ const availableTags = [
   "Sports", "Cooking", "Tech", "Finance", "Consulting", "Startups"
 ];
 
-const prompts = [
-  "Best place in IIMA is...",
-  "One thing I love is...",
-  "My ideal weekend looks like...",
-  "A song that defines me...",
-  "Two truths and a lie about me...",
+const lifestyleQuestions: { key: keyof LifestyleAnswers; question: string; options: string[] }[] = [
+  { key: "alcohol", question: "Alcohol?", options: ["Sometimes", "Regularly", "Never"] },
+  { key: "smoking", question: "Smoking?", options: ["Sometimes", "Regularly", "Never"] },
+  { key: "food", question: "Food preference?", options: ["Veg", "Non-Veg", "Eggetarian"] },
+  { key: "favouritePlace", question: "Favourite place in IIMA?", options: ["Library", "Tea Post", "LKP", "CR", "Sports Complex"] },
+  { key: "teaOrCoffee", question: "Tea or Coffee?", options: ["Tea", "Coffee", "Both"] },
+  { key: "mountainOrBeach", question: "Mountain or Beach?", options: ["Mountain", "Beach", "Both"] },
 ];
 
 const client = generateClient<Schema>();
@@ -67,66 +75,109 @@ const Onboarding = () => {
   const [searchParams] = useSearchParams();
   const initialType = searchParams.get("type") as "individual" | "couple" | null;
   
-  // When arriving from Google/Cognito (code + state in URL), log the signed-in user details once
-  useEffect(() => {
-    const maybeLogUser = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const state = params.get("state");
+  // Auth state
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-      if (code || state) {
-        console.log("Onboarding: detected OAuth callback, logging user profile...");
-        await logUserProfile();
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsCheckingAuth(true);
+      try {
+        const profile = await getUserProfile();
+        
+        if (profile && profile.email) {
+          setIsAuthenticated(true);
+          setUserEmail(profile.email);
+          console.log("User authenticated:", profile.email);
+        } else {
+          setIsAuthenticated(false);
+          setShowAuthModal(true);
+        }
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setIsAuthenticated(false);
+        setShowAuthModal(true);
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
 
-    void maybeLogUser();
+    checkAuth();
   }, []);
 
-  const [step, setStep] = useState<OnboardingStep>(initialType ? "basics" : "type");
+  const [step, setStep] = useState<OnboardingStep>("type");
   const [profile, setProfile] = useState<ProfileData>({
-    type: initialType || "individual",
+    type: "individual",
     name: "",
+    age: 25,
     gender: "",
-    sexuality: [],
+    sexualOrientation: "",
     bio: "",
     tags: [],
-    prompts: [{ question: prompts[0], answer: "" }, { question: prompts[1], answer: "" }],
-    preferences: {
-      extrovert: 50,
-      hangoutTime: "",
-      lifestyle: [],
+    lifestyle: {
+      alcohol: "",
+      smoking: "",
+      food: "",
+      favouritePlace: "",
+      teaOrCoffee: "",
+      mountainOrBeach: "",
     },
   });
 
   const steps: OnboardingStep[] = profile.type === "couple" 
     ? ["type", "basics", "complete"]
-    : ["type", "basics", "interests", "prompts", "preferences", "complete"];
+    : ["type", "basics", "interests", "prompts", "complete"];
 
   const currentStepIndex = steps.indexOf(step);
   const progress = ((currentStepIndex) / (steps.length - 1)) * 100;
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const nextStep = async () => {
     const nextIndex = currentStepIndex + 1;
+    
     // When moving into the final "complete" step for individuals,
-    // persist the profile to the Amplify backend.
-    if (nextIndex === 5 && profile.type === "individual") {
+    // persist the full profile to the Amplify backend.
+    if (nextIndex === 4 && profile.type === "individual") {
+      setIsSaving(true);
       try {
-        const session = await fetchAuthSession();
-        const email =
-          (session.tokens?.idToken?.payload.email as string | undefined) ??
-          "unknown@iima.ac.in";
+        // Use the email from authenticated user
+        const email = userEmail || "unknown@iima.ac.in";
+
+        console.log("Creating profile in the backend for:", email);
 
         await client.models.UserProfile.create({
+          // Basic info
           email,
           name: profile.name,
+          age: profile.age,
           gender: profile.gender,
           bio: profile.bio,
-          sexuality: profile.sexuality,
+          sexualOrientation: profile.sexualOrientation,
+          
+          // Interests/tags
+          tags: profile.tags,
+          
+          // Lifestyle preferences
+          alcoholPreference: profile.lifestyle.alcohol,
+          smokingPreference: profile.lifestyle.smoking,
+          foodPreference: profile.lifestyle.food,
+          favouritePlace: profile.lifestyle.favouritePlace,
+          teaOrCoffee: profile.lifestyle.teaOrCoffee,
+          mountainOrBeach: profile.lifestyle.mountainOrBeach,
+          
+          // Mark onboarding as complete
+          onboardingCompleted: true,
         });
+        
+        console.log("Profile saved successfully!");
       } catch (error) {
-        // For now, just log; can be replaced with toast UI
         console.error("Failed to save user profile", error);
+      } finally {
+        setIsSaving(false);
       }
     }
 
@@ -151,14 +202,6 @@ const Onboarding = () => {
     }));
   };
 
-  const toggleSexuality = (option: string) => {
-    setProfile(prev => ({
-      ...prev,
-      sexuality: prev.sexuality.includes(option)
-        ? prev.sexuality.filter(s => s !== option)
-        : [...prev.sexuality, option]
-    }));
-  };
 
   const renderStep = () => {
     switch (step) {
@@ -221,15 +264,19 @@ const Onboarding = () => {
           >
             <div className="text-center mb-8">
               <h2 className="font-display text-2xl font-bold mb-2">Tell us about yourself</h2>
-              <p className="text-muted-foreground">This info stays private until you reveal</p>
+              <p className="text-muted-foreground flex items-center justify-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                This info stays private until you reveal
+              </p>
             </div>
 
             <div className="space-y-4">
+              {/* 1. Name */}
               <div>
-                <Label htmlFor="name">Your Name</Label>
+                <Label htmlFor="name">Name</Label>
                 <Input
                   id="name"
-                  placeholder="Enter your full name"
+                  placeholder="Enter your name"
                   value={profile.name}
                   onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
                   className="mt-1.5"
@@ -249,10 +296,28 @@ const Onboarding = () => {
                 </div>
               )}
 
+              {/* 2. Age */}
               <div>
-                <Label>Gender Identity</Label>
+                <Label>Age: <span className="text-primary font-semibold">{profile.age}</span></Label>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-xs text-muted-foreground">21</span>
+                  <input
+                    type="range"
+                    min={21}
+                    max={45}
+                    value={profile.age}
+                    onChange={(e) => setProfile(prev => ({ ...prev, age: parseInt(e.target.value) }))}
+                    className="flex-1 accent-primary"
+                  />
+                  <span className="text-xs text-muted-foreground">45</span>
+                </div>
+              </div>
+
+              {/* 3. Gender */}
+              <div>
+                <Label>Gender</Label>
                 <div className="grid grid-cols-3 gap-2 mt-1.5">
-                  {["Woman", "Man", "Non-binary"].map((g) => (
+                  {["Woman", "Man", "Non-Binary"].map((g) => (
                     <button
                       key={g}
                       onClick={() => setProfile(prev => ({ ...prev, gender: g }))}
@@ -268,27 +333,29 @@ const Onboarding = () => {
                 </div>
               </div>
 
+              {/* 4. Sexual Orientation (only for individuals) */}
               {profile.type === "individual" && (
                 <div>
-                  <Label>Interested in</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-1.5">
-                    {["Women", "Men", "Everyone"].map((s) => (
+                  <Label>Sexual Orientation</Label>
+                  <div className="grid grid-cols-2 gap-2 mt-1.5">
+                    {["Straight", "Gay", "Bisexual", "Other"].map((orientation) => (
                       <button
-                        key={s}
-                        onClick={() => toggleSexuality(s)}
+                        key={orientation}
+                        onClick={() => setProfile(prev => ({ ...prev, sexualOrientation: orientation }))}
                         className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                          profile.sexuality.includes(s)
+                          profile.sexualOrientation === orientation
                             ? "bg-secondary text-secondary-foreground"
                             : "glass hover:bg-card/70"
                         }`}
                       >
-                        {s}
+                        {orientation}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
 
+              {/* 5. Short Bio */}
               <div>
                 <Label htmlFor="bio">Short Bio</Label>
                 <Textarea
@@ -302,7 +369,12 @@ const Onboarding = () => {
               </div>
             </div>
 
-            <Button variant="gold" className="w-full" onClick={nextStep} disabled={!profile.name || !profile.gender}>
+            <Button 
+              variant="gold" 
+              className="w-full" 
+              onClick={nextStep} 
+              disabled={!profile.name || !profile.gender || (profile.type === "individual" && !profile.sexualOrientation)}
+            >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -319,7 +391,10 @@ const Onboarding = () => {
           >
             <div className="text-center mb-8">
               <h2 className="font-display text-2xl font-bold mb-2">What are you into?</h2>
-              <p className="text-muted-foreground">Pick up to 6 interests (shown anonymously)</p>
+              <p className="text-muted-foreground flex items-center justify-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                Shown anonymously on your profile
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -350,6 +425,10 @@ const Onboarding = () => {
         );
 
       case "prompts":
+        const allLifestyleAnswered = lifestyleQuestions.every(
+          (q) => profile.lifestyle[q.key] !== ""
+        );
+        
         return (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -357,26 +436,39 @@ const Onboarding = () => {
             exit={{ opacity: 0, x: -20 }}
             className="space-y-6"
           >
-            <div className="text-center mb-8">
+            <div className="text-center mb-6">
               <MessageCircle className="w-10 h-10 text-primary mx-auto mb-3" />
               <h2 className="font-display text-2xl font-bold mb-2">Share a bit more</h2>
-              <p className="text-muted-foreground">These answers appear on your anonymous card</p>
+              <p className="text-muted-foreground flex items-center justify-center gap-1.5">
+                <Shield className="w-3.5 h-3.5" />
+                Your preferences are securely stored
+              </p>
             </div>
 
             <div className="space-y-4">
-              {profile.prompts.map((prompt, idx) => (
-                <div key={idx}>
-                  <Label>{prompt.question}</Label>
-                  <Input
-                    placeholder="Your answer..."
-                    value={prompt.answer}
-                    onChange={(e) => {
-                      const newPrompts = [...profile.prompts];
-                      newPrompts[idx].answer = e.target.value;
-                      setProfile(prev => ({ ...prev, prompts: newPrompts }));
-                    }}
-                    className="mt-1.5"
-                  />
+              {lifestyleQuestions.map((q) => (
+                <div key={q.key}>
+                  <Label className="text-sm">{q.question}</Label>
+                  <div className={`grid gap-2 mt-1.5 ${q.options.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                    {q.options.map((option) => (
+                      <button
+                        key={option}
+                        onClick={() =>
+                          setProfile((prev) => ({
+                            ...prev,
+                            lifestyle: { ...prev.lifestyle, [q.key]: option },
+                          }))
+                        }
+                        className={`p-2.5 rounded-xl text-sm font-medium transition-all ${
+                          profile.lifestyle[q.key] === option
+                            ? "bg-primary text-primary-foreground"
+                            : "glass hover:bg-card/70"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -385,74 +477,25 @@ const Onboarding = () => {
               variant="gold" 
               className="w-full" 
               onClick={nextStep}
-              disabled={!profile.prompts.every(p => p.answer.length > 0)}
+              disabled={!allLifestyleAnswered || isSaving}
             >
-              Continue
-              <ArrowRight className="w-4 h-4 ml-2" />
+              {isSaving ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Finish Setup
+                  <Check className="w-4 h-4 ml-2" />
+                </>
+              )}
             </Button>
-          </motion.div>
-        );
-
-      case "preferences":
-        return (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-6"
-          >
-            <div className="text-center mb-8">
-              <h2 className="font-display text-2xl font-bold mb-2">A few preferences</h2>
-              <p className="text-muted-foreground">Helps us find compatible matches</p>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <Label className="mb-3 block">How social are you?</Label>
-                <div className="flex justify-between text-sm text-muted-foreground mb-2">
-                  <span>Introvert</span>
-                  <span>Extrovert</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={profile.preferences.extrovert}
-                  onChange={(e) => setProfile(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, extrovert: parseInt(e.target.value) }
-                  }))}
-                  className="w-full accent-primary"
-                />
-              </div>
-
-              <div>
-                <Label>Preferred hangout time</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1.5">
-                  {["Morning person", "Night owl", "Whenever", "Weekends only"].map((time) => (
-                    <button
-                      key={time}
-                      onClick={() => setProfile(prev => ({
-                        ...prev,
-                        preferences: { ...prev.preferences, hangoutTime: time }
-                      }))}
-                      className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                        profile.preferences.hangoutTime === time
-                          ? "bg-primary text-primary-foreground"
-                          : "glass hover:bg-card/70"
-                      }`}
-                    >
-                      {time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <Button variant="gold" className="w-full" onClick={nextStep}>
-              Finish Setup
-              <Check className="w-4 h-4 ml-2" />
-            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center mt-3 flex items-center justify-center gap-1">
+              <Shield className="w-3 h-3" />
+              Your data is encrypted and secure
+            </p>
           </motion.div>
         );
 
@@ -491,6 +534,50 @@ const Onboarding = () => {
         );
     }
   };
+
+  // Show loading while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-midnight flex items-center justify-center">
+        <SparkleBackground />
+        <div className="relative z-10 text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth required modal
+  if (showAuthModal || !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+        <SparkleBackground />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="relative z-10 w-full max-w-sm"
+        >
+          <div className="glass rounded-2xl p-6 text-center border border-destructive/20">
+            <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <h2 className="font-display text-xl font-bold mb-2">Sign In Required</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              You need to sign in with your IIMA account to continue with onboarding.
+            </p>
+            <Button 
+              variant="gold" 
+              className="w-full"
+              onClick={() => navigate("/auth")}
+            >
+              Go to Sign In
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
