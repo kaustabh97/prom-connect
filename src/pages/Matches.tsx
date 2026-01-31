@@ -79,7 +79,7 @@ const Matches = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex">
       <SparkleBackground />
 
       {/* Sidebar - Match List */}

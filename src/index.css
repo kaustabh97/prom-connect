@@ -262,6 +262,11 @@
   }
 }
 
+/* Mobile viewport height fix */
+.min-h-dvh {
+  min-height: 100dvh;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

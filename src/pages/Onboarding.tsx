@@ -538,7 +538,7 @@ const Onboarding = () => {
   // Show loading while checking auth
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-gradient-midnight flex items-center justify-center">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center">
         <SparkleBackground />
         <div className="relative z-10 text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -551,7 +551,7 @@ const Onboarding = () => {
   // Show auth required modal
   if (showAuthModal || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
         <SparkleBackground />
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -580,10 +580,10 @@ const Onboarding = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
       <SparkleBackground />
 
-      <div className="relative z-10 min-h-screen flex flex-col">
+      <div className="relative z-10 min-h-dvh flex flex-col">
         {/* Header */}
         <header className="p-4 flex items-center justify-between">
           <div className="flex-1">

@@ -153,7 +153,7 @@ const Discover = () => {
   // Show loading while checking auth
   if (state === "checking_auth") {
     return (
-      <div className="min-h-screen bg-gradient-midnight flex items-center justify-center">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center">
         <SparkleBackground />
         <div className="relative z-10 text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -166,7 +166,7 @@ const Discover = () => {
   // Show auth required screen
   if (state === "auth_required") {
     return (
-      <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
         <SparkleBackground />
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -195,10 +195,10 @@ const Discover = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
       <SparkleBackground />
 
-      <div className="relative z-10 min-h-screen flex flex-col max-w-[400px] mx-auto px-4 pt-5 pb-6">
+      <div className="relative z-10 min-h-dvh flex flex-col max-w-[400px] mx-auto px-4 pt-5 pb-6">
         {/* Header */}
         <header className="mb-4">
           <h1 className="font-display text-xl font-bold text-foreground">

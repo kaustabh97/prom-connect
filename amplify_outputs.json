@@ -1,0 +1,241 @@
+{
+  "auth": {
+    "user_pool_id": "ap-south-1_hde4yOYTQ",
+    "aws_region": "ap-south-1",
+    "user_pool_client_id": "5j8h8vg743t2sm8b227elo3ubk",
+    "identity_pool_id": "ap-south-1:7fc5e911-4f8c-46df-86a2-5c91660697c7",
+    "mfa_methods": [],
+    "standard_required_attributes": [
+      "email"
+    ],
+    "username_attributes": [
+      "email"
+    ],
+    "user_verification_types": [
+      "email"
+    ],
+    "groups": [],
+    "mfa_configuration": "NONE",
+    "password_policy": {
+      "min_length": 8,
+      "require_lowercase": true,
+      "require_numbers": true,
+      "require_symbols": true,
+      "require_uppercase": true
+    },
+    "oauth": {
+      "identity_providers": [
+        "GOOGLE"
+      ],
+      "redirect_sign_in_uri": [
+        "http://localhost:8080/onboarding",
+        "https://your-production-url.com/",
+        "https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse"
+      ],
+      "redirect_sign_out_uri": [
+        "http://localhost:8080/",
+        "http://localhost:8080/auth",
+        "https://your-production-url.com/"
+      ],
+      "response_type": "code",
+      "scopes": [
+        "phone",
+        "email",
+        "openid",
+        "profile",
+        "aws.cognito.signin.user.admin"
+      ],
+      "domain": "f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com"
+    },
+    "unauthenticated_identities_enabled": true
+  },
+  "data": {
+    "url": "https://6pngnpappnb7dnzqbksqh34dju.appsync-api.ap-south-1.amazonaws.com/graphql",
+    "aws_region": "ap-south-1",
+    "api_key": "da2-iapjjyauvfhrdbu26uyn3otf3i",
+    "default_authorization_type": "API_KEY",
+    "authorization_types": [
+      "AMAZON_COGNITO_USER_POOLS",
+      "AWS_IAM"
+    ],
+    "model_introspection": {
+      "version": 1,
+      "models": {
+        "UserProfile": {
+          "name": "UserProfile",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "email": {
+              "name": "email",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "name": {
+              "name": "name",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "mobileNo": {
+              "name": "mobileNo",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "age": {
+              "name": "age",
+              "isArray": false,
+              "type": "Int",
+              "isRequired": false,
+              "attributes": []
+            },
+            "gender": {
+              "name": "gender",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "sexualOrientation": {
+              "name": "sexualOrientation",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "bio": {
+              "name": "bio",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "profilePicKey": {
+              "name": "profilePicKey",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "tags": {
+              "name": "tags",
+              "isArray": true,
+              "type": "String",
+              "isRequired": false,
+              "attributes": [],
+              "isArrayNullable": true
+            },
+            "alcoholPreference": {
+              "name": "alcoholPreference",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "smokingPreference": {
+              "name": "smokingPreference",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "foodPreference": {
+              "name": "foodPreference",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "favouritePlace": {
+              "name": "favouritePlace",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "teaOrCoffee": {
+              "name": "teaOrCoffee",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "mountainOrBeach": {
+              "name": "mountainOrBeach",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "onboardingCompleted": {
+              "name": "onboardingCompleted",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": false,
+              "attributes": []
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "UserProfiles",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        }
+      },
+      "enums": {},
+      "nonModels": {}
+    }
+  },
+  "version": "1.4"
+}

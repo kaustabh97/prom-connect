@@ -33,11 +33,11 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
       <SparkleBackground />
       
       {/* Hero Section */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20">
+      <section className="relative min-h-dvh flex flex-col items-center justify-center px-4 py-8 md:py-20">
         {/* Floating decorative elements */}
         <motion.div
           className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl"
