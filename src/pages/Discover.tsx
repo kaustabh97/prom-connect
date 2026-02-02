@@ -18,28 +18,54 @@ export default function Discover() {
   const [loading, setLoading] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { filters, setFilters } = useFilters();
-  const { recordSwipe, hasPassed, hasLiked } = useMatch();
+  const { recordSwipe, hasPassed, hasLiked, tick } = useMatch();
   const scrollRef = useScrollWheel();
 
   // Load and filter profiles (deterministic per session)
   useEffect(() => {
+    console.log("[Discover] Filtering profiles:", {
+      filters,
+      totalMockProfiles: MOCK_DISCOVERY_PROFILES_FULL.length,
+    });
     setLoading(true);
     const filtered = applyFilters(MOCK_DISCOVERY_PROFILES_FULL, filters);
+    console.log("[Discover] Filtered profiles:", {
+      count: filtered.length,
+      profileIds: filtered.map(p => p.id),
+    });
     setProfiles(filtered);
     setLoading(false);
+    console.log("[Discover] Profiles loaded, loading set to false");
   }, [filters]);
 
   // Queue: exclude already passed/liked so we don't show them again
-  const displayQueue = useMemo(
-    () =>
-      profiles.filter(
-        (p) => !hasPassed(p.id) && !hasLiked(p.id)
-      ),
-    [profiles, hasPassed, hasLiked]
-  );
+  // Include 'tick' in dependencies so queue recomputes when swipes are recorded
+  const displayQueue = useMemo(() => {
+    const filtered = profiles.filter(
+      (p) => !hasPassed(p.id) && !hasLiked(p.id)
+    );
+    console.log("[Discover] displayQueue computed:", {
+      inputProfilesCount: profiles.length,
+      outputQueueCount: filtered.length,
+      excludedCount: profiles.length - filtered.length,
+      queueProfileIds: filtered.map(p => p.id),
+      excludedProfileIds: profiles
+        .filter(p => hasPassed(p.id) || hasLiked(p.id))
+        .map(p => p.id),
+      tick, // Log tick to verify it's changing
+    });
+    return filtered;
+  }, [profiles, hasPassed, hasLiked, tick]);
 
   const handleSwipe = (profileId: string, action: "like" | "pass") => {
+    console.log("[Discover] handleSwipe called:", {
+      profileId,
+      action,
+      displayQueueCount: displayQueue.length,
+      currentTopProfile: displayQueue[0]?.id,
+    });
     recordSwipe(profileId, action);
+    console.log("[Discover] handleSwipe complete - queue will update on next render");
   };
 
   return (

@@ -1,7 +1,7 @@
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import SwipeCard, { type SwipeCardHandle } from "./SwipeCard";
+import SwipeCard from "./SwipeCard";
 import type { DiscoveryProfileFull } from "@/lib/dating";
 import { Heart, X, Filter } from "lucide-react";
 
@@ -16,32 +16,25 @@ export default function DiscoverFeed({
   onSwipe,
   onOpenFilters,
 }: DiscoverFeedProps) {
-  const topCardRef = useRef<SwipeCardHandle>(null);
-  const topProfile = profiles[0] ?? null;
-  const nextProfile = profiles[1] ?? null;
+  const currentProfile = profiles[0] ?? null;
 
   const handleSwipe = useCallback(
     (action: "like" | "pass") => {
-      if (!topProfile) return;
-      topCardRef.current?.triggerSwipe(action);
+      if (!currentProfile) return;
+      console.log("[DiscoverFeed] Button clicked:", {
+        action,
+        profileId: currentProfile.id,
+        profileName: currentProfile.name,
+      });
+      // Immediately remove profile from queue
+      onSwipe(currentProfile.id, action);
     },
-    [topProfile]
-  );
-
-  const onSwipeCallback = useCallback(
-    (action: "like" | "pass") => {
-      if (topProfile) onSwipe(topProfile.id, action);
-    },
-    [topProfile, onSwipe]
+    [currentProfile, onSwipe]
   );
 
   if (profiles.length === 0) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center flex-1 py-12 px-4"
-      >
+      <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
         <p className="text-muted-foreground text-center">
           No more profiles right now. Try adjusting your filters.
         </p>
@@ -49,70 +42,39 @@ export default function DiscoverFeed({
           <Filter className="w-8 h-4 mr-2" />
           Filters
         </Button>
-      </motion.div>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Card stack: height from top card (in flow); next card absolute behind */}
+      {/* Card display */}
       <div className="relative min-h-[400px] mx-2">
-        {nextProfile && (
-          <motion.div
-            initial={false}
-            className="absolute inset-0 top-2 left-2 right-2 bottom-2 rounded-2xl overflow-hidden bg-card border border-border opacity-90 scale-95"
-            style={{ zIndex: 0 }}
-          >
-            <div className="absolute inset-0 bg-muted flex items-center justify-center">
-              {nextProfile.photoUrls?.[0] ? (
-                <img
-                  src={nextProfile.photoUrls[0]}
-                  alt=""
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : (
-                <span className="text-2xl font-display text-primary/40">
-                  {nextProfile.name.charAt(0)}
-                </span>
-              )}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 p-3 text-white bg-gradient-to-t from-black/60 to-transparent">
-              <p className="font-semibold text-sm">
-                {nextProfile.name}, {nextProfile.age}
-              </p>
-            </div>
-          </motion.div>
-        )}
-
+        {/* Current profile card with fade transition */}
         <AnimatePresence mode="wait">
-          {topProfile && (
+          {currentProfile && (
             <motion.div
-              key={topProfile.id}
-              initial={false}
+              key={currentProfile.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="relative w-full"
-              style={{ zIndex: 1 }}
             >
-              <SwipeCard
-                ref={topCardRef}
-                profile={topProfile}
-                onSwipe={onSwipeCallback}
-                isTop
-              />
+              <SwipeCard profile={currentProfile} isTop />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
+      {/* Like / Pass buttons */}
       <div className="flex items-center justify-center gap-6 py-4 px-4">
         <Button
           variant="outline"
           size="icon"
           className="h-14 w-14 rounded-full border-2 border-muted-foreground/50 hover:border-red-500 hover:bg-red-500/10"
           onClick={() => handleSwipe("pass")}
-          disabled={!topProfile}
+          disabled={!currentProfile}
         >
           <X className="w-7 h-7 text-muted-foreground" />
         </Button>
@@ -121,7 +83,7 @@ export default function DiscoverFeed({
           size="icon"
           className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90"
           onClick={() => handleSwipe("like")}
-          disabled={!topProfile}
+          disabled={!currentProfile}
         >
           <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
         </Button>
