@@ -88,7 +88,6 @@ export default function Discover() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { filters, setFilters } = useFilters();
   const { recordSwipe, hasPassed, hasLiked, tick } = useMatch();
-  const { recordSwipe, hasPassed, hasLiked, tick } = useMatch();
   const scrollRef = useScrollWheel();
 
   // Fetch profiles from backend

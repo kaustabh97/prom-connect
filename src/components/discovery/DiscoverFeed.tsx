@@ -51,7 +51,6 @@ export default function DiscoverFeed({
   if (profiles.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
-      <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
         <p className="text-muted-foreground text-center">
           No more profiles right now. Try adjusting your filters.
         </p>
@@ -59,7 +58,6 @@ export default function DiscoverFeed({
           <Filter className="w-8 h-4 mr-2" />
           Filters
         </Button>
-      </div>
       </div>
     );
   }
@@ -70,7 +68,6 @@ export default function DiscoverFeed({
       <div className="relative flex-1 min-h-0">
         {/* Current profile card with fade transition */}
         <AnimatePresence mode="wait">
-          {currentProfile && (
           {currentProfile && (
             <motion.div
               key={currentProfile.id}
