@@ -1,9 +1,9 @@
 {
   "auth": {
-    "user_pool_id": "ap-south-1_hde4yOYTQ",
+    "user_pool_id": "ap-south-1_mSTuaOE5H",
     "aws_region": "ap-south-1",
-    "user_pool_client_id": "5j8h8vg743t2sm8b227elo3ubk",
-    "identity_pool_id": "ap-south-1:7fc5e911-4f8c-46df-86a2-5c91660697c7",
+    "user_pool_client_id": "45152desh0tiej81916rniiban",
+    "identity_pool_id": "ap-south-1:42e87474-a899-4830-aba4-a66d11fa1679",
     "mfa_methods": [],
     "standard_required_attributes": [
       "email"
@@ -29,13 +29,12 @@
       ],
       "redirect_sign_in_uri": [
         "http://localhost:8080/onboarding",
-        "https://your-production-url.com/",
+        "http://localhost:8080/auth",
         "https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse"
       ],
       "redirect_sign_out_uri": [
         "http://localhost:8080/",
-        "http://localhost:8080/auth",
-        "https://your-production-url.com/"
+        "http://localhost:8080/auth"
       ],
       "response_type": "code",
       "scopes": [
@@ -50,9 +49,9 @@
     "unauthenticated_identities_enabled": true
   },
   "data": {
-    "url": "https://6pngnpappnb7dnzqbksqh34dju.appsync-api.ap-south-1.amazonaws.com/graphql",
+    "url": "https://dsutdwvrlbfsbnbk3ynu2n53dm.appsync-api.ap-south-1.amazonaws.com/graphql",
     "aws_region": "ap-south-1",
-    "api_key": "da2-iapjjyauvfhrdbu26uyn3otf3i",
+    "api_key": "da2-rbl735vzcvgrxg7prub3jz3pgq",
     "default_authorization_type": "API_KEY",
     "authorization_types": [
       "AMAZON_COGNITO_USER_POOLS",

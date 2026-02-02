@@ -23,7 +23,7 @@ const schema = a.schema({
       // Interests/tags
       tags: a.string().array(),
       
-      // Lifestyle preferences
+      // Lifestyle preferences (non-negotiables)
       alcoholPreference: a.string(),
       smokingPreference: a.string(),
       foodPreference: a.string(),
@@ -35,9 +35,24 @@ const schema = a.schema({
       onboardingCompleted: a.boolean(),
     })
     .authorization((allow) => [
-      // Allow public access via API key (for development)
       allow.publicApiKey(),
     ]),
+
+  /** Like: user A liked user B */
+  Like: a
+    .model({
+      fromUserId: a.string().required(),
+      toUserId: a.string().required(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  /** Match: mutual like */
+  Match: a
+    .model({
+      user1Id: a.string().required(),
+      user2Id: a.string().required(),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

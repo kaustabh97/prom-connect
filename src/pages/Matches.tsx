@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
-import NavBar from "@/components/NavBar";
 import PromAsk from "@/components/PromAsk";
 import { 
   Heart, 
@@ -82,7 +81,6 @@ const Matches = () => {
   return (
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
-      <NavBar />
 
       <div className="flex-1 flex relative z-10">
 
@@ -92,7 +90,7 @@ const Matches = () => {
         <header className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between mb-4">
             <h1 className="font-display text-2xl font-bold">Matches</h1>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/discover")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
               <Sparkles className="w-5 h-5" />
             </Button>
           </div>

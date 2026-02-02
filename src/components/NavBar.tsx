@@ -29,7 +29,7 @@ const NavBar = ({ showBackButton, onBack, title }: NavBarProps) => {
   };
 
   const navItems = [
-    { path: "/discover", label: "Discover", icon: Compass },
+    { path: "/discover/profile", label: "Discover", icon: Compass },
     { path: "/matches", label: "Matches", icon: Users },
   ];
 

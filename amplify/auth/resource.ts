@@ -18,13 +18,13 @@ export const auth = defineAuth({
       callbackUrls: [
         'http://localhost:8080/onboarding',
         'http://localhost:8080/auth',
-        'https://main.d1emd9gkgd3wf8.amplifyapp.com/onboarding',
+        // 'https://main.d1emd9gkgd3wf8.amplifyapp.com/onboarding',
         'https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse'
       ],
       logoutUrls: [
         'http://localhost:8080/',
         'http://localhost:8080/auth',
-        'https://main.d1emd9gkgd3wf8.amplifyapp.com'
+        // 'https://main.d1emd9gkgd3wf8.amplifyapp.com'
       ],
     },
   },

@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import SparkleBackground from "@/components/SparkleBackground";
-import NavBar from "@/components/NavBar";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -526,7 +525,7 @@ const Onboarding = () => {
             <Button 
               variant="gold" 
               size="lg" 
-              onClick={() => navigate(profile.type === "couple" ? "/" : "/discover")}
+              onClick={() => navigate(profile.type === "couple" ? "/" : "/discover/profile")}
             >
               {profile.type === "couple" ? "Done" : "Start Discovering"}
               <ArrowRight className="w-5 h-5 ml-2" />
@@ -583,7 +582,6 @@ const Onboarding = () => {
   return (
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
-      <NavBar />
 
       <div className="relative z-10 flex-1 flex flex-col">
         {/* Step Header */}

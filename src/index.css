@@ -267,6 +267,22 @@
   min-height: 100dvh;
 }
 
+/* Scrollable areas: trackpad + touch scroll (vertical) */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+
+/* Safe area for bottom nav (notch/home indicator) */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Reserve space so page content never overlaps the fixed bottom nav (h-16 + safe area) */
+.content-above-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
