@@ -10,6 +10,8 @@ import Onboarding from "./pages/Onboarding";
 import Discover from "./pages/Discover";
 import FullProfileView from "./pages/FullProfileView";
 import Matches from "./pages/Matches";
+import TestChat from "./pages/TestChat";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 import { Amplify } from "aws-amplify";
@@ -35,7 +37,10 @@ const App = () => (
             <Route path="/discover/profile" element={<Discover />} />
             <Route path="/discover/profile/:profileId" element={<FullProfileView />} />
             <Route path="/matches" element={<Matches />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
+          <Route path="/test-chat" element={<TestChat />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

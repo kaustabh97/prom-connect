@@ -1,5 +1,7 @@
 import { forwardRef } from "react";
+import { forwardRef } from "react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
+import { Coffee, Mountain, Utensils, Wine, Cigarette, MapPin } from "lucide-react";
 import { Coffee, Mountain, Utensils, Wine, Cigarette, MapPin } from "lucide-react";
 
 interface SwipeCardProps {
@@ -25,6 +27,8 @@ function AttributeChip({
 
 const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
   function SwipeCard({ profile, isTop }, ref) {
+const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
+  function SwipeCard({ profile, isTop }, ref) {
     const mainPhoto = profile.photoUrls?.[0];
 
     const aboutChips: { icon?: React.ElementType; label: string }[] = [];
@@ -38,12 +42,12 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
     if (profile.favouritePlace) aboutChips.push({ icon: MapPin, label: profile.favouritePlace });
 
     return (
-      <div ref={ref} className="relative w-full">
-        <div className="relative w-full rounded-2xl overflow-hidden bg-background border border-border shadow-float min-h-0">
+      <div ref={ref} className="relative w-full h-full flex flex-col min-h-[600px]">
+        <div className="relative w-full h-full rounded-2xl overflow-hidden bg-background border border-border shadow-float flex flex-col">
           {/* Single flow: photo + content (page scrolls, no inner scroll) */}
-          <div className="min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
             {/* Hero photo - flows with content */}
-            <div className="relative aspect-[4/5] w-full bg-muted shrink-0">
+            <div className="relative aspect-[4/5] w-full bg-muted shrink-0 min-h-[400px]">
               {mainPhoto ? (
                 <img
                   src={mainPhoto}
@@ -83,7 +87,25 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                   </span>
                 )}
               </div>
+              {/* Quick identifiers row */}
+              <div className="flex flex-wrap gap-2">
+                <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                  {profile.gender}
+                </span>
+                {profile.sexualOrientation && (
+                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                    {profile.sexualOrientation}
+                  </span>
+                )}
+              </div>
 
+              {/* My bio */}
+              {profile.bio && (
+                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-2">My bio</h3>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{profile.bio}</p>
+                </section>
+              )}
               {/* My bio */}
               {profile.bio && (
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
@@ -103,7 +125,34 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                   </div>
                 </section>
               )}
+              {/* About me - chip grid like Bumble */}
+              {aboutChips.length > 0 && (
+                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-3">About me</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {aboutChips.map((item) => (
+                      <AttributeChip key={item.label} icon={item.icon} label={item.label} />
+                    ))}
+                  </div>
+                </section>
+              )}
 
+              {/* I'm looking for / Non-negotiables */}
+              {profile.nonNegotiables?.length > 0 && (
+                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-3">I'm looking for</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.nonNegotiables.map((n) => (
+                      <span
+                        key={n}
+                        className="px-3 py-2 rounded-full bg-primary/15 text-primary text-sm font-medium border border-primary/20"
+                      >
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
               {/* I'm looking for / Non-negotiables */}
               {profile.nonNegotiables?.length > 0 && (
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
@@ -137,10 +186,28 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                   </div>
                 </section>
               )}
+              {/* My interests - Bumble-style tags */}
+              {profile.tags?.length > 0 && (
+                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-3">My interests</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="px-3 py-2 rounded-full bg-muted/80 text-foreground text-sm border border-border/50"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               <div className="h-4" />
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     );

@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Compass, Users, User, LogOut } from "lucide-react";
 import { signOut } from "aws-amplify/auth";
-import { getUserProfile, type UserProfile } from "@/utils/auth";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { clearTestUser } from "@/utils/auth";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
 import {
   Sheet,
   SheetContent,
@@ -22,7 +22,6 @@ export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const isActive = (path: string) => {
@@ -31,20 +30,27 @@ export default function BottomNav() {
     return location.pathname === path;
   };
 
-  useEffect(() => {
-    if (profileOpen) {
-      getUserProfile().then(setUserProfile);
-    }
-  }, [profileOpen]);
-
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await signOut();
+      if (GOOGLE_LOGIN_CHECK) {
+        // Normal logout: use Amplify signOut
+        await signOut();
+      } else {
+        // Test mode: clear test user from localStorage
+        clearTestUser();
+      }
       setProfileOpen(false);
       navigate("/auth");
     } catch (error) {
       console.error("Error signing out:", error);
+      // Still clear test user and navigate even if signOut fails
+      if (!GOOGLE_LOGIN_CHECK) {
+        clearTestUser();
+      }
+      setProfileOpen(false);
+      navigate("/auth");
+    } finally {
       setIsLoggingOut(false);
     }
   };
@@ -80,40 +86,39 @@ export default function BottomNav() {
       <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl safe-area-pb">
           <SheetHeader className="text-left pb-4 border-b border-border/50">
-            <SheetTitle className="font-display">Profile</SheetTitle>
-            <SheetDescription>Your account and settings</SheetDescription>
+            <SheetTitle className="font-display">Menu</SheetTitle>
+            <SheetDescription>Your account options</SheetDescription>
           </SheetHeader>
-          <div className="py-6 space-y-6">
-            {/* User profile card */}
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border-2 border-primary/20">
-                <AvatarImage src={userProfile?.picture} alt={userProfile?.name} />
-                <AvatarFallback className="bg-primary/20 text-primary text-xl font-display">
-                  {userProfile?.name?.charAt(0) ?? userProfile?.email?.charAt(0) ?? "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-display font-semibold text-lg truncate">
-                  {userProfile?.name ?? "User"}
-                </p>
-                <p className="text-sm text-muted-foreground truncate">
-                  {userProfile?.email ?? userProfile?.username ?? "—"}
-                </p>
-              </div>
-            </div>
-
+          <div className="py-6 space-y-3">
+            {/* Profile button */}
             <Button
               variant="outline"
-              className="w-full justify-center gap-2 text-muted-foreground hover:text-destructive hover:border-destructive"
+              className="w-full justify-start gap-3 h-auto py-4 px-4"
+              onClick={() => {
+                setProfileOpen(false);
+                navigate("/profile");
+              }}
+            >
+              <User className="w-5 h-5" />
+              <span className="font-medium">Profile</span>
+            </Button>
+
+            {/* Logout button */}
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-auto py-4 px-4 text-muted-foreground hover:text-destructive hover:border-destructive"
               onClick={handleLogout}
               disabled={isLoggingOut}
             >
               {isLoggingOut ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <>
+                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  <span className="font-medium">Logging out...</span>
+                </>
               ) : (
                 <>
-                  <LogOut className="w-4 h-4" />
-                  Log out
+                  <LogOut className="w-5 h-5" />
+                  <span className="font-medium">Logout</span>
                 </>
               )}
             </Button>

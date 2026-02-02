@@ -1,22 +1,33 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import SwipeCard from "./SwipeCard";
 import type { DiscoveryProfileFull } from "@/lib/dating";
-import { Heart, X, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
   onSwipe: (profileId: string, action: "like" | "pass") => void;
   onOpenFilters: () => void;
+  onProfileChange?: (profileId: string) => void;
+  scrollToTop?: () => void;
 }
 
 export default function DiscoverFeed({
   profiles,
   onSwipe,
   onOpenFilters,
+  onProfileChange,
+  scrollToTop,
 }: DiscoverFeedProps) {
   const currentProfile = profiles[0] ?? null;
+  
+  // Notify parent when profile changes (for scroll-to-top)
+  useEffect(() => {
+    if (currentProfile?.id && onProfileChange) {
+      onProfileChange(currentProfile.id);
+    }
+  }, [currentProfile?.id, onProfileChange]);
 
   const handleSwipe = useCallback(
     (action: "like" | "pass") => {
@@ -26,14 +37,20 @@ export default function DiscoverFeed({
         profileId: currentProfile.id,
         profileName: currentProfile.name,
       });
+      // Scroll to top immediately when button is clicked (before profile changes)
+      // This ensures we're at the top when the new profile appears
+      if (scrollToTop) {
+        scrollToTop();
+      }
       // Immediately remove profile from queue
       onSwipe(currentProfile.id, action);
     },
-    [currentProfile, onSwipe]
+    [currentProfile, onSwipe, scrollToTop]
   );
 
   if (profiles.length === 0) {
     return (
+      <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
       <div className="flex flex-col items-center justify-center flex-1 py-12 px-4">
         <p className="text-muted-foreground text-center">
           No more profiles right now. Try adjusting your filters.
@@ -43,15 +60,17 @@ export default function DiscoverFeed({
           Filters
         </Button>
       </div>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      {/* Card display */}
-      <div className="relative min-h-[400px] mx-2">
+    <div className="flex flex-col flex-1 min-h-0 px-2 py-2">
+      {/* Full-screen card display */}
+      <div className="relative flex-1 min-h-0">
         {/* Current profile card with fade transition */}
         <AnimatePresence mode="wait">
+          {currentProfile && (
           {currentProfile && (
             <motion.div
               key={currentProfile.id}
@@ -59,34 +78,12 @@ export default function DiscoverFeed({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full"
+              className="relative w-full h-full"
             >
               <SwipeCard profile={currentProfile} isTop />
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      {/* Like / Pass buttons */}
-      <div className="flex items-center justify-center gap-6 py-4 px-4">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-14 w-14 rounded-full border-2 border-muted-foreground/50 hover:border-red-500 hover:bg-red-500/10"
-          onClick={() => handleSwipe("pass")}
-          disabled={!currentProfile}
-        >
-          <X className="w-7 h-7 text-muted-foreground" />
-        </Button>
-        <Button
-          variant="default"
-          size="icon"
-          className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90"
-          onClick={() => handleSwipe("like")}
-          disabled={!currentProfile}
-        >
-          <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
-        </Button>
       </div>
     </div>
   );

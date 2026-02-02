@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import SparkleBackground from "@/components/SparkleBackground";
 import PromAsk from "@/components/PromAsk";
+import { useChat } from "@/hooks/useChat";
+import { useMatches, type MatchWithDetails } from "@/hooks/useMatches";
+import { getUserProfile } from "@/utils/auth";
 import { 
   Heart, 
   MessageCircle, 
@@ -14,7 +18,11 @@ import {
   MoreVertical,
   Flag,
   Trash2,
-  PartyPopper
+  PartyPopper,
+  Loader2,
+  Plus,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,64 +31,143 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Mock matches data
-const mockMatches = [
-  {
-    id: "1",
-    tags: ["Music", "Coffee", "Debate"],
-    promptAnswer: "Library vibes > Coffee shop chaos",
-    compatScore: 0.87,
-    chatStarted: true,
-    lastMessage: "So what's your go-to study spot?",
-    unread: 2,
-    revealed: false,
-  },
-  {
-    id: "2",
-    tags: ["Running", "Tech", "Food"],
-    promptAnswer: "Early morning runs hit different",
-    compatScore: 0.82,
-    chatStarted: true,
-    lastMessage: "We should grab coffee sometime!",
-    unread: 0,
-    revealed: false,
-  },
-  {
-    id: "3",
-    tags: ["Dance", "Movies", "Travel"],
-    promptAnswer: "Bollywood over Hollywood any day",
-    compatScore: 0.78,
-    chatStarted: false,
-    lastMessage: null,
-    unread: 0,
-    revealed: false,
-  },
-];
+// Extended match type for UI
+interface MatchForUI extends MatchWithDetails {
+  displayName: string;
+  tags: string[];
+}
 
 const Matches = () => {
   const navigate = useNavigate();
+  
+  // Auth state
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  
+  // UI state
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [showRevealModal, setShowRevealModal] = useState(false);
   const [showPromAsk, setShowPromAsk] = useState(false);
-  const [revealingMatch, setRevealingMatch] = useState<string | null>(null);
+  const [showCreateMatch, setShowCreateMatch] = useState(false);
+  const [newMatchEmail, setNewMatchEmail] = useState("");
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  
+  // Load current user on mount
+  useEffect(() => {
+    const loadUser = async () => {
+      setIsAuthLoading(true);
+      try {
+        const profile = await getUserProfile();
+        if (profile && profile.userId) {
+          setCurrentUserId(profile.userId);
+          setCurrentUserEmail(profile.email || "");
+        } else {
+          // For development: use a test user ID
+          setCurrentUserId("dev-user-" + Math.random().toString(36).substr(2, 9));
+          setCurrentUserEmail("dev@test.com");
+          setAuthError("Not authenticated - using dev mode");
+        }
+      } catch (err) {
+        // For development: use a test user ID
+        setCurrentUserId("dev-user-" + Math.random().toString(36).substr(2, 9));
+        setCurrentUserEmail("dev@test.com");
+        setAuthError("Auth error - using dev mode");
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    loadUser();
+  }, []);
 
-  const activeMatch = mockMatches.find(m => m.id === activeChat);
+  // Load real matches from database
+  const { 
+    matches: rawMatches, 
+    isLoading: matchesLoading, 
+    error: matchesError,
+    refresh: refreshMatches,
+    createMatch,
+    updateMatchConversation,
+  } = useMatches({ 
+    currentUserId, 
+    currentUserEmail 
+  });
 
-  const handleReveal = (matchId: string) => {
-    setRevealingMatch(matchId);
+  // Transform matches for UI
+  const matches: MatchForUI[] = rawMatches.map(m => ({
+    ...m,
+    displayName: m.otherUserEmail?.split("@")[0] || "Anonymous",
+    tags: [], // Tags would come from user profile in production
+  }));
+  
+  const activeMatch = matches.find(m => m.id === activeChat);
+  const activeConversationId = activeMatch?.conversationId || undefined;
+
+  // Reveal callback - will be set by ChatView
+  const [pendingRevealFn, setPendingRevealFn] = useState<(() => Promise<void>) | null>(null);
+
+  const handleReveal = (revealFn: () => Promise<void>) => {
+    setPendingRevealFn(() => revealFn);
     setShowRevealModal(true);
   };
 
-  const confirmReveal = () => {
-    // In real app, send reveal request
+  const confirmReveal = async () => {
+    if (pendingRevealFn) {
+      await pendingRevealFn();
+    }
     setShowRevealModal(false);
-    setRevealingMatch(null);
-    // Show success animation
+    setPendingRevealFn(null);
   };
+
+  // Store conversation ID when created (also update the match record)
+  const handleConversationCreated = async (matchId: string, conversationId: string) => {
+    await updateMatchConversation(matchId, conversationId);
+  };
+
+  // Create a new match (for testing)
+  const handleCreateMatch = async () => {
+    if (!newMatchEmail.trim()) return;
+    setIsCreatingMatch(true);
+    try {
+      // In production, you'd look up the user by email
+      // For now, we'll use the email as a pseudo-user-id
+      const otherUserId = newMatchEmail.trim();
+      await createMatch(otherUserId, newMatchEmail.trim(), 0.8);
+      setNewMatchEmail("");
+      setShowCreateMatch(false);
+    } finally {
+      setIsCreatingMatch(false);
+    }
+  };
+
+  // Show loading while checking auth
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center">
+        <SparkleBackground />
+        <div className="relative z-10 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
+
+      {/* Dev mode banner */}
+      {authError && (
+        <div className="relative z-20 bg-yellow-500/10 border-b border-yellow-500/20 p-2">
+          <div className="max-w-4xl mx-auto flex items-center gap-2 text-sm">
+            <AlertTriangle className="w-4 h-4 text-yellow-500" />
+            <span className="text-yellow-200">{authError}</span>
+            <span className="text-muted-foreground">• User ID: {currentUserId.slice(0, 12)}...</span>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex relative z-10">
 
@@ -90,24 +177,65 @@ const Matches = () => {
         <header className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between mb-4">
             <h1 className="font-display text-2xl font-bold">Matches</h1>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
-              <Sparkles className="w-5 h-5" />
-            </Button>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={refreshMatches} title="Refresh">
+                <RefreshCw className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
+                <Sparkles className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
           
           <div className="flex gap-2">
             <Button variant="glass" size="sm" className="flex-1">
-              All ({mockMatches.length})
+              All ({matches.length})
             </Button>
-            <Button variant="ghost" size="sm" className="flex-1">
-              Revealed (0)
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => setShowCreateMatch(true)}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Match
             </Button>
           </div>
         </header>
 
         {/* Match List */}
         <div className="flex-1 overflow-y-auto p-2">
-          {mockMatches.map((match) => (
+          {/* Loading state */}
+          {matchesLoading && matches.length === 0 && (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* Error state */}
+          {matchesError && (
+            <div className="text-center py-8 text-destructive text-sm">
+              {matchesError}
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!matchesLoading && matches.length === 0 && (
+            <div className="text-center py-8">
+              <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground mb-2">No matches yet</p>
+              <p className="text-sm text-muted-foreground/70 mb-4">
+                Complete discovery to get matched, or add a test match below.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => setShowCreateMatch(true)}>
+                <Plus className="w-4 h-4 mr-1" />
+                Create Test Match
+              </Button>
+            </div>
+          )}
+
+          {/* Matches */}
+          {matches.map((match) => (
             <motion.button
               key={match.id}
               whileHover={{ scale: 1.02 }}
@@ -128,32 +256,22 @@ const Matches = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold text-foreground">
-                      {Math.round(match.compatScore * 100)}% Match
+                      {match.displayName}
                     </span>
-                    {match.unread > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                        {match.unread}
+                    {match.compatScore && (
+                      <span className="text-xs text-primary">
+                        {Math.round((match.compatScore || 0) * 100)}%
                       </span>
                     )}
                   </div>
                   
-                  <div className="flex flex-wrap gap-1 mb-1">
-                    {match.tags.slice(0, 2).map(tag => (
-                      <span key={tag} className="text-xs text-muted-foreground">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-muted-foreground truncate mb-1">
+                    {match.otherUserEmail}
+                  </p>
                   
-                  {match.lastMessage && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {match.lastMessage}
-                    </p>
-                  )}
-                  
-                  {!match.chatStarted && (
-                    <p className="text-sm text-primary">Start a conversation →</p>
-                  )}
+                  <p className="text-sm text-primary">
+                    {match.conversationId ? "Continue chat →" : "Start chat →"}
+                  </p>
                 </div>
               </div>
             </motion.button>
@@ -165,10 +283,13 @@ const Matches = () => {
       <main className={`flex-1 flex flex-col ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
         {activeChat && activeMatch ? (
           <ChatView 
-            match={activeMatch} 
+            match={activeMatch}
+            conversationId={activeConversationId}
+            currentUserId={currentUserId}
             onBack={() => setActiveChat(null)}
-            onReveal={() => handleReveal(activeMatch.id)}
+            onReveal={handleReveal}
             onPromAsk={() => setShowPromAsk(true)}
+            onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -243,30 +364,143 @@ const Matches = () => {
         {showPromAsk && activeMatch && (
           <PromAsk
             matchId={activeMatch.id}
-            matchCompatScore={activeMatch.compatScore}
+            matchCompatScore={activeMatch.compatScore || 0}
             onClose={() => setShowPromAsk(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Create Match Modal (for testing) */}
+      <AnimatePresence>
+        {showCreateMatch && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass rounded-3xl p-6 max-w-md w-full"
+            >
+              <h3 className="font-display text-xl font-bold mb-4">Create Test Match</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Enter another user's email or ID to create a match for testing.
+                Both users need to create a match with each other to chat.
+              </p>
+              
+              <Input
+                placeholder="Other user's email or ID"
+                value={newMatchEmail}
+                onChange={(e) => setNewMatchEmail(e.target.value)}
+                className="mb-4"
+              />
+
+              <div className="bg-muted/30 rounded-lg p-3 mb-4 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">How to test:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Open the app in two different browsers</li>
+                  <li>Sign in with different Google accounts</li>
+                  <li>Each person creates a match with the other's email</li>
+                  <li>Both will see each other in their matches list</li>
+                  <li>Click to start chatting!</li>
+                </ol>
+              </div>
+
+              <div className="flex gap-3">
+                <Button 
+                  variant="glass" 
+                  className="flex-1"
+                  onClick={() => setShowCreateMatch(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="gold" 
+                  className="flex-1"
+                  onClick={handleCreateMatch}
+                  disabled={!newMatchEmail.trim() || isCreatingMatch}
+                >
+                  {isCreatingMatch ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Create Match
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 };
 
-// Chat View Component
+// Chat View Component - Now using real Amplify backend
 interface ChatViewProps {
-  match: typeof mockMatches[0];
+  match: MatchForUI;
+  conversationId?: string;
+  currentUserId: string;
   onBack: () => void;
-  onReveal: () => void;
+  onReveal: (revealFn: () => Promise<void>) => void;
   onPromAsk: () => void;
+  onConversationCreated: (conversationId: string) => void;
 }
 
-const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
+const ChatView = ({ 
+  match, 
+  conversationId, 
+  currentUserId,
+  onBack, 
+  onReveal, 
+  onPromAsk,
+  onConversationCreated 
+}: ChatViewProps) => {
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState([
-    { id: 1, from: "them", text: "Hey! I noticed we both love coffee ☕", time: "2:30 PM" },
-    { id: 2, from: "me", text: "Yes! Library cafe is my second home 😄", time: "2:32 PM" },
-    { id: 3, from: "them", text: "So what's your go-to study spot?", time: "2:35 PM" },
-  ]);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Use the real chat hook
+  const {
+    conversation,
+    messages,
+    messagesLoading,
+    isLoading,
+    error,
+    sendMessage: sendChatMessage,
+    revealIdentity,
+    createConversation,
+    hasCurrentUserRevealed,
+    hasOtherUserRevealed,
+  } = useChat({
+    conversationId,
+    currentUserId,
+  });
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Create conversation if none exists when component mounts
+  useEffect(() => {
+    const initConversation = async () => {
+      if (!conversationId && !isCreatingConversation && match.otherUserId) {
+        setIsCreatingConversation(true);
+        const newConvo = await createConversation(match.otherUserId);
+        if (newConvo?.id) {
+          onConversationCreated(newConvo.id);
+        }
+        setIsCreatingConversation(false);
+      }
+    };
+    initConversation();
+  }, [conversationId, match.otherUserId, createConversation, onConversationCreated, isCreatingConversation]);
 
   const icebreakers = [
     "What's your favorite IIMA hangout?",
@@ -275,17 +509,29 @@ const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
     "What brought you to IIMA?",
   ];
 
-  const sendMessage = () => {
+  const handleSendMessage = async () => {
     if (message.trim()) {
-      setMessages(prev => [...prev, {
-        id: prev.length + 1,
-        from: "me",
-        text: message,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
+      await sendChatMessage(message);
       setMessage("");
     }
   };
+
+  const handleRevealClick = () => {
+    // Pass the reveal function to the parent so modal can confirm first
+    onReveal(revealIdentity);
+  };
+
+  // Show loading while creating conversation
+  if (isCreatingConversation || (isLoading && !conversation)) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+          <p className="text-muted-foreground">Starting conversation...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -301,8 +547,11 @@ const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
           </div>
           
           <div>
-            <p className="font-semibold">{Math.round(match.compatScore * 100)}% Match</p>
-            <p className="text-xs text-muted-foreground">{match.tags.join(" • ")}</p>
+            <p className="font-semibold">{match.displayName}</p>
+            <p className="text-xs text-muted-foreground">{match.otherUserEmail}</p>
+            {hasOtherUserRevealed && (
+              <p className="text-xs text-green-400">They revealed their identity!</p>
+            )}
           </div>
         </div>
 
@@ -311,9 +560,14 @@ const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
             <PartyPopper className="w-4 h-4 mr-1" />
             Ask to Prom
           </Button>
-          <Button variant="gold" size="sm" onClick={onReveal}>
+          <Button 
+            variant={hasCurrentUserRevealed ? "secondary" : "gold"} 
+            size="sm" 
+            onClick={handleRevealClick}
+            disabled={hasCurrentUserRevealed}
+          >
             <Eye className="w-4 h-4 mr-1" />
-            Reveal
+            {hasCurrentUserRevealed ? "Revealed" : "Reveal"}
           </Button>
           
           <DropdownMenu>
@@ -336,31 +590,69 @@ const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
         </div>
       </header>
 
+      {/* Error display */}
+      {error && (
+        <div className="px-4 py-2 bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
-          <motion.div
-            key={msg.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                msg.from === "me"
-                  ? "bg-primary text-primary-foreground rounded-br-md"
-                  : "glass rounded-bl-md"
-              }`}
-            >
-              <p>{msg.text}</p>
-              <p className={`text-xs mt-1 ${
-                msg.from === "me" ? "text-primary-foreground/70" : "text-muted-foreground"
-              }`}>
-                {msg.time}
-              </p>
+        {messagesLoading && messages.length === 0 && (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        
+        {!messagesLoading && messages.length === 0 && (
+          <div className="flex items-center justify-center h-full text-center">
+            <div>
+              <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground">No messages yet</p>
+              <p className="text-sm text-muted-foreground/70">Send a message to start the conversation!</p>
             </div>
-          </motion.div>
-        ))}
+          </div>
+        )}
+
+        {messages.map((msg) => {
+          const isMe = msg.senderId === currentUserId;
+          const time = msg.sentAt
+            ? new Date(msg.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "";
+
+          return (
+            <motion.div
+              key={msg.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                  isMe
+                    ? "bg-primary text-primary-foreground rounded-br-md"
+                    : "glass rounded-bl-md"
+                }`}
+              >
+                {!isMe && (
+                  <p className="text-xs text-muted-foreground mb-0.5">
+                    {hasOtherUserRevealed ? "Match" : "Anonymous"}
+                  </p>
+                )}
+                <p>{msg.content}</p>
+                {time && (
+                  <p className={`text-xs mt-1 ${
+                    isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                  }`}>
+                    {time}
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Icebreakers */}
@@ -386,11 +678,11 @@ const ChatView = ({ match, onBack, onReveal, onPromAsk }: ChatViewProps) => {
             type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+            onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
             placeholder="Type a message..."
             className="flex-1 bg-muted rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
-          <Button variant="gold" size="icon" onClick={sendMessage} disabled={!message.trim()}>
+          <Button variant="gold" size="icon" onClick={handleSendMessage} disabled={!message.trim()}>
             <Send className="w-5 h-5" />
           </Button>
         </div>

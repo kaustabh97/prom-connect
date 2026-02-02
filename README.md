@@ -33,4 +33,35 @@ npx amplify sandbox (inside frontend package, amplify code is prom-connect/ampli
 
 (Sets up backend sandbox etc)
 
+## Google OAuth "invalid request" fix
+
+If you see "You can't sign in because this app sent an invalid request" when signing in with Google:
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
+2. Click your **OAuth 2.0 Client ID** (Web application).
+3. Under **Authorized redirect URIs**, add this **exact** URI (use the Cognito domain from your `amplify_outputs.json` → `auth.oauth.domain`):
+   - `https://<YOUR_COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+   - Example: `https://f9338aec6e5fd2048b1c.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+4. Under **Authorized JavaScript origins**, add:
+   - `http://localhost:8080`
+   - `http://localhost:8081`
+   - `https://<YOUR_COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com`
+5. Save. Changes can take a few minutes to apply.
+
 PRODUCTION URL FOR NOW: https://main.d1emd9gkgd3wf8.amplifyapp.com/
+
+## "An error was encountered with the requested page" (Google OAuth)
+
+If you see this after signing in with Google, Cognito’s allowed callback URLs are out of date.
+
+1. **Sync the backend** so Cognito gets the URLs from `amplify/auth/resource.ts`:
+   ```sh
+   npx ampx sandbox
+   ```
+   Run this from the project root (where `amplify/` lives). It updates the Cognito app client with the callback URLs in `resource.ts` and regenerates `amplify_outputs.json`.
+
+2. **Confirm the app URL**: The app must run at **http://localhost:8080** (see `vite.config.ts`). Sign-in is started from the root URL (`/`) so the redirect URI is `http://localhost:8080/`.
+
+3. **Google Cloud Console**: Under **Authorized redirect URIs** you must have:
+   `https://<YOUR_COGNITO_DOMAIN>.auth.<REGION>.amazoncognito.com/oauth2/idpresponse`
+   (Use the `domain` value from `amplify_outputs.json` → `auth.oauth.domain`.)

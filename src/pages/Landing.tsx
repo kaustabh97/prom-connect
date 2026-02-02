@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Sparkles, Heart, Shield, Clock, Users } from "lucide-react";
+import { Sparkles, Heart, Shield, Clock, Users, Filter, CheckCircle2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
@@ -11,24 +11,24 @@ const Landing = () => {
 
   const features = [
     {
-      icon: Shield,
-      title: "Privacy First",
-      description: "Your identity stays hidden until you both choose to reveal. No peeking allowed.",
+      icon: Users,
+      title: "Campus Only",
+      description: "Exclusively for IMA community. Sign in with your @iima.ac.in email to access real profiles of your peers.",
+    },
+    {
+      icon: Filter,
+      title: "Set Your Preferences",
+      description: "Use filters and non-negotiables to discover people who align with what matters to you. You're in control.",
     },
     {
       icon: Heart,
-      title: "Mutual Reveals",
-      description: "Only when both of you say 'yes' do the masks come off. It's magic, not creepy.",
+      title: "Swipe to Connect",
+      description: "Browse profiles and swipe to express interest. When interest is mutual, you match and can start chatting.",
     },
     {
-      icon: Clock,
-      title: "Time-Bound",
-      description: "Built for Prom 2026. All data auto-deletes after the event. No digital footprints.",
-    },
-    {
-      icon: Users,
-      title: "Campus Verified",
-      description: "Only IIMA students can join. Sign in with your institute email.",
+      icon: MessageSquare,
+      title: "Chat & Decide",
+      description: "Get to know your matches through conversation. Decide together whether prom feels right for both of you.",
     },
   ];
 
@@ -86,7 +86,7 @@ const Landing = () => {
             transition={{ delay: 0.5, duration: 0.8 }}
             className="text-xl md:text-2xl text-muted-foreground mb-4 font-light"
           >
-            Keep it anonymous. Keep it real.
+            Find meaningful connections for Prom 2026
           </motion.p>
 
           <motion.p
@@ -95,8 +95,8 @@ const Landing = () => {
             transition={{ delay: 0.6, duration: 0.8 }}
             className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto"
           >
-            Find your prom date through genuine connections, not just profiles. 
-            Your identity stays hidden until you both choose to reveal.
+            A campus-only matchmaking experience designed to help you discover compatible peers 
+            and show up to prom with confidence. Real profiles, intentional discovery, shared context.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -130,7 +130,7 @@ const Landing = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Sign in with IIMA
+              Sign in with your IMA email
             </Button>
             <Button
               variant="gold-outline"
@@ -164,10 +164,10 @@ const Landing = () => {
             className="text-center mb-16"
           >
             <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-              How the <span className="text-gradient-gold">Magic</span> Works
+              How <span className="text-gradient-gold">Matchmaking</span> Works
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              A thoughtful approach to finding your perfect prom date
+              A straightforward process designed to help you find compatible connections
             </p>
           </motion.div>
 
@@ -179,7 +179,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Privacy Promise Section */}
+      {/* Why This Works for IMA Section */}
       <section className="relative py-24 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div
@@ -194,23 +194,23 @@ const Landing = () => {
             
             <div className="relative z-10">
               <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
-                <Shield className="w-8 h-8 text-primary" />
+                <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
               
               <h3 className="font-display text-3xl md:text-4xl font-bold mb-4">
-                Our Privacy <span className="text-gradient-gold">Promise</span>
+                Why This Works for <span className="text-gradient-gold">IMA</span>
               </h3>
               
               <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                Only you and your match see revealed profiles — organisers and other users 
-                cannot access these details. Your privacy is not a feature, it's a foundation.
+                Built around shared context, campus schedules, and the reality of prom. 
+                Designed to reduce awkwardness and uncertainty, not create it.
               </p>
 
               <div className="grid sm:grid-cols-3 gap-6 text-left">
                 {[
-                  { title: "Anonymous by Default", desc: "Your identity is hidden until mutual reveal" },
-                  { title: "Zero Knowledge", desc: "Even we can't see who matched with whom" },
-                  { title: "Auto-Delete", desc: "All data purged 7 days after prom" },
+                  { title: "Real Profiles", desc: "See authentic profiles of your peers. No masks, no mystery—just real people." },
+                  { title: "IMA Verified", desc: "Every user is authenticated through their @iima.ac.in email address." },
+                  { title: "Intentional Discovery", desc: "Set preferences and non-negotiables to find people who align with you." },
                 ].map((item) => (
                   <div key={item.title} className="p-4 rounded-xl bg-card/50">
                     <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
@@ -232,10 +232,10 @@ const Landing = () => {
           transition={{ duration: 0.6 }}
         >
           <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            Ready to find your <span className="text-gradient-rose">prom date</span>?
+            Ready to discover your <span className="text-gradient-rose">prom connection</span>?
           </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-            Join fellow IIMA students in the most exciting matchmaking event of the year.
+            Join your IMA peers in a thoughtful matchmaking experience designed to make prom genuinely fun and intentional.
           </p>
           <Button variant="gold" size="xl" onClick={() => navigate("/auth")}>
             Get Started
