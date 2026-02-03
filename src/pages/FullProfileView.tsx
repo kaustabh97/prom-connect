@@ -59,10 +59,13 @@ export default function FullProfileView() {
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
 
+  const state = location.state as { profile?: DiscoveryProfileFull; fromChat?: boolean };
+  const fromChat = state?.fromChat === true;
+
   const [profile, setProfile] = useState<DiscoveryProfileFull | null>(
-    () => (location.state as { profile?: DiscoveryProfileFull })?.profile ?? null
+    () => state?.profile ?? null
   );
-  const [loading, setLoading] = useState(!(location.state as { profile?: DiscoveryProfileFull })?.profile);
+  const [loading, setLoading] = useState(!state?.profile);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch profile from backend when not passed via state
@@ -387,19 +390,21 @@ export default function FullProfileView() {
             </section>
           )}
 
-          <div className="h-24" />
+          {!fromChat && <div className="h-24" />}
         </div>
       </div>
 
-      {/* Fixed Like / Pass */}
-      <div className="fixed bottom-16 left-0 right-0 max-w-[500px] mx-auto px-4 py-3 border-t border-border/50 bg-background/95 backdrop-blur-md flex items-center justify-center gap-6 safe-area-pb z-20">
-        <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={handlePass}>
-          <X className="w-6 h-6" />
-        </Button>
-        <Button variant="default" size="icon" className="h-12 w-12 rounded-full bg-primary" onClick={handleLike}>
-          <Heart className="w-6 h-6 fill-primary-foreground text-primary-foreground" />
-        </Button>
-      </div>
+      {/* Fixed Like / Pass - only when viewing from Discover, not from chat */}
+      {!fromChat && (
+        <div className="fixed bottom-16 left-0 right-0 max-w-[500px] mx-auto px-4 py-3 border-t border-border/50 bg-background/95 backdrop-blur-md flex items-center justify-center gap-6 safe-area-pb z-20">
+          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={handlePass}>
+            <X className="w-6 h-6" />
+          </Button>
+          <Button variant="default" size="icon" className="h-12 w-12 rounded-full bg-primary" onClick={handleLike}>
+            <Heart className="w-6 h-6 fill-primary-foreground text-primary-foreground" />
+          </Button>
+        </div>
+      )}
     </div>
 
     <MatchPopup

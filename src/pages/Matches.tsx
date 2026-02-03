@@ -612,7 +612,7 @@ const ChatView = ({
           <div>
             <button
               type="button"
-              onClick={() => navigate(`/discover/profile/${match.otherUserId}`)}
+              onClick={() => navigate(`/discover/profile/${match.otherUserId}`, { state: { fromChat: true } })}
               className="font-semibold text-foreground hover:text-primary hover:underline text-left"
             >
               {displayName}

@@ -327,15 +327,21 @@ export default function Profile() {
       <SparkleBackground />
 
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
-        {/* Header */}
-        <div className="px-4 pt-3 pb-2 border-b border-border/50 bg-background/95 backdrop-blur-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/discover/profile")}>
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back
-            </Button>
-            <h1 className="font-display text-xl font-bold flex-1">My Profile</h1>
-            <div className="flex gap-1">
+        {/* Header - aligned with Onboarding/Discover (glass, primary accents) */}
+        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/discover/profile")}
+                className="gap-1.5 border-primary/30 text-foreground/90 hover:bg-primary/10 hover:text-foreground hover:border-primary/50"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+              <h1 className="font-display text-xl font-bold text-foreground">My Profile</h1>
+              <div className="flex gap-1 shrink-0">
               <Sheet open={showPollsEditSheet} onOpenChange={setShowPollsEditSheet}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="sm" onClick={openPollsEdit} title="This or That">
@@ -423,59 +429,82 @@ export default function Profile() {
                 </div>
               </SheetContent>
             </Sheet>
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Scrollable content */}
+        {/* Scrollable content - tile/card view like Discover */}
         <div className="flex-1 overflow-y-auto scroll-touch">
-          <div className="max-w-2xl mx-auto p-4 space-y-6 pb-8">
-            {/* Profile Header Card */}
+          <div className="p-4 space-y-6 pb-8 max-w-[500px] mx-auto">
+            {/* Profile tile - Discover-style: hero photo + overlay text, then content */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass rounded-2xl p-6"
+              className="rounded-2xl overflow-hidden bg-background border border-border/50 shadow-float flex flex-col"
             >
-              <div className="flex flex-col items-center text-center mb-6">
-                <Avatar className="h-24 w-24 border-4 border-primary/20 mb-4">
-                  <AvatarImage 
-                    src={profilePicUrl || authProfile?.picture || undefined} 
-                    alt={profile.name || "Profile"} 
+              {/* Hero photo area (like SwipeCard) */}
+              <div className="relative aspect-[4/5] w-full bg-muted shrink-0 min-h-[280px]">
+                {profilePicUrl || authProfile?.picture ? (
+                  <img
+                    src={profilePicUrl || authProfile?.picture || ""}
+                    alt=""
+                    className="w-full h-full object-cover"
                   />
-                  <AvatarFallback className="bg-primary/20 text-primary text-3xl font-display">
-                    {profile.name?.charAt(0)?.toUpperCase() || profile.email?.charAt(0)?.toUpperCase() || "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <h2 className="font-display text-2xl font-bold mb-1">
-                  {profile.name || "Anonymous"}
-                </h2>
-                {profile.age && (
-                  <p className="text-muted-foreground text-sm mb-2">
-                    {profile.age} years old
-                  </p>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Avatar className="h-32 w-32 border-4 border-primary/20">
+                      <AvatarImage src={undefined} alt="" />
+                      <AvatarFallback className="bg-primary/20 text-primary text-5xl font-display">
+                        {profile.name?.charAt(0)?.toUpperCase() || profile.email?.charAt(0)?.toUpperCase() || "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
                 )}
-                {profile.gender && (
-                  <p className="text-muted-foreground text-sm">
-                    {profile.gender}
-                    {profile.sexualOrientation && ` • ${profile.sexualOrientation}`}
-                  </p>
-                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-4 left-4 right-4 text-white">
+                  <h2 className="font-display text-2xl font-bold drop-shadow-md">
+                    {profile.name || "Anonymous"}
+                    {profile.age ? `, ${profile.age}` : ""}
+                  </h2>
+                  {(profile.gender || profile.sexualOrientation) && (
+                    <p className="text-sm text-white/90">
+                      {profile.gender && profile.sexualOrientation
+                        ? `${profile.gender} • ${profile.sexualOrientation}`
+                        : (profile.gender || profile.sexualOrientation)}
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Email */}
-              <div className="flex items-center gap-3 text-sm text-muted-foreground pt-4 border-t border-border/50">
-                <Mail className="w-4 h-4" />
-                <span className="truncate">{profile.email}</span>
+              {/* Content below hero - chips + email */}
+              <div className="px-4 pb-4 pt-3 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {profile.gender && (
+                    <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                      {profile.gender}
+                    </span>
+                  )}
+                  {profile.sexualOrientation && (
+                    <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                      {profile.sexualOrientation}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t border-border/50">
+                  <Mail className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{profile.email}</span>
+                </div>
               </div>
             </motion.div>
 
-            {/* Bio */}
+            {/* Bio tile */}
             {profile.bio && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-3 flex items-center gap-2">
                   <User className="w-5 h-5 text-primary" />
@@ -485,13 +514,13 @@ export default function Profile() {
               </motion.div>
             )}
 
-            {/* Tags/Interests */}
+            {/* Tags/Interests tile */}
             {profile.tags && profile.tags.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
                   <Tag className="w-5 h-5 text-primary" />
@@ -520,7 +549,7 @@ export default function Profile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-4 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
@@ -608,7 +637,7 @@ export default function Profile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-2 flex items-center gap-2">
                   <Sparkles className="w-5 h-5 text-primary" />
@@ -631,7 +660,7 @@ export default function Profile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-4 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
@@ -665,7 +694,7 @@ export default function Profile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-2 flex items-center gap-2">
                   <Vote className="w-5 h-5 text-primary" />
@@ -691,7 +720,7 @@ export default function Profile() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="glass rounded-2xl p-6"
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
                 <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
                   <Heart className="w-5 h-5 text-primary" />
