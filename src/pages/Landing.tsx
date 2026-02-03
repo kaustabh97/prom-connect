@@ -1,10 +1,28 @@
+import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Heart, Shield, Clock, Users, Filter, CheckCircle2, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import SparkleBackground from "@/components/SparkleBackground";
 import FeatureCard from "@/components/FeatureCard";
 import CountdownTimer from "@/components/CountdownTimer";
+
+const SparkleBackground = lazy(() => import("@/components/SparkleBackground"));
+
+const HERO_FADE = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8 } };
+const FADE_IN_VIEW = { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.6 } };
+
+const features = [
+  { icon: Shield, title: "Privacy First", description: "Your identity stays hidden until you both choose to reveal. No peeking allowed." },
+  { icon: Heart, title: "Mutual Reveals", description: "Only when both of you say 'yes' do the masks come off. It's magic, not creepy." },
+  { icon: Clock, title: "Time-Bound", description: "Built for Prom 2026. All data auto-deletes after the event. No digital footprints." },
+  { icon: Users, title: "Campus Verified", description: "Only IIMA students can join. Sign in with your institute email." },
+];
+
+const privacyItems = [
+  { title: "Anonymous by Default", desc: "Your identity is hidden until mutual reveal" },
+  { title: "Zero Knowledge", desc: "Even we can't see who matched with whom" },
+  { title: "Auto-Delete", desc: "All data purged 7 days after prom" },
+];
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -33,21 +51,19 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden">
-      <SparkleBackground />
+    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
+      <Suspense fallback={null}>
+        <SparkleBackground />
+      </Suspense>
       
-      {/* Hero Section */}
-      <section className="relative min-h-dvh flex flex-col items-center justify-center px-4 py-8 md:py-20">
-        {/* Floating decorative elements */}
-        <motion.div
-          className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl"
-          animate={{ y: [0, 20, 0], scale: [1, 1.1, 1] }}
-          transition={{ duration: 8, repeat: Infinity }}
+      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20">
+        <div
+          className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl animate-float"
+          style={{ animationDuration: "8s" }}
         />
-        <motion.div
-          className="absolute bottom-40 right-10 w-40 h-40 rounded-full bg-secondary/10 blur-3xl"
-          animate={{ y: [0, -30, 0], scale: [1, 1.2, 1] }}
-          transition={{ duration: 10, repeat: Infinity }}
+        <div
+          className="absolute bottom-40 right-10 w-40 h-40 rounded-full bg-secondary/10 blur-3xl animate-float"
+          style={{ animationDuration: "10s", animationDirection: "reverse" }}
         />
 
         {/* Main content */}
@@ -62,7 +78,7 @@ const Landing = () => {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-12"
           >
             <Sparkles className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">IIM Ahmedabad Exclusive</span>
@@ -73,20 +89,37 @@ const Landing = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.8 }}
-            className="font-display text-5xl md:text-7xl lg:text-8xl font-bold mb-6"
+            className="relative flex flex-col items-center justify-center gap-0 mb-6 text-center w-full min-h-[14rem] sm:min-h-[16rem] md:min-h-[18rem]"
           >
-            <span className="text-foreground">Prom</span>{" "}
-            <span className="text-gradient-gold">2026</span>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0 w-80 h-80 sm:w-[22rem] sm:h-[22rem] md:w-96 md:h-96 lg:w-[28rem] lg:h-[28rem] overflow-hidden">
+              {/* Add dancing-couple-starry.png to public/ for the hero image */}
+              <img
+                src="/dancing-couple-starry.png"
+                alt=""
+                role="presentation"
+                className="w-full h-full object-contain"
+                decoding="async"
+                fetchPriority="high"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src && !target.src.endsWith("/placeholder.svg")) {
+                    target.src = "/placeholder.svg";
+                  }
+                }}
+              />
+            </div>
+            <h1 className="relative z-10 font-display text-[4rem] sm:text-[5rem] md:text-[6rem] lg:text-[7rem] xl:text-[8rem] font-bold px-4 pr-8 sm:pr-10 md:pr-12 w-full max-w-6xl mx-auto text-center leading-none">
+              {/* Hero font options: font-regal (Great Vibes) | font-hero-allura | font-hero-cormorant italic | font-hero-fraunces | font-hero-italiana */}
+              <span className="font-regal text-gradient-gold font-normal inline-block text-[1.08em] leading-tight">
+                When the lights
+                <br />
+                stay on
+              </span>
+            </h1>
           </motion.h1>
 
-          {/* Tagline */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="text-xl md:text-2xl text-muted-foreground mb-4 font-light"
-          >
-            Find meaningful connections for Prom 2026
+          <motion.p {...HERO_FADE} transition={{ delay: 0.5, duration: 0.8 }} className="text-xl md:text-2xl text-muted-foreground mt-14 mb-2 font-light">
+            Keep it anonymous. Keep it real.
           </motion.p>
 
           <motion.p

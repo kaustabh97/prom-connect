@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sandbox": "node -r ./scripts/polyfill-localStorage.cjs ./node_modules/.bin/ampx sandbox",
+    "pipeline-deploy": "node -r ./scripts/polyfill-localStorage.cjs ./node_modules/.bin/ampx pipeline-deploy"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.13.2",

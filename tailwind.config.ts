@@ -14,8 +14,14 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['"Playfair Display"', 'serif'],
-        sans: ['"DM Sans"', 'sans-serif'],
+        display: ['"Cormorant Garamond"', 'serif'],
+        sans: ['"Nunito"', 'sans-serif'],
+        /* Hero headline options — swap the class on Landing.tsx to try */
+        regal: ['"Great Vibes"', 'cursive'],
+        "hero-allura": ['"Allura"', 'cursive'],
+        "hero-cormorant": ['"Cormorant Garamond"', 'serif'],
+        "hero-fraunces": ['"Fraunces"', 'serif'],
+        "hero-italiana": ['"Italiana"', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",
