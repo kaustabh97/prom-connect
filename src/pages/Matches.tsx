@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import PromAsk from "@/components/PromAsk";
@@ -35,6 +35,7 @@ const client = generateClient<Schema>();
 
 const Matches = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Auth state
@@ -122,6 +123,15 @@ const Matches = () => {
     acceptRequest,
     declineRequest,
   } = useMatchRequests({ currentUserId, currentUserEmail });
+
+  // When user clicks Matches in nav, refetch matches and requests and clear refresh state
+  useEffect(() => {
+    if (location.state?.refresh) {
+      refreshMatches();
+      refreshRequests();
+      navigate(location.pathname, { state: {}, replace: true });
+    }
+  }, [location.state?.refresh, location.pathname, navigate, refreshMatches, refreshRequests]);
 
   const handleAcceptRequest = async (
     requestId: string,
@@ -281,10 +291,10 @@ const Matches = () => {
         </div>
       )}
 
-      <div className="relative z-10 flex-1 flex min-h-0 w-full max-w-[1200px] mx-auto">
+      <div className="relative z-10 flex-1 flex min-h-0 w-full max-w-[500px] mx-auto">
 
-      {/* Sidebar - Match List */}
-      <aside className={`w-full md:w-80 lg:w-96 border-r border-border/50 flex flex-col min-h-0 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+      {/* Match List - full width when no chat open (same UX on all screen sizes) */}
+      <aside className={`flex-1 min-w-0 w-full flex flex-col min-h-0 border-r border-border/50 ${activeChat ? 'hidden' : 'flex'}`}>
         {/* Header */}
         <header className="p-4 border-b border-border/50 shrink-0">
           <h1 className="font-display text-3xl font-bold">Matches</h1>
@@ -429,8 +439,8 @@ const Matches = () => {
         </div>
       </aside>
 
-      {/* Chat Area */}
-      <main className={`flex-1 flex flex-col min-h-0 ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
+      {/* Chat Area - full width when a match is selected (same UX on all screen sizes) */}
+      <main className={`flex-1 min-w-0 w-full flex flex-col min-h-0 ${!activeChat ? 'hidden' : 'flex'}`}>
         {activeChat && activeMatch ? (
           <ChatView 
             match={activeMatch}
@@ -580,7 +590,7 @@ const ChatView = ({
       {/* Chat Header - sticky at top */}
       <header className="sticky top-0 z-10 p-4 border-b border-border/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to matches">
             <X className="w-5 h-5" />
           </Button>
           

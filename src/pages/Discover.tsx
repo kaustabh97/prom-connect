@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import DiscoverFeed from "@/components/discovery/DiscoverFeed";
 import FiltersModal from "@/components/discovery/FiltersModal";
@@ -105,6 +105,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
 
 export default function Discover() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<DiscoveryProfileFull[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +119,15 @@ export default function Discover() {
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
   const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // When user clicks Discover in nav (or same tab), refetch profiles and clear refresh state
+  useEffect(() => {
+    if (location.state?.refresh) {
+      setRefreshKey((k) => k + 1);
+      navigate(location.pathname, { state: {}, replace: true });
+    }
+  }, [location.state?.refresh, location.pathname, navigate]);
 
   // When arriving from onboarding (or link with ?openFilters=1), open filters first and clean URL
   useEffect(() => {
@@ -293,7 +303,7 @@ export default function Discover() {
     };
 
     fetchProfiles();
-  }, []); // Fetch once on mount
+  }, [refreshKey]); // Fetch on mount and when nav requests refresh
 
   // Apply filters to fetched profiles
   const filteredProfiles = useMemo(() => {

@@ -23,7 +23,7 @@ export default function BottomNav() {
         {navItems.map((item) => (
           <button
             key={item.path}
-            onClick={() => navigate(item.path)}
+            onClick={() => navigate(item.path, { state: { refresh: true } })}
             className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-colors min-w-0 ${
               isActive(item.path)
                 ? "text-primary"
