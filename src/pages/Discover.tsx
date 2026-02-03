@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import DiscoverFeed from "@/components/discovery/DiscoverFeed";
 import FiltersModal from "@/components/discovery/FiltersModal";
@@ -7,16 +8,17 @@ import { useMatch } from "@/hooks/useMatch";
 import { useScrollWheel } from "@/hooks/useScrollWheel";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { getUrl } from "aws-amplify/storage";
 import { getUserProfile } from "@/utils/auth";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 import {
   applyFilters,
   type DiscoveryProfileFull,
-  getProfilePhotoUrl,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart, X } from "lucide-react";
+import { Filter, Heart, X, Maximize2 } from "lucide-react";
+import { MatchPopup } from "@/components/discovery/MatchPopup";
 
 const client = generateClient<Schema>();
 
@@ -25,16 +27,8 @@ const client = generateClient<Schema>();
  * Transform backend UserProfile to DiscoveryProfileFull format
  */
 function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]): DiscoveryProfileFull {
-  // Build photo URLs from profilePicKey (if available)
+  // Start empty; S3 URLs added in fetch loop when profilePicKey exists
   const photoUrls: string[] = [];
-  if (backendProfile.profilePicKey) {
-    // If profilePicKey exists, you might want to construct S3 URL here
-    // For now, using placeholder approach
-    photoUrls.push(getProfilePhotoUrl(backendProfile.id || "default"));
-  } else {
-    // Use profile ID to get placeholder photo
-    photoUrls.push(getProfilePhotoUrl(backendProfile.id || "default"));
-  }
 
   // Build non-negotiables from lifestyle preferences
   const nonNegotiables: string[] = [];
@@ -50,7 +44,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     nonNegotiables.push("Alcohol okay");
   }
   
-  if (backendProfile.intention === "Date for Prom") {
+  if (backendProfile.intention === "Date for Prom" || backendProfile.intention === "In a relationship, looking for a prom date") {
     nonNegotiables.push("Serious intent");
   } else if (backendProfile.intention === "Not Sure") {
     nonNegotiables.push("Casual / open");
@@ -70,6 +64,9 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     bio: backendProfile.bio || "",
     tags: backendProfile.tags || [],
     photoUrls,
+    cohort: backendProfile.cohort || undefined,
+    intention: backendProfile.intention || undefined,
+    hometown: backendProfile.hometown || undefined,
     alcoholPreference: backendProfile.alcoholPreference || undefined,
     smokingPreference: backendProfile.smokingPreference || undefined,
     foodPreference: backendProfile.foodPreference || undefined,
@@ -105,13 +102,16 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
 }
 
 export default function Discover() {
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<DiscoveryProfileFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { filters, setFilters } = useFilters();
-  const { recordSwipe, hasPassed, hasLiked, tick } = useMatch();
+  const { recordSwipe, loadLikesFromBackend, hasPassed, hasLiked, tick } = useMatch();
   const scrollRef = useScrollWheel();
+  const [matchPopupOpen, setMatchPopupOpen] = useState(false);
+  const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
 
   // Fetch profiles from backend
   useEffect(() => {
@@ -119,6 +119,9 @@ export default function Discover() {
       try {
         setLoading(true);
         setError(null);
+
+        // Load already-liked profile ids so we exclude them from the feed
+        await loadLikesFromBackend();
         
         console.log("[Discover] Fetching profiles from backend...");
         
@@ -158,6 +161,7 @@ export default function Discover() {
           currentUserEmail,
         });
 
+<<<<<<< HEAD
         // Transform backend profiles to DiscoveryProfileFull format
         // Exclude current user, users in partner match (excludeFromDiscovery), and only completed onboarding
         const transformedProfiles = backendProfiles
@@ -168,14 +172,43 @@ export default function Discover() {
           )
           .map(transformBackendProfile)
           .filter((p) => p.id && p.name); // Filter out invalid profiles
+=======
+        // Filter: exclude current user and only completed onboarding
+        const filteredBackend = backendProfiles.filter(
+          (p) =>
+            p.email !== currentUserEmail &&
+            p.onboardingCompleted === true
+        );
+
+        // Transform to DiscoveryProfileFull format (same length as filteredBackend)
+        const transformedProfiles = filteredBackend.map(transformBackendProfile);
+
+        // Resolve S3 URLs for profile photos (profilePicKey → presigned getUrl)
+        for (let i = 0; i < filteredBackend.length; i++) {
+          const profilePicKey = filteredBackend[i].profilePicKey;
+          if (profilePicKey) {
+            try {
+              const { url } = await getUrl({
+                path: profilePicKey,
+                options: { bucket: "userPhotos" },
+              });
+              transformedProfiles[i].photoUrls = [url];
+            } catch (e) {
+              console.warn("[Discover] Failed to get photo URL for profile", filteredBackend[i].id, e);
+            }
+          }
+        }
+
+        const validProfiles = transformedProfiles.filter((p) => p.id && p.name);
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
         console.log("[Discover] Transformed profiles:", {
           total: backendProfiles.length,
-          afterExcludingCurrent: transformedProfiles.length,
-          profileIds: transformedProfiles.map(p => p.id),
+          afterExcludingCurrent: validProfiles.length,
+          profileIds: validProfiles.map((p) => p.id),
         });
 
-        setProfiles(transformedProfiles);
+        setProfiles(validProfiles);
       } catch (err) {
         console.error("[Discover] Error fetching profiles:", err);
         setError(err instanceof Error ? err.message : "Failed to load profiles");
@@ -222,21 +255,13 @@ export default function Discover() {
     return filtered;
   }, [filteredProfiles, hasPassed, hasLiked, tick]);
 
-  const handleSwipe = (profileId: string, action: "like" | "pass") => {
-    console.log("[Discover] handleSwipe called:", {
-      profileId,
-      action,
-      displayQueueCount: displayQueue.length,
-      currentTopProfile: displayQueue[0]?.id,
-    });
-    console.log("[Discover] handleSwipe called:", {
-      profileId,
-      action,
-      displayQueueCount: displayQueue.length,
-      currentTopProfile: displayQueue[0]?.id,
-    });
-    recordSwipe(profileId, action);
-    console.log("[Discover] handleSwipe complete - queue will update on next render");
+  const handleSwipe = async (profileId: string, action: "like" | "pass") => {
+    const profile = displayQueue.find((p) => p.id === profileId);
+    const result = await recordSwipe(profileId, action);
+    if (result.isMatch && profile) {
+      setMatchedProfile(profile);
+      setMatchPopupOpen(true);
+    }
   };
 
   // Scroll function to pass to DiscoverFeed - scrolls immediately
@@ -277,14 +302,30 @@ export default function Discover() {
           <h1 className="font-display text-xl font-bold text-foreground">
             Discover
           </h1>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setFiltersOpen(true)}
-            className="text-muted-foreground"
-          >
-            <Filter className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {displayQueue.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  const p = displayQueue[0];
+                  if (p) navigate(`/discover/profile/${p.id}`, { state: { profile: p } });
+                }}
+                className="text-muted-foreground"
+                title="View full profile"
+              >
+                <Maximize2 className="w-5 h-5" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFiltersOpen(true)}
+              className="text-muted-foreground"
+            >
+              <Filter className="w-5 h-5" />
+            </Button>
+          </div>
         </header>
 
         {/* Full-screen card area - scrollable */}
@@ -371,6 +412,13 @@ export default function Discover() {
         onOpenChange={setFiltersOpen}
         filters={filters}
         onSave={setFilters}
+      />
+
+      <MatchPopup
+        open={matchPopupOpen}
+        onOpenChange={setMatchPopupOpen}
+        matchedProfile={matchedProfile}
+        onKeepSwiping={() => setMatchedProfile(null)}
       />
     </div>
   );

@@ -15,6 +15,11 @@ export interface DiscoveryProfileFull {
   bio: string;
   tags: string[];
   photoUrls: string[]; // main first; empty = placeholder
+  // From onboarding
+  cohort?: string;
+  intention?: string;
+  hometown?: string;
+  sexualOrientation?: string;
   // Campus / lifestyle (for full profile)
   alcoholPreference?: string;
   smokingPreference?: string;
@@ -22,6 +27,7 @@ export interface DiscoveryProfileFull {
   favouritePlace?: string;
   teaOrCoffee?: string;
   mountainOrBeach?: string;
+<<<<<<< HEAD
   sexualOrientation?: string;
   // Fun answers (optional, added after onboarding)
   morningOrNightPerson?: string;
@@ -48,6 +54,8 @@ export interface DiscoveryProfileFull {
   pollLKPOrHeritage?: string;
   pollMorningOrAfternoon?: string;
   pollCROrLKP?: string;
+=======
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
   // Non-negotiables (for filtering and display)
   nonNegotiables: string[];
 }

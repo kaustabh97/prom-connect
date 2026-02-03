@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import SparkleBackground from "@/components/SparkleBackground";
+import { ImageEditor } from "@/components/ImageEditor";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
@@ -29,6 +30,7 @@ Amplify.configure(outputs);
 const client = generateClient<Schema>();
 
 type OnboardingStep = 
+  | "choice"           // First: "Looking for a date" vs "Already a couple"
   | "welcome" 
   | "dateOfBirth" 
   | "notifications" 
@@ -37,8 +39,8 @@ type OnboardingStep =
   | "hometown"
   | "lifestyle"
   | "photoUpload"
-  | "partnerStatus"
-  | "partnerLink";
+  | "coupleYourName"   // Couple flow: your name
+  | "couplePartnerDetails"; // Couple flow: partner name + email
 
 interface ProfileData {
   name: string;
@@ -52,8 +54,9 @@ interface ProfileData {
   hometown: string;
   notificationsEnabled: boolean;
   profilePicKey: string; // S3 key for profile picture
-  partnerStatus: string; // Looking for partner, Already have partner
-  partnerEmail: string; // Partner's IIMA email when partner is from IIMA; empty when not from IIMA
+  partnerStatus: string; // "Still looking" vs "Already found" (set at choice step)
+  partnerEmail: string;  // Partner's IIMA email (couple flow)
+  partnerName: string;   // Partner's name (couple flow)
   // Lifestyle preferences
   alcoholPreference: string;
   smokingPreference: string;
@@ -64,7 +67,11 @@ interface ProfileData {
   bio: string;
 }
 
-const steps: OnboardingStep[] = [
+// First step: ask "Looking for a date" vs "Already a couple"
+const CHOICE_STEP: OnboardingStep[] = ["choice"];
+
+// Full profile flow (after "Looking for a date")
+const FULL_FLOW_STEPS: OnboardingStep[] = [
   "welcome",
   "dateOfBirth",
   "notifications",
@@ -72,10 +79,11 @@ const steps: OnboardingStep[] = [
   "sexualityIntention",
   "hometown",
   "lifestyle",
-  "partnerStatus",
-  "partnerLink",
   "photoUpload",
 ];
+
+// Simplified couple flow (after "Already a couple")
+const COUPLE_FLOW_STEPS: OnboardingStep[] = ["coupleYourName", "couplePartnerDetails"];
 
 const alcoholOptions = ["Never", "Sometimes", "Regularly"];
 const smokingOptions = ["Never", "Sometimes", "Regularly"];
@@ -84,13 +92,18 @@ const favouritePlaceOptions = ["Tea Post", "Library", "LKP", "CR", "Sports Compl
 const teaOrCoffeeOptions = ["Tea", "Coffee", "Both"];
 const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
 
-const partnerStatusOptions = ["Still looking for my prom date 💫", "Already found my plus-one ✨"];
+const partnerStatusOptions = ["Still looking for my prom date 💫", "Already found my plus-one ✨"] as const;
 const IIMA_EMAIL_SUFFIX = "@iima.ac.in";
 
 const cohorts = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"];
 const genders = ["Man", "Woman", "Non-Binary"];
 const sexualities = ["Straight", "Gay", "Bisexual", "Queer"];
-const intentions = ["Date for Prom", "Long Term", "Not Sure"];
+const intentions = [
+  "Date for Prom",
+  "In a relationship, looking for a prom date",
+  "Long Term",
+  "Not Sure",
+];
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -104,7 +117,8 @@ const Onboarding = () => {
   const [isValidEmail, setIsValidEmail] = useState<boolean | null>(null);
 
   // Profile state
-  const [step, setStep] = useState<OnboardingStep>("welcome");
+  const [step, setStep] = useState<OnboardingStep>("choice");
+  const [flowChoice, setFlowChoice] = useState<"full" | "couple" | null>(null); // Set when user picks at choice step
   const [profile, setProfile] = useState<ProfileData>({
     name: "",
     email: "",
@@ -119,6 +133,7 @@ const Onboarding = () => {
     profilePicKey: "",
     partnerStatus: "",
     partnerEmail: "",
+    partnerName: "",
     alcoholPreference: "",
     smokingPreference: "",
     foodPreference: "",
@@ -128,8 +143,6 @@ const Onboarding = () => {
     bio: "",
   });
 
-  // Partner link: "iima" = enter email, "not-iima" = partner not from IIMA
-  const [partnerLinkChoice, setPartnerLinkChoice] = useState<"" | "iima" | "not-iima">("");
   const [partnerEmailError, setPartnerEmailError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -137,15 +150,19 @@ const Onboarding = () => {
   // Photo upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null); // For image editor
+  const [showImageEditor, setShowImageEditor] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // When "Still looking", partnerLink step is skipped
+  // Current steps: choice only, or full flow, or couple flow
   const effectiveSteps =
-    profile.partnerStatus === "Already found my plus-one ✨"
-      ? steps
-      : steps.filter((s) => s !== "partnerLink");
+    flowChoice === null
+      ? CHOICE_STEP
+      : flowChoice === "full"
+        ? FULL_FLOW_STEPS
+        : COUPLE_FLOW_STEPS;
   const currentStepIndex = effectiveSteps.indexOf(step);
   const totalSteps = effectiveSteps.length;
 
@@ -161,10 +178,9 @@ const Onboarding = () => {
           setUserEmail(authProfile.email);
           setUserName(authProfile.name || "");
           
-          // Pre-populate name and email from Google
+          // Pre-populate email only; name is collected in Name & DOB step
           setProfile(prev => ({
             ...prev,
-            name: authProfile.name || "",
             email: authProfile.email || "",
           }));
           
@@ -287,7 +303,7 @@ const Onboarding = () => {
     }
   };
 
-  // Handle file selection
+  // Handle file selection - show image editor
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -304,24 +320,66 @@ const Onboarding = () => {
       return;
     }
 
-    setSelectedFile(file);
     setUploadError(null);
 
-    // Create preview URL
+    // Create preview URL and show editor
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
+      const imageUrl = reader.result as string;
+      setOriginalImageUrl(imageUrl);
+      setShowImageEditor(true);
     };
     reader.readAsDataURL(file);
+  };
+
+  // Handle image editor save (cropped image)
+  const handleImageEditorSave = (croppedImageUrl: string) => {
+    // Convert blob URL back to File
+    fetch(croppedImageUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
+        setSelectedFile(file);
+        setPreviewUrl(croppedImageUrl);
+        setShowImageEditor(false);
+        setOriginalImageUrl(null);
+      })
+      .catch((err) => {
+        console.error("Error processing cropped image:", err);
+        setUploadError("Failed to process image");
+      });
+  };
+
+  // Handle image editor cancel
+  const handleImageEditorCancel = () => {
+    setShowImageEditor(false);
+    setOriginalImageUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   // Handle file removal
   const handleRemoveFile = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
+    setOriginalImageUrl(null);
+    setShowImageEditor(false);
     setProfile(prev => ({ ...prev, profilePicKey: "" }));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  // When user picks "Looking for a date" or "Already a couple" at the choice step
+  const handleChoice = (option: (typeof partnerStatusOptions)[number]) => {
+    setProfile(prev => ({ ...prev, partnerStatus: option }));
+    if (option === "Still looking for my prom date 💫") {
+      setFlowChoice("full");
+      setStep("welcome");
+    } else {
+      setFlowChoice("couple");
+      setStep("coupleYourName");
     }
   };
 
@@ -331,33 +389,30 @@ const Onboarding = () => {
     setUploadError(null);
 
     try {
-      // Get current user to use their ID as part of the path
-      const currentUser = await getUserProfile();
-      const userId = currentUser?.userId || currentUser?.email?.replace(/[^a-zA-Z0-9]/g, "_") || "anonymous";
-      
       // Generate unique filename
       const timestamp = Date.now();
       const fileExtension = file.name.split('.').pop() || 'jpg';
       const fileName = `profile-${timestamp}.${fileExtension}`;
-      
-      // For Amplify Gen 2, the path pattern uses {entity_id} which gets replaced
-      // with the authenticated user's identity ID. In test mode, we'll use the userId directly.
-      // The storage definition pattern is: profile-pics/{entity_id}/*
-      // But we need to use the actual path format that matches the access pattern
-      const s3Path = `profile-pics/${userId}/${fileName}`;
+<<<<<<< HEAD
+=======
+
+      // IMPORTANT: The storage access rule allow.entity('identity') requires the path to use
+      // the Cognito Identity ID. Use the path callback so Amplify injects identityId.
+      // This works for both authenticated users and unauthenticated (test mode) users -
+      // both get an identity from the Identity Pool.
+      const pathFn = ({ identityId }: { identityId: string }) =>
+        `profile-pics/${identityId}/${fileName}`;
 
       console.log("[Onboarding] Uploading photo to S3:", {
-        path: s3Path,
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        userId,
         storageConfigured: !!(outputs as any).storage,
         outputsKeys: Object.keys(outputs),
       });
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
       // Check if storage is configured in amplify_outputs.json
-      // If not, the backend needs to be synced with 'npx ampx sandbox'
       if (!(outputs as any).storage) {
         const errorMsg = "Storage bucket is not configured. Please run 'npx ampx sandbox' in the project root to sync the backend and create the S3 storage bucket.";
         console.error("[Onboarding] Storage not configured in amplify_outputs.json");
@@ -365,21 +420,34 @@ const Onboarding = () => {
         throw new Error(errorMsg);
       }
 
-      // Upload to S3 using the storage bucket
-      // The path should match the storage definition pattern: profile-pics/{entity_id}/*
-      // Specify the storage resource name 'userPhotos' as defined in amplify/data/resource.ts
+<<<<<<< HEAD
+      // Upload to S3 - use path callback to get the Cognito Identity ID
+      // The path pattern 'profile-pics/{entity_id}/*' requires the actual Cognito Identity ID
+      // Amplify will resolve {entity_id} to the identity ID via the path callback
       const result = await uploadData({
-        path: s3Path,
+        path: ({ identityId }) => {
+          // identityId is the Cognito Identity ID (even in test mode, Amplify creates an unauthenticated identity)
+          if (!identityId) {
+            throw new Error("Unable to get identity ID for S3 upload. Please ensure you're signed in.");
+          }
+          return `profile-pics/${identityId}/${fileName}`;
+        },
+=======
+      // Upload to S3 - path callback ensures we use Cognito Identity ID (required by IAM policy)
+      const result = await uploadData({
+        path: pathFn,
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
         data: file,
         options: {
           contentType: file.type,
-          bucket: 'userPhotos', // Storage resource name from amplify/data/resource.ts
+          bucket: 'userPhotos',
         },
       }).result;
 
-      console.log("[Onboarding] Photo uploaded successfully:", result);
+      // result.path is the resolved S3 path (e.g. profile-pics/{identityId}/profile-xxx.jpg)
+      const s3Path = (result as { path?: string }).path ?? `profile-pics/${fileName}`;
+      console.log("[Onboarding] Photo uploaded successfully:", { path: s3Path, result });
       
-      // Return the S3 key (path)
       return s3Path;
     } catch (error) {
       console.error("[Onboarding] Error uploading photo:", error);
@@ -397,77 +465,90 @@ const Onboarding = () => {
   };
 
   const nextStep = async () => {
-    const nextIndex = currentStepIndex + 1;
-    
-    // Handle photo upload step
+    // Choice step: user advances by clicking an option (no Next button)
+    if (step === "choice") return;
+
+    // Full flow: photoUpload is last → upload then save
     if (step === "photoUpload") {
+<<<<<<< HEAD
+=======
+      let uploadedS3Key: string | undefined;
       // If photo is selected but not uploaded yet, upload it first
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
       if (selectedFile && !profile.profilePicKey) {
         try {
           setIsUploading(true);
           setUploadError(null);
           const s3Key = await uploadPhotoToS3(selectedFile);
+          uploadedS3Key = s3Key;
           setProfile(prev => ({ ...prev, profilePicKey: s3Key }));
-          console.log("[Onboarding] Photo uploaded, S3 key:", s3Key);
         } catch (error) {
           setUploadError(error instanceof Error ? error.message : "Failed to upload photo");
           setIsUploading(false);
-          return; // Don't proceed if upload fails
+          return;
         }
       }
-    }
-
-    // partnerStatus: "Still looking" → skip partnerLink, go to photoUpload; "Already have partner" → go to partnerLink
-    if (step === "partnerStatus") {
-      if (profile.partnerStatus === "Still looking for my prom date 💫") {
-        setStep("photoUpload");
+<<<<<<< HEAD
+      await saveProfileToBackend();
+=======
+      
+<<<<<<< HEAD
+      // If we're on the last step (photoUpload), save profile to backend
+      // Pass uploadedS3Key directly - React setState is async, so profile.profilePicKey may not be updated yet
+      if (nextIndex >= steps.length) {
+        await saveProfileToBackend(uploadedS3Key);
         return;
       }
-      setStep("partnerLink");
+=======
+      // photoUpload is the last step — save profile to backend
+      // Pass uploadedS3Key directly - React setState is async, so profile.profilePicKey may not be updated yet
+      await saveProfileToBackend(uploadedS3Key);
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
       return;
     }
 
-    // partnerLink → go to photoUpload (everyone adds photo)
-    if (step === "partnerLink") {
-      setStep("photoUpload");
+    // Couple flow: last step is couplePartnerDetails → save minimal and redirect
+    if (step === "couplePartnerDetails") {
+      await saveCoupleToBackend();
       return;
     }
 
-    // photoUpload is the last step for everyone → save
-    if (step === "photoUpload") {
-      await saveProfileToBackend();
-      return;
-    }
-    
+    const nextIndex = currentStepIndex + 1;
     if (nextIndex < effectiveSteps.length) {
       setStep(effectiveSteps[nextIndex]);
     }
   };
 
-  const saveProfileToBackend = async () => {
+  const saveProfileToBackend = async (profilePicKeyOverride?: string) => {
+    // Use override when we just uploaded (React state may not have updated yet)
+    const profilePicKeyToSave = profilePicKeyOverride ?? profile.profilePicKey;
+
     console.log("[Onboarding] ========================================");
-    console.log("[Onboarding] Starting profile save process...");
+    console.log("[Onboarding] Starting full profile save...");
     setIsSaving(true);
     setSaveError(null);
     
     try {
       const currentUser = await getUserProfile();
-      const currentUserId = currentUser?.userId ?? "";
-      
-      // partnerEmail: set when partnerLinkChoice is "iima" and we have valid email
-      const partnerEmailToSave =
-        partnerLinkChoice === "iima" && profile.partnerEmail.trim().toLowerCase().endsWith(IIMA_EMAIL_SUFFIX)
-          ? profile.partnerEmail.trim().toLowerCase()
-          : undefined;
+<<<<<<< HEAD
+=======
       
       // Log profile data before saving
       console.log("[Onboarding] Profile data to save:", {
         email: profile.email,
-        userId: currentUserId,
-        partnerStatus: profile.partnerStatus,
-        partnerEmail: partnerEmailToSave,
+        name: profile.name,
+        dateOfBirth: profile.dateOfBirth,
+        age: profile.age,
+        cohort: profile.cohort,
+        gender: profile.gender,
+        sexualOrientation: profile.sexualOrientation,
+        intention: profile.intention,
+        hometown: profile.hometown,
+        notificationsEnabled: profile.notificationsEnabled,
+        profilePicKey: profilePicKeyToSave,
         onboardingCompleted: true,
       });
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
         // Check if profile already exists for this email
         console.log("[Onboarding] Checking for existing profile with email:", profile.email);
@@ -519,9 +600,9 @@ const Onboarding = () => {
           throw new Error(listErrors[0]?.message || "Failed to check existing profile");
         }
 
+        // Only include fields that exist on the deployed CreateUserProfileInput.
         const profileData = {
           email: profile.email,
-          userId: currentUserId || undefined,
           name: profile.name,
           dateOfBirth: profile.dateOfBirth,
           age: profile.age ?? undefined,
@@ -531,9 +612,8 @@ const Onboarding = () => {
           intention: profile.intention,
           hometown: profile.hometown,
           notificationsEnabled: profile.notificationsEnabled,
+<<<<<<< HEAD
           profilePicKey: profile.profilePicKey || undefined,
-          partnerStatus: profile.partnerStatus || undefined,
-          partnerEmail: partnerEmailToSave,
           alcoholPreference: profile.alcoholPreference || undefined,
           smokingPreference: profile.smokingPreference || undefined,
           foodPreference: profile.foodPreference || undefined,
@@ -541,6 +621,9 @@ const Onboarding = () => {
           teaOrCoffee: profile.teaOrCoffee || undefined,
           mountainOrBeach: profile.mountainOrBeach || undefined,
           bio: profile.bio || undefined,
+=======
+          profilePicKey: profilePicKeyToSave || undefined,
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
           onboardingCompleted: true,
         };
 
@@ -563,7 +646,6 @@ const Onboarding = () => {
             {
               id: existingProfile.id,
               email: profileData.email,
-              userId: profileData.userId,
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
@@ -574,8 +656,6 @@ const Onboarding = () => {
               hometown: profileData.hometown,
               notificationsEnabled: profileData.notificationsEnabled,
               profilePicKey: profileData.profilePicKey,
-              partnerStatus: profileData.partnerStatus,
-              partnerEmail: profileData.partnerEmail,
               alcoholPreference: profileData.alcoholPreference,
               smokingPreference: profileData.smokingPreference,
               foodPreference: profileData.foodPreference,
@@ -622,7 +702,6 @@ const Onboarding = () => {
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
               email: profileData.email,
-              userId: profileData.userId,
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
@@ -633,8 +712,6 @@ const Onboarding = () => {
               hometown: profileData.hometown,
               notificationsEnabled: profileData.notificationsEnabled,
               profilePicKey: profileData.profilePicKey,
-              partnerStatus: profileData.partnerStatus,
-              partnerEmail: profileData.partnerEmail,
               alcoholPreference: profileData.alcoholPreference,
               smokingPreference: profileData.smokingPreference,
               foodPreference: profileData.foodPreference,
@@ -673,60 +750,7 @@ const Onboarding = () => {
           });
         }
         
-        // If user added partner's IIMA email, create MatchRequest and optionally send invite email
-        if (partnerEmailToSave && currentUserId) {
-          const currentUserEmail = profile.email.trim().toLowerCase();
-          try {
-            // @ts-ignore - authMode
-            const { data: partnerProfiles } = await client.models.UserProfile.list(
-              { filter: { email: { eq: partnerEmailToSave } } },
-              { authMode: authMode as 'userPool' | 'apiKey' }
-            );
-            const partner = partnerProfiles?.[0];
-            const partnerUserId = partner?.userId ?? undefined;
-
-            // @ts-ignore - authMode
-            const { errors: requestErrors } = await client.models.MatchRequest.create(
-              {
-                fromUserId: currentUserId,
-                fromEmail: currentUserEmail,
-                fromName: profile.name || undefined,
-                toEmail: partnerEmailToSave,
-                toUserId: partnerUserId,
-                status: "pending",
-                createdAt: new Date().toISOString(),
-              },
-              { authMode: authMode as 'userPool' | 'apiKey' }
-            );
-            if (requestErrors) {
-              console.warn("[Onboarding] Could not create match request:", requestErrors);
-            } else {
-              if (partner) {
-                // Partner has profile: they will see the request in-app to confirm
-                console.log("[Onboarding] Match request sent to", partnerEmailToSave, "- they can confirm in the app");
-              } else {
-                // Partner has no profile: send email with link to create profile
-                try {
-                  const appUrl = (await import("@/config")).APP_URL;
-                  // @ts-ignore - custom query
-                  await client.queries.sendPartnerInviteEmail({
-                    toEmail: partnerEmailToSave,
-                    fromName: profile.name || "Someone",
-                    appUrl,
-                  });
-                  console.log("[Onboarding] Invite email sent to", partnerEmailToSave);
-                } catch (emailErr) {
-                  console.warn("[Onboarding] Could not send invite email:", emailErr);
-                }
-              }
-            }
-          } catch (reqErr) {
-            console.warn("[Onboarding] Match request flow failed:", reqErr);
-          }
-        }
-        
         console.log("[Onboarding] ✅ Profile save completed successfully!");
-        // If this user has pending partner requests (someone added their email), show matches so they can accept
         const currentUserEmailForRequests = profile.email.trim().toLowerCase();
         try {
           const { data: requestsToMe } = await client.models.MatchRequest.listMatchRequestByToEmail(
@@ -735,7 +759,6 @@ const Onboarding = () => {
           );
           const hasPending = (requestsToMe ?? []).some((r) => r.status === "pending");
           if (hasPending) {
-            console.log("[Onboarding] User has pending partner request(s), navigating to matches");
             navigate("/matches");
             setIsSaving(false);
             return;
@@ -769,7 +792,113 @@ const Onboarding = () => {
       }
   };
 
+  const saveCoupleToBackend = async () => {
+    console.log("[Onboarding] Saving couple flow (minimal profile + partner link)...");
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const currentUser = await getUserProfile();
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const isAuthenticated = !!session.tokens;
+      const authMode = isAuthenticated ? "userPool" : "apiKey";
+      const partnerEmailTrim = profile.partnerEmail.trim().toLowerCase();
+      if (!partnerEmailTrim.endsWith(IIMA_EMAIL_SUFFIX)) {
+        setSaveError("Partner email must be an @iima.ac.in address.");
+        setIsSaving(false);
+        return;
+      }
+      if (partnerEmailTrim === profile.email.trim().toLowerCase()) {
+        setSaveError("You cannot add your own email as partner.");
+        setIsSaving(false);
+        return;
+      }
+
+      // @ts-ignore - authMode option
+      const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
+        { filter: { email: { eq: profile.email } } },
+        { authMode: authMode as "userPool" | "apiKey" }
+      );
+      if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
+
+      const minimalData = {
+        email: profile.email,
+        name: profile.name.trim() || undefined,
+        bio: profile.partnerName.trim() ? `Partner: ${profile.partnerName.trim()}` : undefined,
+        onboardingCompleted: true,
+      };
+
+      if (existingProfiles?.length) {
+        // @ts-ignore - update args
+        await client.models.UserProfile.update(
+          { id: existingProfiles[0].id, ...minimalData },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+      } else {
+        // @ts-ignore - create args
+        await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+      }
+
+      const currentUserId = currentUser?.userId ?? existingProfiles?.[0]?.id ?? "";
+      const currentUserEmail = profile.email.trim().toLowerCase();
+      try {
+        // @ts-ignore - authMode
+        const { data: partnerProfiles } = await client.models.UserProfile.list(
+          { filter: { email: { eq: partnerEmailTrim } } },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+        const partner = partnerProfiles?.[0];
+        // @ts-ignore - MatchRequest create
+        await client.models.MatchRequest.create(
+          {
+            fromUserId: currentUserId,
+            fromEmail: currentUserEmail,
+            fromName: profile.name || undefined,
+            toEmail: partnerEmailTrim,
+            toUserId: partner?.userId ?? undefined,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+          },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+        if (!partner) {
+          try {
+            const appUrl = (await import("@/config")).APP_URL;
+            await client.queries.sendPartnerInviteEmail({
+              toEmail: partnerEmailTrim,
+              fromName: profile.name || "Someone",
+              appUrl,
+            });
+          } catch (_) {}
+        }
+      } catch (reqErr) {
+        console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
+      }
+
+      let hasPending = false;
+      try {
+        // @ts-ignore - MatchRequest list
+        const { data: requestsToMe } = await client.models.MatchRequest.listMatchRequestByToEmail(
+          { toEmail: currentUserEmail },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+        hasPending = (requestsToMe ?? []).some((r: { status: string }) => r.status === "pending");
+      } catch (_) {}
+      navigate(hasPending ? "/matches" : "/discover/profile");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const prevStep = () => {
+    // From first step of a flow, go back to choice
+    if (step === "welcome" || step === "coupleYourName") {
+      setStep("choice");
+      setFlowChoice(null);
+      return;
+    }
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
       setStep(effectiveSteps[prevIndex]);
@@ -778,12 +907,14 @@ const Onboarding = () => {
 
   const canProceed = () => {
     switch (step) {
+      case "choice":
+        return true; // Advance via option buttons, not Next
       case "welcome":
         return true;
       case "dateOfBirth":
-        return profile.dateOfBirth.length === 10 && profile.age !== null;
+        return profile.name.trim() !== "" && profile.dateOfBirth.length === 10 && profile.age !== null;
       case "notifications":
-        return true; // Optional
+        return true;
       case "ageCohortGender":
         return profile.cohort !== "" && profile.gender !== "";
       case "sexualityIntention":
@@ -791,20 +922,18 @@ const Onboarding = () => {
       case "hometown":
         return profile.hometown.trim() !== "";
       case "lifestyle":
-        return true; // All optional
+        return true;
       case "photoUpload":
         return profile.profilePicKey !== "" || selectedFile !== null;
-      case "partnerStatus":
-        return profile.partnerStatus !== "";
-      case "partnerLink":
-        if (partnerLinkChoice === "not-iima") return true;
-        if (partnerLinkChoice === "iima") {
-          const email = profile.partnerEmail.trim().toLowerCase();
-          if (!email.endsWith(IIMA_EMAIL_SUFFIX)) return false;
-          if (email === profile.email.trim().toLowerCase()) return false; // can't add self
-          return true;
-        }
-        return false;
+      case "coupleYourName":
+        return profile.name.trim() !== "";
+      case "couplePartnerDetails": {
+        const email = profile.partnerEmail.trim().toLowerCase();
+        if (!profile.partnerName.trim()) return false;
+        if (!email.endsWith(IIMA_EMAIL_SUFFIX)) return false;
+        if (email === profile.email.trim().toLowerCase()) return false;
+        return true;
+      }
       default:
         return false;
     }
@@ -812,6 +941,39 @@ const Onboarding = () => {
 
   const renderStep = () => {
     switch (step) {
+      case "choice":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">Are you here for a date or already a couple?</h2>
+              <p className="text-muted-foreground">
+                We’ll tailor the next steps to you.
+              </p>
+            </div>
+            <div className="space-y-3">
+              {partnerStatusOptions.map((option) => (
+                <Button
+                  key={option}
+                  variant={profile.partnerStatus === option ? "default" : "outline"}
+                  className="w-full h-14 text-base justify-start px-6"
+                  onClick={() => handleChoice(option)}
+                >
+                  <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
+                    {profile.partnerStatus === option ? <Check className="w-5 h-5" /> : null}
+                  </span>
+                  {option}
+                </Button>
+              ))}
+            </div>
+          </motion.div>
+        );
+
       case "welcome":
         return (
           <motion.div
@@ -821,7 +983,11 @@ const Onboarding = () => {
             className="space-y-6 text-center"
           >
             <h2 className="font-display text-3xl font-bold mb-4">
+<<<<<<< HEAD
               Hey {profile.name || "you"} 👋
+=======
+              Hi.
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
               Prom 2026 is calling – and so is your future date.{" "}
@@ -842,8 +1008,25 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
+<<<<<<< HEAD
               <h2 className="font-display text-2xl font-bold mb-2">When did you enter this world?</h2>
               <p className="text-muted-foreground">So we know you&apos;re old enough to dance the night away</p>
+=======
+              <h2 className="font-display text-2xl font-bold mb-2">Name & Date of Birth</h2>
+              <p className="text-muted-foreground">Tell us your name and when you were born</p>
+            </div>
+            <div>
+              <Label htmlFor="name" className="text-base mb-3 block">
+                Name
+              </Label>
+              <Input
+                id="name"
+                placeholder="Your name"
+                value={profile.name}
+                onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))}
+                className="text-base"
+              />
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
             </div>
             <div>
               <Label htmlFor="dateOfBirth" className="text-base mb-3 block">
@@ -1245,39 +1428,48 @@ const Onboarding = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <Label className="text-base mb-3 block">Looking good ✨</Label>
-                <div className="relative w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden border-2 border-border bg-muted">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Profile preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : profile.profilePicKey ? (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="w-16 h-16 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground ml-2">Uploaded – prom ready!</p>
-                    </div>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon"
-                    className="absolute top-2 right-2"
-                    onClick={handleRemoveFile}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                <Label className="text-base mb-3 block text-center">Your profile photo</Label>
+                <div className="relative w-48 h-48 mx-auto">
+                  {/* Circular preview */}
+                  <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-primary/20 bg-muted shadow-lg ring-4 ring-background">
+                    {previewUrl ? (
+                      <img
+                        src={previewUrl}
+                        alt="Profile preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : profile.profilePicKey ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center">
+                        <ImageIcon className="w-12 h-12 text-muted-foreground mb-2" />
+                        <p className="text-xs text-muted-foreground text-center px-2">Uploaded</p>
+                      </div>
+                    ) : null}
+                  </div>
+                  {/* Remove button */}
+                  {previewUrl && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg"
+                      onClick={handleRemoveFile}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
                 {!profile.profilePicKey && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Swap for a better one
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Change photo
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
@@ -1302,7 +1494,7 @@ const Onboarding = () => {
           </motion.div>
         );
 
-      case "partnerStatus":
+      case "coupleYourName":
         return (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1312,33 +1504,23 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">The big question</h2>
-              <p className="text-muted-foreground">
-                Still on the hunt, or already locked in with your plus-one?
-              </p>
+              <h2 className="font-display text-2xl font-bold mb-2">Your name</h2>
+              <p className="text-muted-foreground">What should we call you?</p>
             </div>
-
-            <div className="space-y-3">
-              {partnerStatusOptions.map((option) => (
-                <Button
-                  key={option}
-                  variant={profile.partnerStatus === option ? "default" : "outline"}
-                  className="w-full h-14 text-base justify-start px-6"
-                  onClick={() => setProfile(prev => ({ ...prev, partnerStatus: option }))}
-                >
-                  <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
-                    {profile.partnerStatus === option ? (
-                      <Check className="w-5 h-5" />
-                    ) : null}
-                  </span>
-                  {option}
-                </Button>
-              ))}
+            <div>
+              <Label htmlFor="coupleName" className="text-base mb-3 block">Name</Label>
+              <Input
+                id="coupleName"
+                placeholder="Your name"
+                value={profile.name}
+                onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value.trim() }))}
+                className="text-base"
+              />
             </div>
           </motion.div>
         );
 
-      case "partnerLink":
+      case "couplePartnerDetails":
         return (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1348,77 +1530,48 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">Link your plus-one</h2>
-              <p className="text-muted-foreground">
-                Is your person from IIMA too? Drop their email – when they accept, you&apos;re matched. Easy.
-              </p>
+              <h2 className="font-display text-2xl font-bold mb-2">Your partner</h2>
+              <p className="text-muted-foreground">Partner&apos;s name and IIMA email – we&apos;ll link you two.</p>
             </div>
-
-            <div className="space-y-3">
-              <Button
-                variant={partnerLinkChoice === "iima" ? "default" : "outline"}
-                className="w-full h-14 text-base justify-start px-6"
-                onClick={() => {
-                  setPartnerLinkChoice("iima");
+            <div>
+              <Label htmlFor="partnerName" className="text-base mb-3 block">Partner&apos;s name</Label>
+              <Input
+                id="partnerName"
+                placeholder="Partner's name"
+                value={profile.partnerName}
+                onChange={(e) => {
+                  setProfile((prev) => ({ ...prev, partnerName: e.target.value }));
                   setPartnerEmailError(null);
-                  setProfile((prev) => ({ ...prev, partnerEmail: "" }));
                 }}
-              >
-                <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
-                  {partnerLinkChoice === "iima" ? <Check className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
-                </span>
-                Yep, they&apos;re from IIMA
-              </Button>
-
-              {partnerLinkChoice === "iima" && (
-                <div className="pl-2 space-y-2">
-                  <Label htmlFor="partnerEmail" className="text-sm">
-                    Their @iima.ac.in email
-                  </Label>
-                  <Input
-                    id="partnerEmail"
-                    type="email"
-                    placeholder="partner@iima.ac.in"
-                    value={profile.partnerEmail}
-                    onChange={(e) => {
-                      setProfile((prev) => ({ ...prev, partnerEmail: e.target.value }));
-                      setPartnerEmailError(null);
-                    }}
-                    onBlur={() => {
-                      const email = profile.partnerEmail.trim();
-                      if (email && !email.toLowerCase().endsWith(IIMA_EMAIL_SUFFIX)) {
-                        setPartnerEmailError("Gotta be @iima.ac.in – no outsiders here");
-                      } else if (email && email.toLowerCase() === profile.email.trim().toLowerCase()) {
-                        setPartnerEmailError("Nice try, but you can&apos;t add yourself 😏");
-                      } else {
-                        setPartnerEmailError(null);
-                      }
-                    }}
-                    className="h-12"
-                  />
-                  {partnerEmailError && (
-                    <p className="text-sm text-destructive">{partnerEmailError}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    They&apos;ll need to sign up and add your email back – then it&apos;s a match!
-                  </p>
-                </div>
+                className="text-base"
+              />
+            </div>
+            <div>
+              <Label htmlFor="partnerEmail" className="text-base mb-3 block">Partner&apos;s IIMA email</Label>
+              <Input
+                id="partnerEmail"
+                type="email"
+                placeholder="partner@iima.ac.in"
+                value={profile.partnerEmail}
+                onChange={(e) => {
+                  setProfile((prev) => ({ ...prev, partnerEmail: e.target.value }));
+                  setPartnerEmailError(null);
+                }}
+                onBlur={() => {
+                  const email = profile.partnerEmail.trim().toLowerCase();
+                  if (email && !email.endsWith(IIMA_EMAIL_SUFFIX)) {
+                    setPartnerEmailError("Please enter a valid @iima.ac.in email");
+                  } else if (email && email === profile.email.trim().toLowerCase()) {
+                    setPartnerEmailError("You cannot add your own email");
+                  } else {
+                    setPartnerEmailError(null);
+                  }
+                }}
+                className="text-base"
+              />
+              {partnerEmailError && (
+                <p className="text-sm text-destructive mt-2">{partnerEmailError}</p>
               )}
-
-              <Button
-                variant={partnerLinkChoice === "not-iima" ? "default" : "outline"}
-                className="w-full h-14 text-base justify-start px-6"
-                onClick={() => {
-                  setPartnerLinkChoice("not-iima");
-                  setProfile((prev) => ({ ...prev, partnerEmail: "" }));
-                  setPartnerEmailError(null);
-                }}
-              >
-                <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
-                  {partnerLinkChoice === "not-iima" ? <Check className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
-                </span>
-                Nah, they&apos;re not from IIMA
-              </Button>
             </div>
           </motion.div>
         );
@@ -1590,34 +1743,49 @@ const Onboarding = () => {
           </div>
         </main>
 
-        {/* Next Button */}
-        <div className="px-4 pb-6 pt-4">
-          {saveError && (
-            <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
-              <p className="text-sm text-destructive text-center">{saveError}</p>
-            </div>
-          )}
-          <Button
-            variant="gold"
-            size="lg"
-            className="w-full h-14 text-base font-semibold"
-            onClick={nextStep}
-            disabled={!canProceed() || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                Almost there...
-              </>
-            ) : (
-              <>
-                Let&apos;s go
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </>
+        {/* Next Button (hidden on choice step – user picks an option to advance) */}
+        {step !== "choice" && (
+          <div className="px-4 pb-6 pt-4">
+            {saveError && (
+              <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive text-center">{saveError}</p>
+              </div>
             )}
-          </Button>
-        </div>
+            <Button
+              variant="gold"
+              size="lg"
+              className="w-full h-14 text-base font-semibold"
+              onClick={nextStep}
+              disabled={!canProceed() || isSaving}
+            >
+              {isSaving ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Almost there...
+                </>
+              ) : (
+                <>
+                  Let&apos;s go
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Image Editor Modal */}
+      <AnimatePresence>
+        {showImageEditor && originalImageUrl && (
+          <ImageEditor
+            imageUrl={originalImageUrl}
+            onSave={handleImageEditorSave}
+            onCancel={handleImageEditorCancel}
+            aspectRatio={1}
+            shape="circle"
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

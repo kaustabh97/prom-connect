@@ -4,6 +4,7 @@ export const handler = async (event: { arguments: PartnerInviteArgs }) => {
   const { toEmail, fromName, appUrl } = event.arguments;
 
   try {
+    // @ts-expect-error - Package will be installed by Amplify during build
     const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
     const ses = new SESClient({ region: process.env.AWS_REGION || "us-east-1" });
 

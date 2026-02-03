@@ -1,9 +1,9 @@
 {
   "auth": {
-    "user_pool_id": "ap-south-1_4b26SQuvw",
+    "user_pool_id": "ap-south-1_KLqCGGrmE",
     "aws_region": "ap-south-1",
-    "user_pool_client_id": "7p3prkdokknbhij1nn0j1nm67s",
-    "identity_pool_id": "ap-south-1:bc7d6b60-04ce-438a-8cf7-78f843bcb33f",
+    "user_pool_client_id": "dhb03nluvap03fsbdmdb5fb5c",
+    "identity_pool_id": "ap-south-1:ce1a6b7f-7e8c-49d7-968b-4c929319e4dc",
     "mfa_methods": [],
     "standard_required_attributes": [
       "email"
@@ -49,9 +49,9 @@
     "unauthenticated_identities_enabled": true
   },
   "data": {
-    "url": "https://ddsmxbthnvf2jojznvpwca7uri.appsync-api.ap-south-1.amazonaws.com/graphql",
+    "url": "https://yhjdysr72vfg5h7juyo5gco734.appsync-api.ap-south-1.amazonaws.com/graphql",
     "aws_region": "ap-south-1",
-    "api_key": "da2-hguf5ypvsbealahsvizb6esdgu",
+    "api_key": "da2-x4int6bvtbgctlnqttdtbzllhu",
     "default_authorization_type": "API_KEY",
     "authorization_types": [
       "AMAZON_COGNITO_USER_POOLS",
@@ -68,6 +68,13 @@
               "isArray": false,
               "type": "ID",
               "isRequired": true,
+              "attributes": []
+            },
+            "userId": {
+              "name": "userId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
               "attributes": []
             },
             "email": {
@@ -135,6 +142,20 @@
             },
             "hometown": {
               "name": "hometown",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "partnerStatus": {
+              "name": "partnerStatus",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "partnerEmail": {
+              "name": "partnerEmail",
               "isArray": false,
               "type": "String",
               "isRequired": false,
@@ -211,8 +232,176 @@
               "isRequired": false,
               "attributes": []
             },
+            "morningOrNightPerson": {
+              "name": "morningOrNightPerson",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "idealWeekend": {
+              "name": "idealWeekend",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "goToKaraokeSong": {
+              "name": "goToKaraokeSong",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "superpowerChoice": {
+              "name": "superpowerChoice",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "favouriteMovieGenre": {
+              "name": "favouriteMovieGenre",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "secretTalent": {
+              "name": "secretTalent",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "favouriteChaiSpot": {
+              "name": "favouriteChaiSpot",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "idealPromOutfit": {
+              "name": "idealPromOutfit",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "messOrOutside": {
+              "name": "messOrOutside",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "bestDateSpotOnCampus": {
+              "name": "bestDateSpotOnCampus",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "bollywoodOrEnglishAtProm": {
+              "name": "bollywoodOrEnglishAtProm",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "lateNightRitual": {
+              "name": "lateNightRitual",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "perfectSaturdayAtIIMA": {
+              "name": "perfectSaturdayAtIIMA",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "goToBollywoodSong": {
+              "name": "goToBollywoodSong",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollTniteOrStayIn": {
+              "name": "pollTniteOrStayIn",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "poll145Surprises": {
+              "name": "poll145Surprises",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollTeaPostOrNestle": {
+              "name": "pollTeaPostOrNestle",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollMaggiOrChai": {
+              "name": "pollMaggiOrChai",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollDormOrLibrary": {
+              "name": "pollDormOrLibrary",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollSectionOrBatch": {
+              "name": "pollSectionOrBatch",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollLKPOrHeritage": {
+              "name": "pollLKPOrHeritage",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollMorningOrAfternoon": {
+              "name": "pollMorningOrAfternoon",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "pollCROrLKP": {
+              "name": "pollCROrLKP",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
             "onboardingCompleted": {
               "name": "onboardingCompleted",
+              "isArray": false,
+              "type": "Boolean",
+              "isRequired": false,
+              "attributes": []
+            },
+            "excludeFromDiscovery": {
+              "name": "excludeFromDiscovery",
               "isArray": false,
               "type": "Boolean",
               "isRequired": false,
@@ -241,6 +430,144 @@
             {
               "type": "model",
               "properties": {}
+            },
+            {
+              "type": "auth",
+              "properties": {
+                "rules": [
+                  {
+                    "allow": "public",
+                    "provider": "apiKey",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  },
+                  {
+                    "allow": "private",
+                    "operations": [
+                      "create",
+                      "update",
+                      "delete",
+                      "read"
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "primaryKeyInfo": {
+            "isCustomPrimaryKey": false,
+            "primaryKeyFieldName": "id",
+            "sortKeyFieldNames": []
+          }
+        },
+        "MatchRequest": {
+          "name": "MatchRequest",
+          "fields": {
+            "id": {
+              "name": "id",
+              "isArray": false,
+              "type": "ID",
+              "isRequired": true,
+              "attributes": []
+            },
+            "fromUserId": {
+              "name": "fromUserId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "fromEmail": {
+              "name": "fromEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "fromName": {
+              "name": "fromName",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "toEmail": {
+              "name": "toEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": true,
+              "attributes": []
+            },
+            "toUserId": {
+              "name": "toUserId",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "status": {
+              "name": "status",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
+            "createdAt": {
+              "name": "createdAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": []
+            },
+            "updatedAt": {
+              "name": "updatedAt",
+              "isArray": false,
+              "type": "AWSDateTime",
+              "isRequired": false,
+              "attributes": [],
+              "isReadOnly": true
+            }
+          },
+          "syncable": true,
+          "pluralName": "MatchRequests",
+          "attributes": [
+            {
+              "type": "model",
+              "properties": {}
+            },
+            {
+              "type": "key",
+              "properties": {
+                "name": "matchRequestsByFromUserId",
+                "queryField": "listMatchRequestByFromUserId",
+                "fields": [
+                  "fromUserId"
+                ]
+              }
+            },
+            {
+              "type": "key",
+              "properties": {
+                "name": "matchRequestsByToEmail",
+                "queryField": "listMatchRequestByToEmail",
+                "fields": [
+                  "toEmail"
+                ]
+              }
+            },
+            {
+              "type": "key",
+              "properties": {
+                "name": "matchRequestsByToUserId",
+                "queryField": "listMatchRequestByToUserId",
+                "fields": [
+                  "toUserId"
+                ]
+              }
             },
             {
               "type": "auth",
@@ -719,8 +1046,63 @@
         }
       },
       "enums": {},
-      "nonModels": {}
+      "nonModels": {},
+      "queries": {
+        "sendPartnerInviteEmail": {
+          "name": "sendPartnerInviteEmail",
+          "isArray": false,
+          "type": "AWSJSON",
+          "isRequired": false,
+          "arguments": {
+            "toEmail": {
+              "name": "toEmail",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            },
+            "fromName": {
+              "name": "fromName",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            },
+            "appUrl": {
+              "name": "appUrl",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false
+            }
+          }
+        }
+      }
     }
+  },
+  "storage": {
+    "aws_region": "ap-south-1",
+    "bucket_name": "amplify-vitereactshadcnts-userphotosbucket6594de53-g2z62latuysa",
+    "buckets": [
+      {
+        "name": "userPhotos",
+        "bucket_name": "amplify-vitereactshadcnts-userphotosbucket6594de53-g2z62latuysa",
+        "aws_region": "ap-south-1",
+        "paths": {
+          "profile-pics/*": {
+            "authenticated": [
+              "get",
+              "list"
+            ]
+          },
+          "profile-pics/${cognito-identity.amazonaws.com:sub}/*": {
+            "entityidentity": [
+              "get",
+              "list",
+              "write",
+              "delete"
+            ]
+          }
+        }
+      }
+    ]
   },
   "version": "1.4"
 }

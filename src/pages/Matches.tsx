@@ -9,11 +9,13 @@ import { useChat } from "@/hooks/useChat";
 import { useMatches, type MatchWithDetails } from "@/hooks/useMatches";
 import { useMatchRequests } from "@/hooks/useMatchRequests";
 import { getUserProfile } from "@/utils/auth";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { 
   Heart, 
   MessageCircle, 
   Sparkles, 
-  Eye, 
   X,
   Send,
   MoreVertical,
@@ -23,7 +25,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -32,11 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Extended match type for UI
-interface MatchForUI extends MatchWithDetails {
-  displayName: string;
-  tags: string[];
-}
+const client = generateClient<Schema>();
 
 const Matches = () => {
   const navigate = useNavigate();
@@ -49,7 +47,6 @@ const Matches = () => {
   
   // UI state
   const [activeChat, setActiveChat] = useState<string | null>(null);
-  const [showRevealModal, setShowRevealModal] = useState(false);
   const [showPromAsk, setShowPromAsk] = useState(false);
   const [showCreateMatch, setShowCreateMatch] = useState(false);
   const [newMatchEmail, setNewMatchEmail] = useState("");
@@ -62,20 +59,44 @@ const Matches = () => {
       setIsAuthLoading(true);
       try {
         const profile = await getUserProfile();
-        if (profile && profile.userId) {
-          setCurrentUserId(profile.userId);
-          setCurrentUserEmail(profile.email || "");
-        } else {
-          // For development: use a test user ID
-          setCurrentUserId("dev-user-" + Math.random().toString(36).substr(2, 9));
-          setCurrentUserEmail("dev@test.com");
-          setAuthError("Not authenticated - using dev mode");
+
+        if (!profile?.email) {
+          setAuthError("Please sign in to view your matches.");
+          setCurrentUserId("");
+          setCurrentUserEmail("");
+          return;
         }
+
+        const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+        const opts = authMode ? { authMode } : undefined;
+
+        const listUserProfiles = () => {
+          const filters = { filter: { email: { eq: profile.email } } };
+          if (opts) {
+            // @ts-ignore - authMode option not in generated types yet
+            return client.models.UserProfile.list(filters, opts);
+          }
+          return client.models.UserProfile.list(filters);
+        };
+
+        const { data: userProfiles } = await listUserProfiles();
+        const backendProfile = userProfiles?.[0];
+
+        if (!backendProfile?.id) {
+          setAuthError("Complete onboarding to start matching.");
+          setCurrentUserId("");
+          setCurrentUserEmail(profile.email);
+          return;
+        }
+
+        setCurrentUserId(backendProfile.id);
+        setCurrentUserEmail(backendProfile.email || profile.email || "");
+        setAuthError(null);
       } catch (err) {
-        // For development: use a test user ID
-        setCurrentUserId("dev-user-" + Math.random().toString(36).substr(2, 9));
-        setCurrentUserEmail("dev@test.com");
-        setAuthError("Auth error - using dev mode");
+        console.error("[Matches] Failed to load user profile:", err);
+        setAuthError("Unable to load your profile. Please try again.");
+        setCurrentUserId("");
+        setCurrentUserEmail("");
       } finally {
         setIsAuthLoading(false);
       }
@@ -121,30 +142,16 @@ const Matches = () => {
   };
 
   // Transform matches for UI
-  const matches: MatchForUI[] = rawMatches.map(m => ({
-    ...m,
-    displayName: m.otherUserEmail?.split("@")[0] || "Anonymous",
-    tags: [], // Tags would come from user profile in production
+  const matchesForUI = rawMatches.map((m) => ({
+    match: m,
+    uiDisplayName:
+      m.otherUserProfile?.name ||
+      m.otherUserEmail?.split("@")[0] ||
+      "Anonymous",
   }));
   
-  const activeMatch = matches.find(m => m.id === activeChat);
+  const activeMatch = rawMatches.find(m => m.id === activeChat);
   const activeConversationId = activeMatch?.conversationId || undefined;
-
-  // Reveal callback - will be set by ChatView
-  const [pendingRevealFn, setPendingRevealFn] = useState<(() => Promise<void>) | null>(null);
-
-  const handleReveal = (revealFn: () => Promise<void>) => {
-    setPendingRevealFn(() => revealFn);
-    setShowRevealModal(true);
-  };
-
-  const confirmReveal = async () => {
-    if (pendingRevealFn) {
-      await pendingRevealFn();
-    }
-    setShowRevealModal(false);
-    setPendingRevealFn(null);
-  };
 
   // Store conversation ID when created (also update the match record)
   const handleConversationCreated = async (matchId: string, conversationId: string) => {
@@ -215,7 +222,7 @@ const Matches = () => {
           
           <div className="flex gap-2">
             <Button variant="glass" size="sm" className="flex-1">
-              All ({matches.length})
+              All ({rawMatches.length})
             </Button>
             <Button 
               variant="ghost" 
@@ -283,7 +290,7 @@ const Matches = () => {
         {/* Match List */}
         <div className="flex-1 overflow-y-auto p-2">
           {/* Loading state */}
-          {matchesLoading && matches.length === 0 && (
+          {matchesLoading && rawMatches.length === 0 && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
@@ -297,7 +304,7 @@ const Matches = () => {
           )}
 
           {/* Empty state */}
-          {!matchesLoading && matches.length === 0 && (
+          {!matchesLoading && rawMatches.length === 0 && (
             <div className="text-center py-8">
               <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
               <p className="text-muted-foreground mb-2">No matches yet</p>
@@ -311,8 +318,8 @@ const Matches = () => {
             </div>
           )}
 
-          {/* Matches */}
-          {matches.map((match) => (
+          {/* Matches - name only, no email */}
+          {matchesForUI.map(({ match, uiDisplayName }) => (
             <motion.button
               key={match.id}
               whileHover={{ scale: 1.02 }}
@@ -325,28 +332,14 @@ const Matches = () => {
               }`}
             >
               <div className="flex items-start gap-3">
-                {/* Avatar placeholder */}
                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0">
                   <Heart className="w-5 h-5 text-primary" />
                 </div>
-                
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-foreground">
-                      {match.displayName}
-                    </span>
-                    {match.compatScore && (
-                      <span className="text-xs text-primary">
-                        {Math.round((match.compatScore || 0) * 100)}%
-                      </span>
-                    )}
-                  </div>
-                  
-                  <p className="text-xs text-muted-foreground truncate mb-1">
-                    {match.otherUserEmail}
-                  </p>
-                  
-                  <p className="text-sm text-primary">
+                  <span className="font-semibold text-foreground block truncate">
+                    {uiDisplayName}
+                  </span>
+                  <p className="text-sm text-primary mt-0.5">
                     {match.conversationId ? "Continue chat →" : "Start chat →"}
                   </p>
                 </div>
@@ -364,7 +357,6 @@ const Matches = () => {
             conversationId={activeConversationId}
             currentUserId={currentUserId}
             onBack={() => setActiveChat(null)}
-            onReveal={handleReveal}
             onPromAsk={() => setShowPromAsk(true)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
           />
@@ -381,60 +373,6 @@ const Matches = () => {
         )}
       </main>
       </div>
-
-      {/* Reveal Modal */}
-      <AnimatePresence>
-        {showRevealModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass rounded-3xl p-8 max-w-md w-full text-center"
-            >
-              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                <Eye className="w-8 h-8 text-primary" />
-              </div>
-              
-              <h3 className="font-display text-2xl font-bold mb-2">Ready to Reveal?</h3>
-              <p className="text-muted-foreground mb-6">
-                When you both reveal, you'll see each other's photos, names, and contact details. 
-                This cannot be undone.
-              </p>
-
-              <div className="glass rounded-xl p-4 mb-6 text-left">
-                <p className="text-sm text-foreground font-medium mb-1">🔒 Privacy Promise</p>
-                <p className="text-xs text-muted-foreground">
-                  Only you and your match will see revealed details. Organisers and other users cannot access this information.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <Button 
-                  variant="glass" 
-                  className="flex-1"
-                  onClick={() => setShowRevealModal(false)}
-                >
-                  Not Yet
-                </Button>
-                <Button 
-                  variant="gold" 
-                  className="flex-1"
-                  onClick={confirmReveal}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Reveal Identity
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Prom Ask Modal */}
       <AnimatePresence>
@@ -520,11 +458,10 @@ const Matches = () => {
 
 // Chat View Component - Now using real Amplify backend
 interface ChatViewProps {
-  match: MatchForUI;
+  match: MatchWithDetails;
   conversationId?: string;
   currentUserId: string;
   onBack: () => void;
-  onReveal: (revealFn: () => Promise<void>) => void;
   onPromAsk: () => void;
   onConversationCreated: (conversationId: string) => void;
 }
@@ -534,13 +471,18 @@ const ChatView = ({
   conversationId, 
   currentUserId,
   onBack, 
-  onReveal, 
   onPromAsk,
   onConversationCreated 
 }: ChatViewProps) => {
+  const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const displayName =
+    match.otherUserProfile?.name ||
+    match.otherUserEmail?.split("@")[0] ||
+    "Anonymous";
 
   // Use the real chat hook
   const {
@@ -550,10 +492,7 @@ const ChatView = ({
     isLoading,
     error,
     sendMessage: sendChatMessage,
-    revealIdentity,
     createConversation,
-    hasCurrentUserRevealed,
-    hasOtherUserRevealed,
   } = useChat({
     conversationId,
     currentUserId,
@@ -593,11 +532,6 @@ const ChatView = ({
     }
   };
 
-  const handleRevealClick = () => {
-    // Pass the reveal function to the parent so modal can confirm first
-    onReveal(revealIdentity);
-  };
-
   // Show loading while creating conversation
   if (isCreatingConversation || (isLoading && !conversation)) {
     return (
@@ -612,7 +546,7 @@ const ChatView = ({
 
   return (
     <>
-      {/* Chat Header */}
+      {/* Chat Header - name clickable to view full profile */}
       <header className="p-4 border-b border-border/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onBack}>
@@ -624,11 +558,13 @@ const ChatView = ({
           </div>
           
           <div>
-            <p className="font-semibold">{match.displayName}</p>
-            <p className="text-xs text-muted-foreground">{match.otherUserEmail}</p>
-            {hasOtherUserRevealed && (
-              <p className="text-xs text-green-400">They revealed their identity!</p>
-            )}
+            <button
+              type="button"
+              onClick={() => navigate(`/discover/profile/${match.otherUserId}`)}
+              className="font-semibold text-foreground hover:text-primary hover:underline text-left"
+            >
+              {displayName}
+            </button>
           </div>
         </div>
 
@@ -636,15 +572,6 @@ const ChatView = ({
           <Button variant="rose" size="sm" onClick={onPromAsk}>
             <PartyPopper className="w-4 h-4 mr-1" />
             Ask to Prom
-          </Button>
-          <Button 
-            variant={hasCurrentUserRevealed ? "secondary" : "gold"} 
-            size="sm" 
-            onClick={handleRevealClick}
-            disabled={hasCurrentUserRevealed}
-          >
-            <Eye className="w-4 h-4 mr-1" />
-            {hasCurrentUserRevealed ? "Revealed" : "Reveal"}
           </Button>
           
           <DropdownMenu>
@@ -712,11 +639,6 @@ const ChatView = ({
                     : "glass rounded-bl-md"
                 }`}
               >
-                {!isMe && (
-                  <p className="text-xs text-muted-foreground mb-0.5">
-                    {hasOtherUserRevealed ? "Match" : "Anonymous"}
-                  </p>
-                )}
                 <p>{msg.content}</p>
                 {time && (
                   <p className={`text-xs mt-1 ${

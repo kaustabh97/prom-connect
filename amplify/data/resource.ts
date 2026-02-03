@@ -78,6 +78,7 @@ const schema = a.schema({
       allow.authenticated(),      // Allow authenticated users to create/update their own profiles
     ]),
 
+<<<<<<< HEAD
   /** Partner link request: user A requests to link with partner B (by email). B must accept. */
   MatchRequest: a
     .model({
@@ -100,18 +101,25 @@ const schema = a.schema({
     ]),
 
   /** Like: user A liked user B */
+=======
+  /** Like: user A (fromUserId) liked user B (toUserId). UserProfile ids. */
+>>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
   Like: a
     .model({
       fromUserId: a.string().required(),
       toUserId: a.string().required(),
     })
+    .secondaryIndexes((index) => [
+      index("fromUserId"),   // Query "who I liked" for Discover exclusion
+      index("toUserId"),     // Query "who liked me" for mutual match check
+    ])
     .authorization((allow) => [allow.publicApiKey()]),
 
-  // Match between two users - created by the matching algorithm or mutual likes
+  /** Match: mutual like between two users. user1Id/user2Id are UserProfile ids. */
   Match: a
     .model({
-      user1Id: a.string().required(),           // First user's Cognito ID
-      user2Id: a.string().required(),           // Second user's Cognito ID
+      user1Id: a.string().required(),           // First user's UserProfile id
+      user2Id: a.string().required(),           // Second user's UserProfile id
       user1Email: a.string(),                   // First user's email (for display)
       user2Email: a.string(),                   // Second user's email (for display)
       compatScore: a.float(),                   // Compatibility score (0-1)

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
 
@@ -10,6 +11,7 @@ type Match = Schema["Match"]["type"];
 export interface MatchWithDetails extends Match {
   otherUserId: string;
   otherUserEmail: string;
+  otherUserProfile?: Schema["UserProfile"]["type"];
 }
 
 interface UseMatchesOptions {
@@ -39,15 +41,18 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
     setError(null);
     
     try {
+      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+      const opts = authMode ? { authMode } : undefined;
+
       // Get matches where user is user1
-      const { data: asUser1, errors: errors1 } = await client.models.Match.listMatchByUser1Id({
-        user1Id: currentUserId,
-      });
+      const { data: asUser1, errors: errors1 } =
+        // @ts-ignore - authMode option
+        await client.models.Match.listMatchByUser1Id({ user1Id: currentUserId }, opts);
       
       // Get matches where user is user2
-      const { data: asUser2, errors: errors2 } = await client.models.Match.listMatchByUser2Id({
-        user2Id: currentUserId,
-      });
+      const { data: asUser2, errors: errors2 } =
+        // @ts-ignore - authMode option
+        await client.models.Match.listMatchByUser2Id({ user2Id: currentUserId }, opts);
 
       if (errors1 || errors2) {
         console.error("Error loading matches:", errors1 || errors2);
@@ -80,7 +85,31 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
         return timeB - timeA;
       });
 
-      setMatches(allMatches);
+      // Fetch other user profiles for richer display (name, etc.)
+      const uniqueOtherUserIds = Array.from(new Set(allMatches.map((m) => m.otherUserId).filter(Boolean)));
+      const profileMap: Record<string, Schema["UserProfile"]["type"] | undefined> = {};
+      await Promise.all(
+        uniqueOtherUserIds.map(async (id) => {
+          try {
+            const { data } =
+              // @ts-ignore - authMode
+              await client.models.UserProfile.get({ id }, opts);
+            if (data) {
+              profileMap[id] = data;
+            }
+          } catch (err) {
+            console.warn("[useMatches] Failed to load profile for match user:", id, err);
+          }
+        })
+      );
+
+      const enrichedMatches = allMatches.map((match) => ({
+        ...match,
+        otherUserEmail: match.otherUserEmail || profileMap[match.otherUserId]?.email || "Anonymous",
+        otherUserProfile: profileMap[match.otherUserId],
+      }));
+
+      setMatches(enrichedMatches);
     } catch (err) {
       console.error("Error loading matches:", err);
       setError(err instanceof Error ? err.message : "Failed to load matches");
@@ -101,15 +130,22 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
     }
 
     try {
-      const { data, errors } = await client.models.Match.create({
-        user1Id: currentUserId,
-        user2Id: otherUserId,
-        user1Email: currentUserEmail,
-        user2Email: otherUserEmail,
-        compatScore,
-        status: "active",
-        createdAt: new Date().toISOString(),
-      });
+      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+      const opts = authMode ? { authMode } : undefined;
+      const { data, errors } =
+        // @ts-ignore - authMode
+        await client.models.Match.create(
+          {
+            user1Id: currentUserId,
+            user2Id: otherUserId,
+            user1Email: currentUserEmail,
+            user2Email: otherUserEmail,
+            compatScore,
+            status: "active",
+            createdAt: new Date().toISOString(),
+          },
+          opts
+        );
 
       if (errors) {
         console.error("Error creating match:", errors);
@@ -130,10 +166,16 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
   // Update match with conversation ID
   const updateMatchConversation = useCallback(async (matchId: string, conversationId: string) => {
     try {
-      await client.models.Match.update({
-        id: matchId,
-        conversationId,
-      });
+      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+      const opts = authMode ? { authMode } : undefined;
+      // @ts-ignore - authMode
+      await client.models.Match.update(
+        {
+          id: matchId,
+          conversationId,
+        },
+        opts
+      );
       
       // Update local state
       setMatches(prev => prev.map(m => 

@@ -86,53 +86,42 @@ const Auth = () => {
       // Set test user in localStorage
       setTestUser(email);
       
-      // Check backend for existing profile
-      const client = generateClient<Schema>();
-      
-      console.log("[Auth] Checking backend for existing profile with email:", email);
-      
-      const { data: profiles, errors } = await client.models.UserProfile.list(
-        {
-          filter: {
-            email: {
-              eq: email,
-            },
-          },
-        },
-        { authMode: 'apiKey' }
-      );
-
-      if (errors) {
-        console.error("[Auth] Error checking backend profile:", errors);
-        // Continue anyway - user can still go through onboarding
-      }
-
-      // Get the profile to verify it was set
+      // Get the profile (from localStorage in test mode)
       const profile = await getUserProfile();
       setUserInfo(profile);
-      
-      if (profile) {
-        // Check if profile exists in backend and onboarding is complete
-        if (profiles && profiles.length > 0) {
-          const backendProfile = profiles[0];
-          console.log("[Auth] Found backend profile:", {
-            email: backendProfile.email,
-            onboardingCompleted: backendProfile.onboardingCompleted,
-          });
-          
-          if (backendProfile.onboardingCompleted) {
-            // Profile exists and onboarding is complete - go to discover
-            navigate("/discover/profile");
-          } else {
-            // Profile exists but onboarding not complete - go to onboarding
-            navigate("/onboarding");
-          }
-        } else {
-          // No profile in backend - go to onboarding to create one
-          console.log("[Auth] No backend profile found, redirecting to onboarding");
-          navigate("/onboarding");
+
+      if (!profile) {
+        setIsSigningIn(false);
+        return;
+      }
+
+      // Try to check backend for existing profile (optional – if API is unreachable, we still continue)
+      let profiles: Array<{ email?: string; onboardingCompleted?: boolean }> | null = null;
+      try {
+        const client = generateClient<Schema>();
+        const result = await client.models.UserProfile.list(
+          {
+            filter: { email: { eq: email } },
+          },
+          { authMode: "apiKey" }
+        );
+        profiles = result.data ?? null;
+        if (result.errors) {
+          console.warn("[Auth] Backend profile check returned errors:", result.errors);
+        }
+      } catch (backendError) {
+        // Backend unreachable (wrong URL, network, or API not deployed) – continue to onboarding
+        console.warn("[Auth] Backend profile check failed (network/API). Continuing to onboarding.", backendError);
+      }
+
+      if (profiles && profiles.length > 0) {
+        const backendProfile = profiles[0];
+        if (backendProfile.onboardingCompleted) {
+          navigate("/discover/profile");
+          return;
         }
       }
+      navigate("/onboarding");
     } catch (error) {
       console.error("Error in email sign-in:", error);
       alert("Failed to sign in. Please try again.");

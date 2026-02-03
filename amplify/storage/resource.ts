@@ -6,6 +6,8 @@ export const storage = defineStorage({
     'profile-pics/{entity_id}/*': [
       allow.authenticated.to(['read']),
       allow.entity('identity').to(['read', 'write', 'delete']),
+      // Allow guest (unauthenticated) write for test mode when GOOGLE_LOGIN_CHECK is false
+      allow.guest.to(['read', 'write', 'delete']),
     ],
   }),
 });

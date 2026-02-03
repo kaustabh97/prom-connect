@@ -23,7 +23,7 @@ export const APP_URL =
  * - Backend checks will be performed normally
  * - Existing profiles will be fetched and checked
  */
-export const ENABLE_BACKEND_PROFILE_FETCH = false;
+export const ENABLE_BACKEND_PROFILE_FETCH = true;
 
 /**
  * Enable/disable Google login requirement

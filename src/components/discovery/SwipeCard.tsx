@@ -28,8 +28,6 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
     const mainPhoto = profile.photoUrls?.[0];
 
     const aboutChips: { icon?: React.ElementType; label: string }[] = [];
-    if (profile.gender) aboutChips.push({ label: profile.gender });
-    if (profile.sexualOrientation) aboutChips.push({ label: profile.sexualOrientation });
     if (profile.alcoholPreference) aboutChips.push({ icon: Wine, label: profile.alcoholPreference });
     if (profile.smokingPreference) aboutChips.push({ icon: Cigarette, label: profile.smokingPreference });
     if (profile.foodPreference) aboutChips.push({ icon: Utensils, label: profile.foodPreference });
@@ -72,14 +70,31 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
 
             {/* Content sections - same scroll */}
             <div className="px-4 pb-4 pt-3 space-y-4">
-              {/* Quick identifiers */}
+              {/* Basic info: Gender, Sexual Orientation, Cohort, Hometown, Intention */}
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                  {profile.gender}
-                </span>
+                {profile.gender && (
+                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                    {profile.gender}
+                  </span>
+                )}
                 {profile.sexualOrientation && (
                   <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
                     {profile.sexualOrientation}
+                  </span>
+                )}
+                {profile.cohort && (
+                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                    {profile.cohort}
+                  </span>
+                )}
+                {profile.hometown && (
+                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
+                    {profile.hometown}
+                  </span>
+                )}
+                {profile.intention && (
+                  <span className="px-3 py-1.5 rounded-full bg-primary/15 text-primary text-sm font-medium border border-primary/20">
+                    {profile.intention}
                   </span>
                 )}
               </div>
