@@ -15,7 +15,6 @@ import { getUrl } from "aws-amplify/storage";
 import { 
   Heart, 
   MessageCircle, 
-  Sparkles, 
   X,
   Send,
   MoreVertical,
@@ -23,7 +22,6 @@ import {
   Trash2,
   Loader2,
   Plus,
-  RefreshCw,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -51,6 +49,7 @@ const Matches = () => {
   const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
   const [profilePicUrls, setProfilePicUrls] = useState<Record<string, string>>({});
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, string>>({});
   
   // Load current user on mount
   useEffect(() => {
@@ -139,6 +138,27 @@ const Matches = () => {
     }
   };
 
+  // Helper function to format last message time
+  const formatLastMessageTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return "";
+    
+    const now = new Date();
+    const messageTime = new Date(timestamp);
+    const diffMs = now.getTime() - messageTime.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    // For older messages, show date
+    return messageTime.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
   // Fetch profile picture URLs for matches
   useEffect(() => {
     const fetchProfilePics = async () => {
@@ -167,6 +187,39 @@ const Matches = () => {
     }
   }, [rawMatches]);
 
+  // Fetch last message times for conversations
+  useEffect(() => {
+    const fetchLastMessageTimes = async () => {
+      const times: Record<string, string> = {};
+      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+      const opts = authMode ? { authMode } : undefined;
+
+      await Promise.all(
+        rawMatches.map(async (match) => {
+          if (match.conversationId) {
+            try {
+              // @ts-ignore - authMode option
+              const { data: conversation } = await client.models.Conversation.get(
+                { id: match.conversationId },
+                opts
+              );
+              if (conversation?.lastMessageAt) {
+                times[match.id] = formatLastMessageTime(conversation.lastMessageAt);
+              }
+            } catch (err) {
+              console.warn("[Matches] Failed to get conversation for match", match.id, err);
+            }
+          }
+        })
+      );
+      setLastMessageTimes(times);
+    };
+
+    if (rawMatches.length > 0) {
+      fetchLastMessageTimes();
+    }
+  }, [rawMatches]);
+
   // Transform matches for UI
   const matchesForUI = rawMatches.map((m) => ({
     match: m,
@@ -175,6 +228,7 @@ const Matches = () => {
       m.otherUserEmail?.split("@")[0] ||
       "Anonymous",
     profilePicUrl: profilePicUrls[m.id],
+    lastMessageTime: lastMessageTimes[m.id] || "",
   }));
 
   // Open chat from URL param (matchId)
@@ -233,18 +287,7 @@ const Matches = () => {
       <aside className={`w-full md:w-80 lg:w-96 border-r border-border/50 flex flex-col min-h-0 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         {/* Header */}
         <header className="p-4 border-b border-border/50 shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="font-display text-2xl font-bold">Matches</h1>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="icon" onClick={refreshMatches} title="Refresh">
-                <RefreshCw className="w-5 h-5" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
-                <Sparkles className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-          
+          <h1 className="font-display text-3xl font-bold">Matches</h1>
         </header>
 
         {/* Partner requests - confirm match */}
@@ -326,7 +369,7 @@ const Matches = () => {
           )}
 
           {/* Matches - name only, no email */}
-          {matchesForUI.map(({ match, uiDisplayName, profilePicUrl }) => (
+          {matchesForUI.map(({ match, uiDisplayName, profilePicUrl, lastMessageTime }) => (
             <motion.button
               key={match.id}
               whileHover={{ scale: 1.02 }}
@@ -341,7 +384,7 @@ const Matches = () => {
               {/* Subtle shimmer effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-500" />
               
-              <div className="flex items-start gap-3 relative z-10">
+              <div className="flex items-center gap-3 relative z-10">
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 overflow-hidden ${
                   activeChat === match.id 
                     ? "ring-2 ring-primary/50" 
@@ -363,18 +406,22 @@ const Matches = () => {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className={`font-semibold block truncate transition-colors ${
-                    activeChat === match.id ? "text-foreground" : "text-foreground/90"
-                  }`}>
-                    {uiDisplayName}
-                  </span>
-                  <p className={`text-sm mt-1 transition-colors ${
-                    activeChat === match.id 
-                      ? "text-primary font-medium" 
-                      : "text-primary/70"
-                  }`}>
-                    {match.conversationId ? "Continue chat →" : "Start chat →"}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`font-semibold block truncate transition-colors ${
+                      activeChat === match.id ? "text-foreground" : "text-foreground/90"
+                    }`}>
+                      {uiDisplayName}
+                    </span>
+                    {lastMessageTime && (
+                      <span className={`text-xs shrink-0 transition-colors ${
+                        activeChat === match.id 
+                          ? "text-primary/80" 
+                          : "text-muted-foreground"
+                      }`}>
+                        {lastMessageTime}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.button>

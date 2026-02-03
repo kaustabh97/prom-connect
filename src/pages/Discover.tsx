@@ -302,7 +302,7 @@ export default function Discover() {
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
         {/* Fixed header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
-          <h1 className="font-display text-xl font-bold text-foreground">
+          <h1 className="font-display text-3xl font-bold text-foreground">
             Discover
           </h1>
           <div className="flex items-center gap-1">

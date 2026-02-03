@@ -263,12 +263,22 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border/50">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>© 2026 Prom IIMA. Built with 💛 for the campus.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms</a>
-            <a href="#" className="hover:text-primary transition-colors">Help</a>
+        <div className="max-w-6xl mx-auto flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+            <p>© 2026 Prom IIMA. Built with 💛 for the campus.</p>
+            <div className="flex gap-6">
+              <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-primary transition-colors">Terms</a>
+              <a href="#" className="hover:text-primary transition-colors">Help</a>
+            </div>
+          </div>
+          <div className="text-center text-xs text-muted-foreground/60 pt-2">
+            Created by{" "}
+            <span className="text-muted-foreground/70">Dipak Agrawal</span>
+            {", "}
+            <span className="text-muted-foreground/70">Kaustabh Chatterjee</span>
+            {", "}
+            <span className="text-muted-foreground/70">Sparsh Chadha</span>
           </div>
         </div>
       </footer>
