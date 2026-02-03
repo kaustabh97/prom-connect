@@ -136,11 +136,12 @@ export default function Discover() {
         });
 
         // Transform backend profiles to DiscoveryProfileFull format
-        // Exclude current user's profile and only include completed onboarding profiles
+        // Exclude current user, users in partner match (excludeFromDiscovery), and only completed onboarding
         const transformedProfiles = backendProfiles
           .filter((p) => 
             p.email !== currentUserEmail && // Exclude current user
-            p.onboardingCompleted === true // Only completed profiles
+            p.onboardingCompleted === true && // Only completed profiles
+            p.excludeFromDiscovery !== true // Exclude users in confirmed partner match
           )
           .map(transformBackendProfile)
           .filter((p) => p.id && p.name); // Filter out invalid profiles

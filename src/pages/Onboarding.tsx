@@ -17,7 +17,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
-import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, LogOut, Upload, Image as ImageIcon, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
@@ -34,7 +34,9 @@ type OnboardingStep =
   | "ageCohortGender" 
   | "sexualityIntention" 
   | "hometown"
-  | "photoUpload";
+  | "photoUpload"
+  | "partnerStatus"
+  | "partnerLink";
 
 interface ProfileData {
   name: string;
@@ -48,6 +50,8 @@ interface ProfileData {
   hometown: string;
   notificationsEnabled: boolean;
   profilePicKey: string; // S3 key for profile picture
+  partnerStatus: string; // Looking for partner, Already have partner
+  partnerEmail: string; // Partner's IIMA email when partner is from IIMA; empty when not from IIMA
 }
 
 const steps: OnboardingStep[] = [
@@ -57,8 +61,13 @@ const steps: OnboardingStep[] = [
   "ageCohortGender",
   "sexualityIntention",
   "hometown",
+  "partnerStatus",
+  "partnerLink",
   "photoUpload",
 ];
+
+const partnerStatusOptions = ["Looking for a partner", "Already have a partner"];
+const IIMA_EMAIL_SUFFIX = "@iima.ac.in";
 
 const cohorts = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"];
 const genders = ["Man", "Woman", "Non-Binary"];
@@ -90,7 +99,13 @@ const Onboarding = () => {
     hometown: "",
     notificationsEnabled: false,
     profilePicKey: "",
+    partnerStatus: "",
+    partnerEmail: "",
   });
+
+  // Partner link: "iima" = enter email, "not-iima" = partner not from IIMA
+  const [partnerLinkChoice, setPartnerLinkChoice] = useState<"" | "iima" | "not-iima">("");
+  const [partnerEmailError, setPartnerEmailError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   
@@ -101,8 +116,13 @@ const Onboarding = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentStepIndex = steps.indexOf(step);
-  const totalSteps = steps.length;
+  // When "Looking for a partner", partnerLink step is skipped
+  const effectiveSteps =
+    profile.partnerStatus === "Already have a partner"
+      ? steps
+      : steps.filter((s) => s !== "partnerLink");
+  const currentStepIndex = effectiveSteps.indexOf(step);
+  const totalSteps = effectiveSteps.length;
 
   // Check authentication on mount
   useEffect(() => {
@@ -370,43 +390,57 @@ const Onboarding = () => {
           return; // Don't proceed if upload fails
         }
       }
-      
-      // If we're on the last step (photoUpload), save profile to backend
-      if (nextIndex >= steps.length) {
-        await saveProfileToBackend();
+    }
+
+    // partnerStatus: "Looking for a partner" → skip partnerLink, go to photoUpload; "Already have a partner" → go to partnerLink
+    if (step === "partnerStatus") {
+      if (profile.partnerStatus === "Looking for a partner") {
+        setStep("photoUpload");
         return;
       }
+      setStep("partnerLink");
+      return;
+    }
+
+    // partnerLink → go to photoUpload (everyone adds photo)
+    if (step === "partnerLink") {
+      setStep("photoUpload");
+      return;
+    }
+
+    // photoUpload is the last step for everyone → save
+    if (step === "photoUpload") {
+      await saveProfileToBackend();
+      return;
     }
     
-    if (nextIndex < steps.length) {
-      setStep(steps[nextIndex]);
-    } else {
-      // This should not happen as photoUpload is now the last step
-      await saveProfileToBackend();
+    if (nextIndex < effectiveSteps.length) {
+      setStep(effectiveSteps[nextIndex]);
     }
   };
 
   const saveProfileToBackend = async () => {
     console.log("[Onboarding] ========================================");
     console.log("[Onboarding] Starting profile save process...");
-    console.log("[Onboarding] Step: photoUpload (final step)");
     setIsSaving(true);
     setSaveError(null);
     
     try {
+      const currentUser = await getUserProfile();
+      const currentUserId = currentUser?.userId ?? "";
+      
+      // partnerEmail: set when partnerLinkChoice is "iima" and we have valid email
+      const partnerEmailToSave =
+        partnerLinkChoice === "iima" && profile.partnerEmail.trim().toLowerCase().endsWith(IIMA_EMAIL_SUFFIX)
+          ? profile.partnerEmail.trim().toLowerCase()
+          : undefined;
+      
       // Log profile data before saving
       console.log("[Onboarding] Profile data to save:", {
         email: profile.email,
-        name: profile.name,
-        dateOfBirth: profile.dateOfBirth,
-        age: profile.age,
-        cohort: profile.cohort,
-        gender: profile.gender,
-        sexualOrientation: profile.sexualOrientation,
-        intention: profile.intention,
-        hometown: profile.hometown,
-        notificationsEnabled: profile.notificationsEnabled,
-        profilePicKey: profile.profilePicKey,
+        userId: currentUserId,
+        partnerStatus: profile.partnerStatus,
+        partnerEmail: partnerEmailToSave,
         onboardingCompleted: true,
       });
 
@@ -462,6 +496,7 @@ const Onboarding = () => {
 
         const profileData = {
           email: profile.email,
+          userId: currentUserId || undefined,
           name: profile.name,
           dateOfBirth: profile.dateOfBirth,
           age: profile.age ?? undefined,
@@ -472,6 +507,8 @@ const Onboarding = () => {
           hometown: profile.hometown,
           notificationsEnabled: profile.notificationsEnabled,
           profilePicKey: profile.profilePicKey || undefined,
+          partnerStatus: profile.partnerStatus || undefined,
+          partnerEmail: partnerEmailToSave,
           onboardingCompleted: true,
         };
 
@@ -494,6 +531,7 @@ const Onboarding = () => {
             {
               id: existingProfile.id,
               email: profileData.email,
+              userId: profileData.userId,
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
@@ -504,6 +542,8 @@ const Onboarding = () => {
               hometown: profileData.hometown,
               notificationsEnabled: profileData.notificationsEnabled,
               profilePicKey: profileData.profilePicKey,
+              partnerStatus: profileData.partnerStatus,
+              partnerEmail: profileData.partnerEmail,
               onboardingCompleted: profileData.onboardingCompleted,
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
@@ -543,6 +583,7 @@ const Onboarding = () => {
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
               email: profileData.email,
+              userId: profileData.userId,
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
@@ -553,6 +594,8 @@ const Onboarding = () => {
               hometown: profileData.hometown,
               notificationsEnabled: profileData.notificationsEnabled,
               profilePicKey: profileData.profilePicKey,
+              partnerStatus: profileData.partnerStatus,
+              partnerEmail: profileData.partnerEmail,
               onboardingCompleted: profileData.onboardingCompleted,
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
@@ -584,10 +627,76 @@ const Onboarding = () => {
           });
         }
         
+        // If user added partner's IIMA email, create MatchRequest and optionally send invite email
+        if (partnerEmailToSave && currentUserId) {
+          const currentUserEmail = profile.email.trim().toLowerCase();
+          try {
+            // @ts-ignore - authMode
+            const { data: partnerProfiles } = await client.models.UserProfile.list(
+              { filter: { email: { eq: partnerEmailToSave } } },
+              { authMode: authMode as 'userPool' | 'apiKey' }
+            );
+            const partner = partnerProfiles?.[0];
+            const partnerUserId = partner?.userId ?? undefined;
+
+            // @ts-ignore - authMode
+            const { errors: requestErrors } = await client.models.MatchRequest.create(
+              {
+                fromUserId: currentUserId,
+                fromEmail: currentUserEmail,
+                fromName: profile.name || undefined,
+                toEmail: partnerEmailToSave,
+                toUserId: partnerUserId,
+                status: "pending",
+                createdAt: new Date().toISOString(),
+              },
+              { authMode: authMode as 'userPool' | 'apiKey' }
+            );
+            if (requestErrors) {
+              console.warn("[Onboarding] Could not create match request:", requestErrors);
+            } else {
+              if (partner) {
+                // Partner has profile: they will see the request in-app to confirm
+                console.log("[Onboarding] Match request sent to", partnerEmailToSave, "- they can confirm in the app");
+              } else {
+                // Partner has no profile: send email with link to create profile
+                try {
+                  const appUrl = (await import("@/config")).APP_URL;
+                  // @ts-ignore - custom query
+                  await client.queries.sendPartnerInviteEmail({
+                    toEmail: partnerEmailToSave,
+                    fromName: profile.name || "Someone",
+                    appUrl,
+                  });
+                  console.log("[Onboarding] Invite email sent to", partnerEmailToSave);
+                } catch (emailErr) {
+                  console.warn("[Onboarding] Could not send invite email:", emailErr);
+                }
+              }
+            }
+          } catch (reqErr) {
+            console.warn("[Onboarding] Match request flow failed:", reqErr);
+          }
+        }
+        
         console.log("[Onboarding] ✅ Profile save completed successfully!");
+        // If this user has pending partner requests (someone added their email), show matches so they can accept
+        const currentUserEmailForRequests = profile.email.trim().toLowerCase();
+        try {
+          const { data: requestsToMe } = await client.models.MatchRequest.listMatchRequestByToEmail(
+            { toEmail: currentUserEmailForRequests },
+            { authMode: authMode as 'userPool' | 'apiKey' }
+          );
+          const hasPending = (requestsToMe ?? []).some((r) => r.status === "pending");
+          if (hasPending) {
+            console.log("[Onboarding] User has pending partner request(s), navigating to matches");
+            navigate("/matches");
+            setIsSaving(false);
+            return;
+          }
+        } catch (_) {}
         console.log("[Onboarding] Navigating to discover page...");
         console.log("[Onboarding] ========================================");
-        // Successfully saved - navigate to discover
         navigate("/discover/profile");
       } catch (error) {
         console.error("[Onboarding] ❌ Failed to save user profile:", {
@@ -617,7 +726,7 @@ const Onboarding = () => {
   const prevStep = () => {
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
-      setStep(steps[prevIndex]);
+      setStep(effectiveSteps[prevIndex]);
     }
   };
 
@@ -637,6 +746,17 @@ const Onboarding = () => {
         return profile.hometown.trim() !== "";
       case "photoUpload":
         return profile.profilePicKey !== "" || selectedFile !== null;
+      case "partnerStatus":
+        return profile.partnerStatus !== "";
+      case "partnerLink":
+        if (partnerLinkChoice === "not-iima") return true;
+        if (partnerLinkChoice === "iima") {
+          const email = profile.partnerEmail.trim().toLowerCase();
+          if (!email.endsWith(IIMA_EMAIL_SUFFIX)) return false;
+          if (email === profile.email.trim().toLowerCase()) return false; // can't add self
+          return true;
+        }
+        return false;
       default:
         return false;
     }
@@ -1001,6 +1121,127 @@ const Onboarding = () => {
                 <p className="text-sm text-muted-foreground">Uploading photo...</p>
               </div>
             )}
+          </motion.div>
+        );
+
+      case "partnerStatus":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">One last thing</h2>
+              <p className="text-muted-foreground">
+                Are you looking for a partner or do you already have one?
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {partnerStatusOptions.map((option) => (
+                <Button
+                  key={option}
+                  variant={profile.partnerStatus === option ? "default" : "outline"}
+                  className="w-full h-14 text-base justify-start px-6"
+                  onClick={() => setProfile(prev => ({ ...prev, partnerStatus: option }))}
+                >
+                  <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
+                    {profile.partnerStatus === option ? (
+                      <Check className="w-5 h-5" />
+                    ) : null}
+                  </span>
+                  {option}
+                </Button>
+              ))}
+            </div>
+          </motion.div>
+        );
+
+      case "partnerLink":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">Link your partner</h2>
+              <p className="text-muted-foreground">
+                Is your partner from IIMA? Add their email to get matched directly when they accept.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                variant={partnerLinkChoice === "iima" ? "default" : "outline"}
+                className="w-full h-14 text-base justify-start px-6"
+                onClick={() => {
+                  setPartnerLinkChoice("iima");
+                  setPartnerEmailError(null);
+                  setProfile((prev) => ({ ...prev, partnerEmail: "" }));
+                }}
+              >
+                <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
+                  {partnerLinkChoice === "iima" ? <Check className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
+                </span>
+                Partner from IIMA
+              </Button>
+
+              {partnerLinkChoice === "iima" && (
+                <div className="pl-2 space-y-2">
+                  <Label htmlFor="partnerEmail" className="text-sm">
+                    Partner&apos;s IIMA email
+                  </Label>
+                  <Input
+                    id="partnerEmail"
+                    type="email"
+                    placeholder="partner@iima.ac.in"
+                    value={profile.partnerEmail}
+                    onChange={(e) => {
+                      setProfile((prev) => ({ ...prev, partnerEmail: e.target.value }));
+                      setPartnerEmailError(null);
+                    }}
+                    onBlur={() => {
+                      const email = profile.partnerEmail.trim();
+                      if (email && !email.toLowerCase().endsWith(IIMA_EMAIL_SUFFIX)) {
+                        setPartnerEmailError("Please enter a valid @iima.ac.in email");
+                      } else if (email && email.toLowerCase() === profile.email.trim().toLowerCase()) {
+                        setPartnerEmailError("You cannot add your own email");
+                      } else {
+                        setPartnerEmailError(null);
+                      }
+                    }}
+                    className="h-12"
+                  />
+                  {partnerEmailError && (
+                    <p className="text-sm text-destructive">{partnerEmailError}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    They must have completed onboarding and added your email to get matched.
+                  </p>
+                </div>
+              )}
+
+              <Button
+                variant={partnerLinkChoice === "not-iima" ? "default" : "outline"}
+                className="w-full h-14 text-base justify-start px-6"
+                onClick={() => {
+                  setPartnerLinkChoice("not-iima");
+                  setProfile((prev) => ({ ...prev, partnerEmail: "" }));
+                  setPartnerEmailError(null);
+                }}
+              >
+                <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
+                  {partnerLinkChoice === "not-iima" ? <Check className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
+                </span>
+                Partner not from IIMA
+              </Button>
+            </div>
           </motion.div>
         );
 

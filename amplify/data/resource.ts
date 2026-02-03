@@ -1,4 +1,5 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -11,6 +12,7 @@ const schema = a.schema({
   UserProfile: a
     .model({
       // Basic info
+      userId: a.string(), // Cognito/sub or test ID - for linking partners and match creation
       email: a.string().required(),
       name: a.string(),
       mobileNo: a.string(),
@@ -21,6 +23,8 @@ const schema = a.schema({
       sexualOrientation: a.string(),
       intention: a.string(), // Date for Prom, Long Term, Not Sure
       hometown: a.string(),
+      partnerStatus: a.string(), // Looking for partner, Already have partner
+      partnerEmail: a.string(), // Partner's IIMA email when both have partners; for direct matching
       bio: a.string(),
       profilePicKey: a.string(), // Reference to the file in S3
       notificationsEnabled: a.boolean(), // Browser and email notifications
@@ -38,10 +42,33 @@ const schema = a.schema({
       
       // Profile completion status
       onboardingCompleted: a.boolean(),
+      // When true, user is in a confirmed partner match and should not appear in discovery
+      excludeFromDiscovery: a.boolean(),
     })
     .authorization((allow) => [
       allow.publicApiKey(),      // Allow API key for public access
       allow.authenticated(),      // Allow authenticated users to create/update their own profiles
+    ]),
+
+  /** Partner link request: user A requests to link with partner B (by email). B must accept. */
+  MatchRequest: a
+    .model({
+      fromUserId: a.string().required(),    // User who sent the request
+      fromEmail: a.string().required(),     // For display
+      fromName: a.string(),                 // Sender's name for display
+      toEmail: a.string().required(),       // Partner's email (may not have profile yet)
+      toUserId: a.string(),                 // Set when partner has profile
+      status: a.string().default("pending"), // pending, accepted, declined
+      createdAt: a.datetime(),
+    })
+    .secondaryIndexes((index) => [
+      index("toEmail"),                     // Find requests for partner when they sign up
+      index("toUserId"),                    // Find requests for partner by their userId
+      index("fromUserId"),                  // Find requests sent by user
+    ])
+    .authorization((allow) => [
+      allow.publicApiKey(),
+      allow.authenticated(),
     ]),
 
   /** Like: user A liked user B */
@@ -91,6 +118,18 @@ const schema = a.schema({
       allow.publicApiKey(),                     // Allow public access for development (TEMP)
       allow.authenticated(),                    // Authenticated users can access
     ]),
+
+  // Custom query to send partner invite email (Lambda + SES)
+  sendPartnerInviteEmail: a
+    .query()
+    .arguments({
+      toEmail: a.string(),
+      fromName: a.string(),
+      appUrl: a.string(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
+    .handler(a.handler.function(sendPartnerInvite)),
 
   // Individual messages within a conversation
   Message: a

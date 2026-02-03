@@ -7,6 +7,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import PromAsk from "@/components/PromAsk";
 import { useChat } from "@/hooks/useChat";
 import { useMatches, type MatchWithDetails } from "@/hooks/useMatches";
+import { useMatchRequests } from "@/hooks/useMatchRequests";
 import { getUserProfile } from "@/utils/auth";
 import { 
   Heart, 
@@ -53,6 +54,7 @@ const Matches = () => {
   const [showCreateMatch, setShowCreateMatch] = useState(false);
   const [newMatchEmail, setNewMatchEmail] = useState("");
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
   
   // Load current user on mount
   useEffect(() => {
@@ -93,6 +95,30 @@ const Matches = () => {
     currentUserId, 
     currentUserEmail 
   });
+
+  // Partner link requests (accept/decline)
+  const {
+    pendingRequests,
+    isLoading: requestsLoading,
+    refresh: refreshRequests,
+    acceptRequest,
+    declineRequest,
+  } = useMatchRequests({ currentUserId, currentUserEmail });
+
+  const handleAcceptRequest = async (
+    requestId: string,
+    fromUserId: string,
+    fromEmail: string,
+    fromName?: string
+  ) => {
+    setAcceptingRequestId(requestId);
+    try {
+      const ok = await acceptRequest(requestId, fromUserId, fromEmail, fromName);
+      if (ok) await refreshMatches();
+    } finally {
+      setAcceptingRequestId(null);
+    }
+  };
 
   // Transform matches for UI
   const matches: MatchForUI[] = rawMatches.map(m => ({
@@ -202,6 +228,57 @@ const Matches = () => {
             </Button>
           </div>
         </header>
+
+        {/* Partner requests - confirm match */}
+        {pendingRequests.length > 0 && (
+          <div className="p-3 border-b border-border/50">
+            <p className="text-sm font-medium text-foreground mb-2">Partner requests</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Someone wants to link with you as their partner. Accept to get matched.
+            </p>
+            {pendingRequests.map((req) => (
+              <div
+                key={req.id}
+                className="flex items-center justify-between gap-2 p-3 rounded-xl glass mb-2"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground truncate">
+                    {req.fromName || req.fromEmail?.split("@")[0] || "Someone"}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{req.fromEmail}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => declineRequest(req.id)}
+                    disabled={!!acceptingRequestId}
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      handleAcceptRequest(
+                        req.id,
+                        req.fromUserId,
+                        req.fromEmail,
+                        req.fromName ?? undefined
+                      )
+                    }
+                    disabled={!!acceptingRequestId}
+                  >
+                    {acceptingRequestId === req.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Accept"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Match List */}
         <div className="flex-1 overflow-y-auto p-2">

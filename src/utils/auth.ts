@@ -84,14 +84,29 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     }
     
     const user = await getCurrentUser();
-    
+    const payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
+    const email = payload?.email as string | undefined;
+    let name = payload?.name as string | undefined;
+    // If name is missing or equals email, use Google profile: given_name + family_name
+    if (!name || (email && name === email)) {
+      const givenName = payload?.given_name as string | undefined;
+      const familyName = payload?.family_name as string | undefined;
+      if (givenName || familyName) {
+        name = [givenName, familyName].filter(Boolean).join(" ").trim();
+      }
+    }
+    if (!name && email) {
+      name = email.split("@")[0];
+    }
+    const picture = payload?.picture as string | undefined;
+
     const profile: UserProfile = {
       username: user.username,
       userId: user.userId,
-      email: session.tokens?.idToken?.payload.email as string | undefined,
-      name: session.tokens?.idToken?.payload.name as string | undefined,
-      picture: session.tokens?.idToken?.payload.picture as string | undefined,
-      fullToken: session.tokens?.idToken?.payload,
+      email,
+      name: name || undefined,
+      picture,
+      fullToken: payload,
     };
     
     return profile;

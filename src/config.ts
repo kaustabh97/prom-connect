@@ -5,6 +5,12 @@
  * that can be easily toggled to control app behavior.
  */
 
+/** Base URL for the Prom Connect app (used in partner invite emails) */
+export const APP_URL =
+  typeof window !== "undefined"
+    ? window.location.origin
+    : (import.meta.env?.VITE_APP_URL as string) || "https://prom-connect.example.com";
+
 /**
  * Enable/disable backend profile fetching
  * 

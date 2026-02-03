@@ -83,7 +83,7 @@ const Auth = () => {
     try {
       const email = testEmail.trim();
       
-      // Set test user in localStorage first
+      // Set test user in localStorage
       setTestUser(email);
       
       // Check backend for existing profile
