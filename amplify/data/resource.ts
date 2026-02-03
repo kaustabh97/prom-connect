@@ -78,7 +78,6 @@ const schema = a.schema({
       allow.authenticated(),      // Allow authenticated users to create/update their own profiles
     ]),
 
-<<<<<<< HEAD
   /** Partner link request: user A requests to link with partner B (by email). B must accept. */
   MatchRequest: a
     .model({
@@ -100,10 +99,7 @@ const schema = a.schema({
       allow.authenticated(),
     ]),
 
-  /** Like: user A liked user B */
-=======
   /** Like: user A (fromUserId) liked user B (toUserId). UserProfile ids. */
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
   Like: a
     .model({
       fromUserId: a.string().required(),

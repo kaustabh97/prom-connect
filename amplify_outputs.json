@@ -651,6 +651,26 @@
               "properties": {}
             },
             {
+              "type": "key",
+              "properties": {
+                "name": "likesByFromUserId",
+                "queryField": "listLikeByFromUserId",
+                "fields": [
+                  "fromUserId"
+                ]
+              }
+            },
+            {
+              "type": "key",
+              "properties": {
+                "name": "likesByToUserId",
+                "queryField": "listLikeByToUserId",
+                "fields": [
+                  "toUserId"
+                ]
+              }
+            },
+            {
               "type": "auth",
               "properties": {
                 "rules": [
@@ -1090,6 +1110,12 @@
             "authenticated": [
               "get",
               "list"
+            ],
+            "guest": [
+              "get",
+              "list",
+              "write",
+              "delete"
             ]
           },
           "profile-pics/${cognito-identity.amazonaws.com:sub}/*": {

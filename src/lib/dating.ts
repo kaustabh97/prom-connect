@@ -3,10 +3,8 @@
  * Non-anonymous; profiles are visible at all times.
  */
 
-// ============================================================================
-// PROFILE (full, for discovery cards and profile view)
-// ============================================================================
-
+// =====================================================================// PROFILE (full, for discovery cards and profile view)
+// =====================================================================
 export interface DiscoveryProfileFull {
   id: string;
   name: string;
@@ -27,7 +25,6 @@ export interface DiscoveryProfileFull {
   favouritePlace?: string;
   teaOrCoffee?: string;
   mountainOrBeach?: string;
-<<<<<<< HEAD
   sexualOrientation?: string;
   // Fun answers (optional, added after onboarding)
   morningOrNightPerson?: string;
@@ -54,16 +51,12 @@ export interface DiscoveryProfileFull {
   pollLKPOrHeritage?: string;
   pollMorningOrAfternoon?: string;
   pollCROrLKP?: string;
-=======
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
   // Non-negotiables (for filtering and display)
   nonNegotiables: string[];
 }
 
-// ============================================================================
-// FILTERS (intent-based, persisted)
-// ============================================================================
-
+// =====================================================================// FILTERS (intent-based, persisted)
+// =====================================================================
 export interface DiscoveryFilters {
   ageMin: number;
   ageMax: number;
@@ -93,10 +86,8 @@ export const NON_NEGOTIABLE_OPTIONS = [
 
 export const GENDER_OPTIONS = ["Woman", "Man", "Non-Binary"] as const;
 
-// ============================================================================
-// LIKE / PASS / MATCH (API contract)
-// ============================================================================
-
+// =====================================================================// LIKE / PASS / MATCH (API contract)
+// =====================================================================
 export type SwipeAction = "like" | "pass";
 
 export interface LikePayload {
@@ -111,10 +102,8 @@ export interface MatchRecord {
   createdAt: string;
 }
 
-// ============================================================================
-// PROFILE PHOTOS (place images in public/profile-photos/)
-// ============================================================================
-
+// =====================================================================// PROFILE PHOTOS (place images in public/profile-photos/)
+// =====================================================================
 /** Base path for dummy profile photos. Add p1.jpg, p2.jpg, ... p5.jpg (or .png) there. */
 export const PROFILE_PHOTOS_BASE = "/profile-photos";
 
@@ -123,10 +112,8 @@ export function getProfilePhotoUrl(profileId: string, ext = "jpg"): string {
   return `${PROFILE_PHOTOS_BASE}/${profileId}.${ext}`;
 }
 
-// ============================================================================
-// MOCK DATA (for UX; replace with API)
-// ============================================================================
-
+// =====================================================================// MOCK DATA (for UX; replace with API)
+// =====================================================================
 export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
   {
     id: "p1",

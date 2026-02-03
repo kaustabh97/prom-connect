@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import SparkleBackground from "@/components/SparkleBackground";
-import { ImageEditor } from "@/components/ImageEditor";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
@@ -150,8 +149,6 @@ const Onboarding = () => {
   // Photo upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null); // For image editor
-  const [showImageEditor, setShowImageEditor] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -303,7 +300,7 @@ const Onboarding = () => {
     }
   };
 
-  // Handle file selection - show image editor
+  // Handle file selection - simple preview
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -321,50 +318,20 @@ const Onboarding = () => {
     }
 
     setUploadError(null);
+    setSelectedFile(file);
 
-    // Create preview URL and show editor
+    // Create preview URL
     const reader = new FileReader();
     reader.onloadend = () => {
-      const imageUrl = reader.result as string;
-      setOriginalImageUrl(imageUrl);
-      setShowImageEditor(true);
+      setPreviewUrl(reader.result as string);
     };
     reader.readAsDataURL(file);
-  };
-
-  // Handle image editor save (cropped image)
-  const handleImageEditorSave = (croppedImageUrl: string) => {
-    // Convert blob URL back to File
-    fetch(croppedImageUrl)
-      .then((res) => res.blob())
-      .then((blob) => {
-        const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
-        setSelectedFile(file);
-        setPreviewUrl(croppedImageUrl);
-        setShowImageEditor(false);
-        setOriginalImageUrl(null);
-      })
-      .catch((err) => {
-        console.error("Error processing cropped image:", err);
-        setUploadError("Failed to process image");
-      });
-  };
-
-  // Handle image editor cancel
-  const handleImageEditorCancel = () => {
-    setShowImageEditor(false);
-    setOriginalImageUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   // Handle file removal
   const handleRemoveFile = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
-    setOriginalImageUrl(null);
-    setShowImageEditor(false);
     setProfile(prev => ({ ...prev, profilePicKey: "" }));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -393,8 +360,6 @@ const Onboarding = () => {
       const timestamp = Date.now();
       const fileExtension = file.name.split('.').pop() || 'jpg';
       const fileName = `profile-${timestamp}.${fileExtension}`;
-<<<<<<< HEAD
-=======
 
       // IMPORTANT: The storage access rule allow.entity('identity') requires the path to use
       // the Cognito Identity ID. Use the path callback so Amplify injects identityId.
@@ -410,7 +375,6 @@ const Onboarding = () => {
         storageConfigured: !!(outputs as any).storage,
         outputsKeys: Object.keys(outputs),
       });
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
       // Check if storage is configured in amplify_outputs.json
       if (!(outputs as any).storage) {
@@ -420,23 +384,9 @@ const Onboarding = () => {
         throw new Error(errorMsg);
       }
 
-<<<<<<< HEAD
-      // Upload to S3 - use path callback to get the Cognito Identity ID
-      // The path pattern 'profile-pics/{entity_id}/*' requires the actual Cognito Identity ID
-      // Amplify will resolve {entity_id} to the identity ID via the path callback
-      const result = await uploadData({
-        path: ({ identityId }) => {
-          // identityId is the Cognito Identity ID (even in test mode, Amplify creates an unauthenticated identity)
-          if (!identityId) {
-            throw new Error("Unable to get identity ID for S3 upload. Please ensure you're signed in.");
-          }
-          return `profile-pics/${identityId}/${fileName}`;
-        },
-=======
       // Upload to S3 - path callback ensures we use Cognito Identity ID (required by IAM policy)
       const result = await uploadData({
         path: pathFn,
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
         data: file,
         options: {
           contentType: file.type,
@@ -470,11 +420,8 @@ const Onboarding = () => {
 
     // Full flow: photoUpload is last → upload then save
     if (step === "photoUpload") {
-<<<<<<< HEAD
-=======
       let uploadedS3Key: string | undefined;
       // If photo is selected but not uploaded yet, upload it first
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
       if (selectedFile && !profile.profilePicKey) {
         try {
           setIsUploading(true);
@@ -488,26 +435,14 @@ const Onboarding = () => {
           return;
         }
       }
-<<<<<<< HEAD
-      await saveProfileToBackend();
-=======
       
-<<<<<<< HEAD
-      // If we're on the last step (photoUpload), save profile to backend
-      // Pass uploadedS3Key directly - React setState is async, so profile.profilePicKey may not be updated yet
-      if (nextIndex >= steps.length) {
-        await saveProfileToBackend(uploadedS3Key);
-        return;
-      }
-=======
       // photoUpload is the last step — save profile to backend
       // Pass uploadedS3Key directly - React setState is async, so profile.profilePicKey may not be updated yet
       await saveProfileToBackend(uploadedS3Key);
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
       return;
     }
 
-    // Couple flow: last step is couplePartnerDetails → save minimal and redirect
+    // Couple flow: couplePartnerDetails is last → save couple to backend
     if (step === "couplePartnerDetails") {
       await saveCoupleToBackend();
       return;
@@ -530,8 +465,6 @@ const Onboarding = () => {
     
     try {
       const currentUser = await getUserProfile();
-<<<<<<< HEAD
-=======
       
       // Log profile data before saving
       console.log("[Onboarding] Profile data to save:", {
@@ -548,7 +481,6 @@ const Onboarding = () => {
         profilePicKey: profilePicKeyToSave,
         onboardingCompleted: true,
       });
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
         // Check if profile already exists for this email
         console.log("[Onboarding] Checking for existing profile with email:", profile.email);
@@ -612,8 +544,7 @@ const Onboarding = () => {
           intention: profile.intention,
           hometown: profile.hometown,
           notificationsEnabled: profile.notificationsEnabled,
-<<<<<<< HEAD
-          profilePicKey: profile.profilePicKey || undefined,
+          profilePicKey: profilePicKeyToSave || undefined,
           alcoholPreference: profile.alcoholPreference || undefined,
           smokingPreference: profile.smokingPreference || undefined,
           foodPreference: profile.foodPreference || undefined,
@@ -621,9 +552,6 @@ const Onboarding = () => {
           teaOrCoffee: profile.teaOrCoffee || undefined,
           mountainOrBeach: profile.mountainOrBeach || undefined,
           bio: profile.bio || undefined,
-=======
-          profilePicKey: profilePicKeyToSave || undefined,
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
           onboardingCompleted: true,
         };
 
@@ -983,11 +911,7 @@ const Onboarding = () => {
             className="space-y-6 text-center"
           >
             <h2 className="font-display text-3xl font-bold mb-4">
-<<<<<<< HEAD
               Hey {profile.name || "you"} 👋
-=======
-              Hi.
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
               Prom 2026 is calling – and so is your future date.{" "}
@@ -1008,10 +932,6 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-<<<<<<< HEAD
-              <h2 className="font-display text-2xl font-bold mb-2">When did you enter this world?</h2>
-              <p className="text-muted-foreground">So we know you&apos;re old enough to dance the night away</p>
-=======
               <h2 className="font-display text-2xl font-bold mb-2">Name & Date of Birth</h2>
               <p className="text-muted-foreground">Tell us your name and when you were born</p>
             </div>
@@ -1026,7 +946,6 @@ const Onboarding = () => {
                 onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))}
                 className="text-base"
               />
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
             </div>
             <div>
               <Label htmlFor="dateOfBirth" className="text-base mb-3 block">
@@ -1405,74 +1324,46 @@ const Onboarding = () => {
               id="photo-upload"
             />
 
-            {/* Upload area */}
-            {!previewUrl && !profile.profilePicKey ? (
-              <div className="space-y-4">
-                <Label htmlFor="photo-upload" className="text-base mb-3 block">
-                  Drop your best pic
-                </Label>
+            {/* Simple upload */}
+            <div className="space-y-4">
+              <Label htmlFor="photo-upload" className="text-base mb-3 block text-center">
+                {previewUrl ? "Profile photo" : "Upload your photo"}
+              </Label>
+              
+              {previewUrl ? (
+                <div className="space-y-3">
+                  <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-2 border-border bg-muted">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Change photo
+                  </Button>
+                </div>
+              ) : (
                 <label
                   htmlFor="photo-upload"
-                  className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors bg-muted/30"
+                  className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/30"
                 >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
-                    <p className="mb-2 text-sm text-foreground">
-                      <span className="font-semibold">Tap to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG, GIF – max 5MB (no potato quality pls)
-                    </p>
-                  </div>
+                  <ImageIcon className="w-10 h-10 text-muted-foreground mb-3" />
+                  <p className="text-sm text-foreground mb-1">
+                    <span className="font-semibold">Click to upload</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    JPG or PNG, max 5MB
+                  </p>
                 </label>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Label className="text-base mb-3 block text-center">Your profile photo</Label>
-                <div className="relative w-48 h-48 mx-auto">
-                  {/* Circular preview */}
-                  <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-primary/20 bg-muted shadow-lg ring-4 ring-background">
-                    {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt="Profile preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : profile.profilePicKey ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center">
-                        <ImageIcon className="w-12 h-12 text-muted-foreground mb-2" />
-                        <p className="text-xs text-muted-foreground text-center px-2">Uploaded</p>
-                      </div>
-                    ) : null}
-                  </div>
-                  {/* Remove button */}
-                  {previewUrl && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute -top-2 -right-2 h-8 w-8 rounded-full shadow-lg"
-                      onClick={handleRemoveFile}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-                {!profile.profilePicKey && (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Change photo
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
             {uploadError && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
@@ -1773,19 +1664,6 @@ const Onboarding = () => {
           </div>
         )}
       </div>
-
-      {/* Image Editor Modal */}
-      <AnimatePresence>
-        {showImageEditor && originalImageUrl && (
-          <ImageEditor
-            imageUrl={originalImageUrl}
-            onSave={handleImageEditorSave}
-            onCancel={handleImageEditorCancel}
-            aspectRatio={1}
-            shape="circle"
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 };

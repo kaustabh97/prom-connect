@@ -161,27 +161,17 @@ export default function Discover() {
           currentUserEmail,
         });
 
-<<<<<<< HEAD
         // Transform backend profiles to DiscoveryProfileFull format
         // Exclude current user, users in partner match (excludeFromDiscovery), and only completed onboarding
-        const transformedProfiles = backendProfiles
-          .filter((p) => 
+        const filteredBackend = backendProfiles.filter(
+          (p) =>
             p.email !== currentUserEmail && // Exclude current user
             p.onboardingCompleted === true && // Only completed profiles
             p.excludeFromDiscovery !== true // Exclude users in confirmed partner match
-          )
-          .map(transformBackendProfile)
-          .filter((p) => p.id && p.name); // Filter out invalid profiles
-=======
-        // Filter: exclude current user and only completed onboarding
-        const filteredBackend = backendProfiles.filter(
-          (p) =>
-            p.email !== currentUserEmail &&
-            p.onboardingCompleted === true
         );
 
-        // Transform to DiscoveryProfileFull format (same length as filteredBackend)
-        const transformedProfiles = filteredBackend.map(transformBackendProfile);
+        // Transform to DiscoveryProfileFull format
+        const transformedProfiles = filteredBackend.map(transformBackendProfile).filter((p) => p.id && p.name);
 
         // Resolve S3 URLs for profile photos (profilePicKey → presigned getUrl)
         for (let i = 0; i < filteredBackend.length; i++) {
@@ -200,7 +190,6 @@ export default function Discover() {
         }
 
         const validProfiles = transformedProfiles.filter((p) => p.id && p.name);
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 
         console.log("[Discover] Transformed profiles:", {
           total: backendProfiles.length,

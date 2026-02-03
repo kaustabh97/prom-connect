@@ -3,16 +3,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useScrollWheel } from "@/hooks/useScrollWheel";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-<<<<<<< HEAD
-import { Heart, X, ArrowLeft, Sparkles, Vote } from "lucide-react";
-import {
-  MOCK_DISCOVERY_PROFILES_FULL,
-  type DiscoveryProfileFull,
-} from "@/lib/dating";
-=======
-import { Heart, X, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin } from "lucide-react";
+import { Heart, X, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin, Sparkles, Vote } from "lucide-react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
 import { useMatch } from "@/hooks/useMatch";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import { generateClient } from "aws-amplify/data";
@@ -247,7 +239,6 @@ export default function FullProfileView() {
             </section>
           )}
 
-<<<<<<< HEAD
           {/* Fun answers */}
           {(profile.morningOrNightPerson || profile.idealWeekend || profile.goToKaraokeSong ||
             profile.superpowerChoice || profile.favouriteMovieGenre || profile.secretTalent ||
@@ -356,8 +347,6 @@ export default function FullProfileView() {
             </ul>
           </section>
 
-=======
->>>>>>> ee807f5 (feat: mutual likes, match popup, Matches from backend, onboarding & discover UX)
           {/* Non-negotiables */}
           {profile.nonNegotiables?.length > 0 && (
             <section>
