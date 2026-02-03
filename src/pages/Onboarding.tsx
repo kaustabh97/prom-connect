@@ -151,6 +151,7 @@ const Onboarding = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showExpandedImage, setShowExpandedImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Current steps: choice only, or full flow, or couple flow
@@ -1332,7 +1333,10 @@ const Onboarding = () => {
               
               {previewUrl ? (
                 <div className="space-y-3">
-                  <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-2 border-border bg-muted">
+                  <div 
+                    className="w-32 h-32 mx-auto rounded-full overflow-hidden border-2 border-border bg-muted cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setShowExpandedImage(true)}
+                  >
                     <img
                       src={previewUrl}
                       alt="Preview"
@@ -1664,6 +1668,41 @@ const Onboarding = () => {
           </div>
         )}
       </div>
+
+      {/* Expanded Image Modal */}
+      <AnimatePresence>
+        {showExpandedImage && previewUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setShowExpandedImage(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-4xl max-h-[90vh] w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={previewUrl}
+                alt="Profile preview"
+                className="w-full h-auto max-h-[90vh] object-contain rounded-lg"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white"
+                onClick={() => setShowExpandedImage(false)}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

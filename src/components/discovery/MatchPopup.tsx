@@ -5,21 +5,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Heart } from "lucide-react";
+import { Heart, MessageCircle } from "lucide-react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
 
 interface MatchPopupProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   matchedProfile: DiscoveryProfileFull | null;
+  matchId?: string | null;
   onKeepSwiping?: () => void;
+  onOpenChat?: () => void;
 }
 
 export function MatchPopup({
   open,
   onOpenChange,
   matchedProfile,
+  matchId,
   onKeepSwiping,
+  onOpenChat,
 }: MatchPopupProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,10 +68,20 @@ export function MatchPopup({
             className="bg-primary hover:bg-primary/90"
             onClick={() => {
               onOpenChange(false);
+              onOpenChat?.();
+            }}
+          >
+            <MessageCircle className="w-4 h-4 mr-2" />
+            Open Chat
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
               onKeepSwiping?.();
             }}
           >
-            Keep swiping
+            Keep Swiping
           </Button>
         </div>
       </DialogContent>

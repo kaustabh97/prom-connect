@@ -112,6 +112,7 @@ export default function Discover() {
   const scrollRef = useScrollWheel();
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
+  const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
 
   // Fetch profiles from backend
   useEffect(() => {
@@ -161,17 +162,15 @@ export default function Discover() {
           currentUserEmail,
         });
 
-        // Transform backend profiles to DiscoveryProfileFull format
-        // Exclude current user, users in partner match (excludeFromDiscovery), and only completed onboarding
+        // Filter: exclude current user and only completed onboarding
         const filteredBackend = backendProfiles.filter(
           (p) =>
-            p.email !== currentUserEmail && // Exclude current user
-            p.onboardingCompleted === true && // Only completed profiles
-            p.excludeFromDiscovery !== true // Exclude users in confirmed partner match
+            p.email !== currentUserEmail &&
+            p.onboardingCompleted === true
         );
 
-        // Transform to DiscoveryProfileFull format
-        const transformedProfiles = filteredBackend.map(transformBackendProfile).filter((p) => p.id && p.name);
+        // Transform to DiscoveryProfileFull format (same length as filteredBackend)
+        const transformedProfiles = filteredBackend.map(transformBackendProfile);
 
         // Resolve S3 URLs for profile photos (profilePicKey → presigned getUrl)
         for (let i = 0; i < filteredBackend.length; i++) {
@@ -249,6 +248,7 @@ export default function Discover() {
     const result = await recordSwipe(profileId, action);
     if (result.isMatch && profile) {
       setMatchedProfile(profile);
+      setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     }
   };
@@ -407,7 +407,18 @@ export default function Discover() {
         open={matchPopupOpen}
         onOpenChange={setMatchPopupOpen}
         matchedProfile={matchedProfile}
-        onKeepSwiping={() => setMatchedProfile(null)}
+        matchId={matchedMatchId}
+        onKeepSwiping={() => {
+          setMatchedProfile(null);
+          setMatchedMatchId(null);
+        }}
+        onOpenChat={() => {
+          if (matchedMatchId) {
+            navigate(`/matches?matchId=${matchedMatchId}`);
+          } else {
+            navigate("/matches");
+          }
+        }}
       />
     </div>
   );

@@ -12,7 +12,7 @@ const passedIds = new Set<string>();
 const likedIds = new Set<string>();
 const matches: { user1Id: string; user2Id: string }[] = [];
 
-export type RecordSwipeResult = { isMatch: boolean };
+export type RecordSwipeResult = { isMatch: boolean; matchId?: string };
 
 export function useMatch() {
   const [tick, setTick] = useState(0);
@@ -111,7 +111,7 @@ export function useMatch() {
                 const u1 = fromUserId;
                 const u2 = profileId;
                 // @ts-ignore - authMode type
-                await client.models.Match.create(
+                const { data: matchData } = await client.models.Match.create(
                   {
                     user1Id: u1,
                     user2Id: u2,
@@ -122,7 +122,10 @@ export function useMatch() {
                   },
                   opts
                 );
-                console.log("[useMatch] Mutual like! Match created:", { user1Id: u1, user2Id: u2 });
+                if (matchData?.id) {
+                  result.matchId = matchData.id;
+                }
+                console.log("[useMatch] Mutual like! Match created:", { user1Id: u1, user2Id: u2, matchId: matchData?.id });
               }
             }
           }

@@ -57,7 +57,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/95 backdrop-blur-lg safe-area-pb">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/30 bg-black/40 backdrop-blur-md safe-area-pb">
         <div className="max-w-[500px] mx-auto flex items-center justify-around h-16 px-2">
           {navItems.map((item) => (
             <button

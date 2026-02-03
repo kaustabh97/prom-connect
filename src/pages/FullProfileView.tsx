@@ -56,6 +56,7 @@ export default function FullProfileView() {
   const { recordSwipe } = useMatch();
   const scrollRef = useScrollWheel();
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
+  const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<DiscoveryProfileFull | null>(
     () => (location.state as { profile?: DiscoveryProfileFull })?.profile ?? null
@@ -106,6 +107,7 @@ export default function FullProfileView() {
     if (!profile) return;
     const result = await recordSwipe(profile.id, "like");
     if (result.isMatch) {
+      setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     } else {
       navigate("/discover/profile");
@@ -393,7 +395,18 @@ export default function FullProfileView() {
         open={matchPopupOpen}
         onOpenChange={setMatchPopupOpen}
         matchedProfile={profile}
-        onKeepSwiping={() => navigate("/discover/profile")}
+        matchId={matchedMatchId}
+        onKeepSwiping={() => {
+          setMatchedMatchId(null);
+          navigate("/discover/profile");
+        }}
+        onOpenChat={() => {
+          if (matchedMatchId) {
+            navigate(`/matches?matchId=${matchedMatchId}`);
+          } else {
+            navigate("/matches");
+          }
+        }}
       />
     </div>
   );
