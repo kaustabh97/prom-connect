@@ -23,6 +23,31 @@ export interface DiscoveryProfileFull {
   teaOrCoffee?: string;
   mountainOrBeach?: string;
   sexualOrientation?: string;
+  // Fun answers (optional, added after onboarding)
+  morningOrNightPerson?: string;
+  idealWeekend?: string;
+  goToKaraokeSong?: string;
+  superpowerChoice?: string;
+  favouriteMovieGenre?: string;
+  secretTalent?: string;
+  favouriteChaiSpot?: string;
+  idealPromOutfit?: string;
+  messOrOutside?: string;
+  bestDateSpotOnCampus?: string;
+  bollywoodOrEnglishAtProm?: string;
+  lateNightRitual?: string;
+  perfectSaturdayAtIIMA?: string;
+  goToBollywoodSong?: string;
+  // This or That polls
+  pollTniteOrStayIn?: string;
+  poll145Surprises?: string;
+  pollTeaPostOrNestle?: string;
+  pollMaggiOrChai?: string;
+  pollDormOrLibrary?: string;
+  pollSectionOrBatch?: string;
+  pollLKPOrHeritage?: string;
+  pollMorningOrAfternoon?: string;
+  pollCROrLKP?: string;
   // Non-negotiables (for filtering and display)
   nonNegotiables: string[];
 }

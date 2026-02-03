@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ type OnboardingStep =
   | "ageCohortGender" 
   | "sexualityIntention" 
   | "hometown"
+  | "lifestyle"
   | "photoUpload"
   | "partnerStatus"
   | "partnerLink";
@@ -52,6 +54,14 @@ interface ProfileData {
   profilePicKey: string; // S3 key for profile picture
   partnerStatus: string; // Looking for partner, Already have partner
   partnerEmail: string; // Partner's IIMA email when partner is from IIMA; empty when not from IIMA
+  // Lifestyle preferences
+  alcoholPreference: string;
+  smokingPreference: string;
+  foodPreference: string;
+  favouritePlace: string;
+  teaOrCoffee: string;
+  mountainOrBeach: string;
+  bio: string;
 }
 
 const steps: OnboardingStep[] = [
@@ -61,12 +71,20 @@ const steps: OnboardingStep[] = [
   "ageCohortGender",
   "sexualityIntention",
   "hometown",
+  "lifestyle",
   "partnerStatus",
   "partnerLink",
   "photoUpload",
 ];
 
-const partnerStatusOptions = ["Looking for a partner", "Already have a partner"];
+const alcoholOptions = ["Never", "Sometimes", "Regularly"];
+const smokingOptions = ["Never", "Sometimes", "Regularly"];
+const foodOptions = ["Veg", "Non-Veg", "Eggetarian", "No preference"];
+const favouritePlaceOptions = ["Tea Post", "Library", "LKP", "CR", "Sports Complex", "Nestlé", "Heritage Walk", "Other"];
+const teaOrCoffeeOptions = ["Tea", "Coffee", "Both"];
+const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
+
+const partnerStatusOptions = ["Still looking for my prom date 💫", "Already found my plus-one ✨"];
 const IIMA_EMAIL_SUFFIX = "@iima.ac.in";
 
 const cohorts = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"];
@@ -101,6 +119,13 @@ const Onboarding = () => {
     profilePicKey: "",
     partnerStatus: "",
     partnerEmail: "",
+    alcoholPreference: "",
+    smokingPreference: "",
+    foodPreference: "",
+    favouritePlace: "",
+    teaOrCoffee: "",
+    mountainOrBeach: "",
+    bio: "",
   });
 
   // Partner link: "iima" = enter email, "not-iima" = partner not from IIMA
@@ -116,9 +141,9 @@ const Onboarding = () => {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // When "Looking for a partner", partnerLink step is skipped
+  // When "Still looking", partnerLink step is skipped
   const effectiveSteps =
-    profile.partnerStatus === "Already have a partner"
+    profile.partnerStatus === "Already found my plus-one ✨"
       ? steps
       : steps.filter((s) => s !== "partnerLink");
   const currentStepIndex = effectiveSteps.indexOf(step);
@@ -392,9 +417,9 @@ const Onboarding = () => {
       }
     }
 
-    // partnerStatus: "Looking for a partner" → skip partnerLink, go to photoUpload; "Already have a partner" → go to partnerLink
+    // partnerStatus: "Still looking" → skip partnerLink, go to photoUpload; "Already have partner" → go to partnerLink
     if (step === "partnerStatus") {
-      if (profile.partnerStatus === "Looking for a partner") {
+      if (profile.partnerStatus === "Still looking for my prom date 💫") {
         setStep("photoUpload");
         return;
       }
@@ -509,6 +534,13 @@ const Onboarding = () => {
           profilePicKey: profile.profilePicKey || undefined,
           partnerStatus: profile.partnerStatus || undefined,
           partnerEmail: partnerEmailToSave,
+          alcoholPreference: profile.alcoholPreference || undefined,
+          smokingPreference: profile.smokingPreference || undefined,
+          foodPreference: profile.foodPreference || undefined,
+          favouritePlace: profile.favouritePlace || undefined,
+          teaOrCoffee: profile.teaOrCoffee || undefined,
+          mountainOrBeach: profile.mountainOrBeach || undefined,
+          bio: profile.bio || undefined,
           onboardingCompleted: true,
         };
 
@@ -544,6 +576,13 @@ const Onboarding = () => {
               profilePicKey: profileData.profilePicKey,
               partnerStatus: profileData.partnerStatus,
               partnerEmail: profileData.partnerEmail,
+              alcoholPreference: profileData.alcoholPreference,
+              smokingPreference: profileData.smokingPreference,
+              foodPreference: profileData.foodPreference,
+              favouritePlace: profileData.favouritePlace,
+              teaOrCoffee: profileData.teaOrCoffee,
+              mountainOrBeach: profileData.mountainOrBeach,
+              bio: profileData.bio,
               onboardingCompleted: profileData.onboardingCompleted,
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
@@ -596,6 +635,13 @@ const Onboarding = () => {
               profilePicKey: profileData.profilePicKey,
               partnerStatus: profileData.partnerStatus,
               partnerEmail: profileData.partnerEmail,
+              alcoholPreference: profileData.alcoholPreference,
+              smokingPreference: profileData.smokingPreference,
+              foodPreference: profileData.foodPreference,
+              favouritePlace: profileData.favouritePlace,
+              teaOrCoffee: profileData.teaOrCoffee,
+              mountainOrBeach: profileData.mountainOrBeach,
+              bio: profileData.bio,
               onboardingCompleted: profileData.onboardingCompleted,
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
@@ -744,6 +790,8 @@ const Onboarding = () => {
         return profile.sexualOrientation !== "" && profile.intention !== "";
       case "hometown":
         return profile.hometown.trim() !== "";
+      case "lifestyle":
+        return true; // All optional
       case "photoUpload":
         return profile.profilePicKey !== "" || selectedFile !== null;
       case "partnerStatus":
@@ -773,14 +821,14 @@ const Onboarding = () => {
             className="space-y-6 text-center"
           >
             <h2 className="font-display text-3xl font-bold mb-4">
-              Hi {profile.name || "there"},
+              Hey {profile.name || "you"} 👋
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Get ready to match with someone for Prom{" "}
-              <span className="text-primary">(and maybe more)</span>.
+              Prom 2026 is calling – and so is your future date.{" "}
+              <span className="text-primary">(Saree or suit, we got you)</span>
             </p>
             <p className="text-muted-foreground mt-4">
-              Next, we require your details to create your profile.
+              Quick deets and you&apos;re in. No long forms, we promise – unlike those 2am case preps.
             </p>
           </motion.div>
         );
@@ -794,12 +842,12 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Date of Birth</h2>
-              <p className="text-muted-foreground">Enter your date of birth</p>
+              <h2 className="font-display text-2xl font-bold mb-2">When did you enter this world?</h2>
+              <p className="text-muted-foreground">So we know you&apos;re old enough to dance the night away</p>
             </div>
             <div>
               <Label htmlFor="dateOfBirth" className="text-base mb-3 block">
-                Date of Birth (DD MM YYYY)
+                Birthday (DD MM YYYY)
               </Label>
               <Input
                 id="dateOfBirth"
@@ -828,9 +876,9 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <Bell className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">Enable Notifications</h2>
+              <h2 className="font-display text-2xl font-bold mb-2">Don&apos;t miss *the* match</h2>
               <p className="text-muted-foreground">
-                Stay updated about matches and messages through browser and email notifications
+                Get a ping when someone likes you back – way more exciting than a 1:45 surprise
               </p>
             </div>
             <Button
@@ -841,17 +889,17 @@ const Onboarding = () => {
               {profile.notificationsEnabled ? (
                 <>
                   <Check className="w-5 h-5 mr-2" />
-                  Notifications Enabled
+                  I&apos;m in – notify me!
                 </>
               ) : (
                 <>
                   <Bell className="w-5 h-5 mr-2" />
-                  Enable Notifications
+                  Yeah, I want to know
                 </>
               )}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              You can change this later in settings
+              Flip this anytime in settings
             </p>
           </motion.div>
         );
@@ -914,14 +962,14 @@ const Onboarding = () => {
             {/* Gender Dropdown */}
             <div>
               <Label htmlFor="gender" className="text-base mb-3 block">
-                Gender
+                How do you identify?
               </Label>
               <Select
                 value={profile.gender}
                 onValueChange={(value) => setProfile(prev => ({ ...prev, gender: value }))}
               >
                 <SelectTrigger id="gender" className="h-12 text-base">
-                  <SelectValue placeholder="How do you identify?" />
+                  <SelectValue placeholder="Your call" />
                 </SelectTrigger>
                 <SelectContent>
                   {genders.map((gender) => (
@@ -973,14 +1021,14 @@ const Onboarding = () => {
             {/* Intention Dropdown */}
             <div>
               <Label htmlFor="intention" className="text-base mb-3 block">
-                Intention
+                What&apos;s the endgame?
               </Label>
               <Select
                 value={profile.intention}
                 onValueChange={(value) => setProfile(prev => ({ ...prev, intention: value }))}
               >
                 <SelectTrigger id="intention" className="h-12 text-base">
-                  <SelectValue placeholder="What are you looking for?" />
+                  <SelectValue placeholder="Just prom? Or more?" />
                 </SelectTrigger>
                 <SelectContent>
                   {intentions.map((intention) => (
@@ -1021,6 +1069,136 @@ const Onboarding = () => {
           </motion.div>
         );
 
+      case "lifestyle":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl font-bold mb-2">Tea Post or Nestlé energy?</h2>
+              <p className="text-muted-foreground">Optional – but helps your matches know the real you</p>
+            </div>
+
+            <div>
+              <Label htmlFor="bio" className="text-base mb-3 block">In your own words</Label>
+              <Textarea
+                id="bio"
+                placeholder="2am chai at Tea Post type? Or early bird library person? Sell yourself..."
+                value={profile.bio}
+                onChange={(e) => setProfile((prev) => ({ ...prev, bio: e.target.value }))}
+                className="min-h-[80px] resize-none"
+                maxLength={300}
+              />
+              <p className="text-xs text-muted-foreground mt-1">{profile.bio.length}/300</p>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Alcohol</Label>
+              <Select
+                value={profile.alcoholPreference}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, alcoholPreference: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {alcoholOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Smoke break person?</Label>
+              <Select
+                value={profile.smokingPreference}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, smokingPreference: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Pick one" />
+                </SelectTrigger>
+                <SelectContent>
+                  {smokingOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Mess or outside?</Label>
+              <Select
+                value={profile.foodPreference}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, foodPreference: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Your food vibe" />
+                </SelectTrigger>
+                <SelectContent>
+                  {foodOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Tea or Coffee</Label>
+              <Select
+                value={profile.teaOrCoffee}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, teaOrCoffee: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teaOrCoffeeOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Mountain or beach person?</Label>
+              <Select
+                value={profile.mountainOrBeach}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, mountainOrBeach: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Weekend getaway vibes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mountainOrBeachOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-base mb-3 block">Your spot on campus?</Label>
+              <Select
+                value={profile.favouritePlace}
+                onValueChange={(v) => setProfile((prev) => ({ ...prev, favouritePlace: v }))}
+              >
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Tea Post, LKP, Library...?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {favouritePlaceOptions.map((o) => (
+                    <SelectItem key={o} value={o}>{o}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </motion.div>
+        );
+
       case "photoUpload":
         return (
           <motion.div
@@ -1030,8 +1208,8 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Profile Photo</h2>
-              <p className="text-muted-foreground">Upload a photo of yourself</p>
+              <h2 className="font-display text-2xl font-bold mb-2">Your best shot</h2>
+              <p className="text-muted-foreground">The one that makes people double-tap. Prom-ready vibes only</p>
             </div>
 
             {/* File input (hidden) */}
@@ -1048,7 +1226,7 @@ const Onboarding = () => {
             {!previewUrl && !profile.profilePicKey ? (
               <div className="space-y-4">
                 <Label htmlFor="photo-upload" className="text-base mb-3 block">
-                  Select Photo
+                  Drop your best pic
                 </Label>
                 <label
                   htmlFor="photo-upload"
@@ -1057,17 +1235,17 @@ const Onboarding = () => {
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <ImageIcon className="w-12 h-12 text-muted-foreground mb-4" />
                     <p className="mb-2 text-sm text-foreground">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
+                      <span className="font-semibold">Tap to upload</span> or drag and drop
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      PNG, JPG, GIF up to 5MB
+                      PNG, JPG, GIF – max 5MB (no potato quality pls)
                     </p>
                   </div>
                 </label>
               </div>
             ) : (
               <div className="space-y-4">
-                <Label className="text-base mb-3 block">Profile Photo</Label>
+                <Label className="text-base mb-3 block">Looking good ✨</Label>
                 <div className="relative w-full aspect-square max-w-xs mx-auto rounded-xl overflow-hidden border-2 border-border bg-muted">
                   {previewUrl ? (
                     <img
@@ -1078,7 +1256,7 @@ const Onboarding = () => {
                   ) : profile.profilePicKey ? (
                     <div className="w-full h-full flex items-center justify-center">
                       <ImageIcon className="w-16 h-16 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground ml-2">Photo uploaded</p>
+                      <p className="text-sm text-muted-foreground ml-2">Uploaded – prom ready!</p>
                     </div>
                   ) : null}
                   <Button
@@ -1098,7 +1276,7 @@ const Onboarding = () => {
                     className="w-full"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    Change Photo
+                    Swap for a better one
                   </Button>
                 )}
               </div>
@@ -1118,7 +1296,7 @@ const Onboarding = () => {
             {isUploading && (
               <div className="flex items-center justify-center py-4">
                 <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
-                <p className="text-sm text-muted-foreground">Uploading photo...</p>
+                <p className="text-sm text-muted-foreground">Getting you camera-ready...</p>
               </div>
             )}
           </motion.div>
@@ -1134,9 +1312,9 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">One last thing</h2>
+              <h2 className="font-display text-2xl font-bold mb-2">The big question</h2>
               <p className="text-muted-foreground">
-                Are you looking for a partner or do you already have one?
+                Still on the hunt, or already locked in with your plus-one?
               </p>
             </div>
 
@@ -1170,9 +1348,9 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">Link your partner</h2>
+              <h2 className="font-display text-2xl font-bold mb-2">Link your plus-one</h2>
               <p className="text-muted-foreground">
-                Is your partner from IIMA? Add their email to get matched directly when they accept.
+                Is your person from IIMA too? Drop their email – when they accept, you&apos;re matched. Easy.
               </p>
             </div>
 
@@ -1189,13 +1367,13 @@ const Onboarding = () => {
                 <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
                   {partnerLinkChoice === "iima" ? <Check className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
                 </span>
-                Partner from IIMA
+                Yep, they&apos;re from IIMA
               </Button>
 
               {partnerLinkChoice === "iima" && (
                 <div className="pl-2 space-y-2">
                   <Label htmlFor="partnerEmail" className="text-sm">
-                    Partner&apos;s IIMA email
+                    Their @iima.ac.in email
                   </Label>
                   <Input
                     id="partnerEmail"
@@ -1209,9 +1387,9 @@ const Onboarding = () => {
                     onBlur={() => {
                       const email = profile.partnerEmail.trim();
                       if (email && !email.toLowerCase().endsWith(IIMA_EMAIL_SUFFIX)) {
-                        setPartnerEmailError("Please enter a valid @iima.ac.in email");
+                        setPartnerEmailError("Gotta be @iima.ac.in – no outsiders here");
                       } else if (email && email.toLowerCase() === profile.email.trim().toLowerCase()) {
-                        setPartnerEmailError("You cannot add your own email");
+                        setPartnerEmailError("Nice try, but you can&apos;t add yourself 😏");
                       } else {
                         setPartnerEmailError(null);
                       }
@@ -1222,7 +1400,7 @@ const Onboarding = () => {
                     <p className="text-sm text-destructive">{partnerEmailError}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    They must have completed onboarding and added your email to get matched.
+                    They&apos;ll need to sign up and add your email back – then it&apos;s a match!
                   </p>
                 </div>
               )}
@@ -1239,7 +1417,7 @@ const Onboarding = () => {
                 <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
                   {partnerLinkChoice === "not-iima" ? <Check className="w-5 h-5" /> : <UserX className="w-5 h-5" />}
                 </span>
-                Partner not from IIMA
+                Nah, they&apos;re not from IIMA
               </Button>
             </div>
           </motion.div>
@@ -1277,9 +1455,9 @@ const Onboarding = () => {
             <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-destructive" />
             </div>
-            <h2 className="font-display text-xl font-bold mb-2">Sign In Required</h2>
+            <h2 className="font-display text-xl font-bold mb-2">Hey, you need to sign in first</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              You need to sign in with your IIMA account to continue with onboarding.
+              Prom Connect is IIMA-only – sign in with your campus email to get started.
             </p>
             <Button 
               variant="gold" 
@@ -1357,15 +1535,15 @@ const Onboarding = () => {
           <div className="flex items-center justify-between mb-3">
             {/* Back Button */}
             {currentStepIndex > 0 ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={prevStep}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={prevStep}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Oops, go back
+                </Button>
             ) : (
               <div /> // Spacer to keep logout aligned right
             )}
@@ -1385,10 +1563,10 @@ const Onboarding = () => {
           {/* Progress Indicator */}
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">
-              Step {currentStepIndex + 1} of {totalSteps}
+              {currentStepIndex + 1} of {totalSteps}
             </span>
             <span className="text-sm text-muted-foreground">
-              {totalSteps - currentStepIndex - 1} steps remaining
+              {totalSteps - currentStepIndex - 1} to go – almost there!
             </span>
           </div>
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -1429,11 +1607,11 @@ const Onboarding = () => {
             {isSaving ? (
               <>
                 <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                Saving...
+                Almost there...
               </>
             ) : (
               <>
-                Continue
+                Let&apos;s go
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}

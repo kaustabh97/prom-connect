@@ -40,6 +40,34 @@ const schema = a.schema({
       teaOrCoffee: a.string(),
       mountainOrBeach: a.string(),
       
+      // Optional fun questions (added after onboarding)
+      morningOrNightPerson: a.string(),
+      idealWeekend: a.string(),
+      goToKaraokeSong: a.string(),
+      superpowerChoice: a.string(),
+      favouriteMovieGenre: a.string(),
+      secretTalent: a.string(),
+      // IIMA-specific & Indian college prom fun questions
+      favouriteChaiSpot: a.string(),       // Tea Post, Nestlé, Room chai, LKP, etc.
+      idealPromOutfit: a.string(),         // Saree/Kurta, Western, Fusion, Sherwani
+      messOrOutside: a.string(),           // Mess loyalist, Outside foodie, Depends
+      bestDateSpotOnCampus: a.string(),    // Tea Post, Heritage walk, Library, LKP
+      bollywoodOrEnglishAtProm: a.string(),// Bollywood, English, Both
+      lateNightRitual: a.string(),         // Maggi run, 2am chai, Dorm talks, etc.
+      perfectSaturdayAtIIMA: a.string(),   // Free text
+      goToBollywoodSong: a.string(),       // For karaoke / prom dance
+      
+      // Optional This or That polls (IIMA-specific)
+      pollTniteOrStayIn: a.string(),       // Tnite | Stay in
+      poll145Surprises: a.string(),        // Love them | Avoid them
+      pollTeaPostOrNestle: a.string(),     // Tea Post | Nestlé
+      pollMaggiOrChai: a.string(),         // Maggi | Chai
+      pollDormOrLibrary: a.string(),       // Dorm | Library
+      pollSectionOrBatch: a.string(),      // Section party | Batch party
+      pollLKPOrHeritage: a.string(),       // LKP | Heritage walk
+      pollMorningOrAfternoon: a.string(),  // Morning class | Afternoon class
+      pollCROrLKP: a.string(),             // CR | LKP (weekend)
+      
       // Profile completion status
       onboardingCompleted: a.boolean(),
       // When true, user is in a confirmed partner match and should not appear in discovery
