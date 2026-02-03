@@ -37,12 +37,12 @@ const Landing = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden w-full">
       <Suspense fallback={null}>
         <SparkleBackground />
       </Suspense>
       
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20">
+      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20 w-full max-w-[600px] mx-auto">
         <div
           className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl animate-float"
           style={{ animationDuration: "8s" }}

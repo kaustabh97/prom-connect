@@ -202,7 +202,7 @@ const Matches = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
 
       {/* Dev mode banner */}
@@ -216,7 +216,7 @@ const Matches = () => {
         </div>
       )}
 
-      <div className="relative z-10 flex-1 flex min-h-0">
+      <div className="relative z-10 flex-1 flex min-h-0 w-full max-w-[1200px] mx-auto">
 
       {/* Sidebar - Match List */}
       <aside className={`w-full md:w-80 lg:w-96 border-r border-border/50 flex flex-col min-h-0 ${activeChat ? 'hidden md:flex' : 'flex'}`}>

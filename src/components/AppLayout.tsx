@@ -6,8 +6,8 @@ import BottomNav from "@/components/BottomNav";
  */
 export default function AppLayout() {
   return (
-    <div className="min-h-dvh flex flex-col content-above-nav">
-      <main className="flex-1 min-h-0">
+    <div className="min-h-dvh flex flex-col content-above-nav w-full">
+      <main className="flex-1 min-h-0 w-full">
         <Outlet />
       </main>
       <BottomNav />

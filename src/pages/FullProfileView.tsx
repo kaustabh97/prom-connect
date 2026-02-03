@@ -150,7 +150,7 @@ export default function FullProfileView() {
   if (profile.favouritePlace) aboutItems.push({ icon: MapPin, label: profile.favouritePlace });
 
   return (
-    <div className="flex flex-col flex-1 bg-background min-h-0">
+    <div className="flex flex-col flex-1 bg-background min-h-0 w-full max-w-[500px] mx-auto">
       <div
         ref={scrollRef}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scroll-touch outline-none pb-4"

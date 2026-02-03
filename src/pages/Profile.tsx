@@ -242,7 +242,7 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center w-full">
         <SparkleBackground />
         <div className="relative z-10 text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -254,7 +254,7 @@ export default function Profile() {
 
   if (error) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center p-4 w-full">
         <SparkleBackground />
         <div className="relative z-10 w-full max-w-md">
           <div className="glass rounded-2xl p-6 text-center">
@@ -271,7 +271,7 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center p-4 w-full">
         <SparkleBackground />
         <div className="relative z-10 w-full max-w-md">
           <div className="glass rounded-2xl p-6 text-center">
@@ -286,10 +286,10 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
 
-      <div className="relative z-10 flex-1 flex flex-col min-h-0">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
         {/* Header */}
         <div className="px-4 pt-3 pb-2 border-b border-border/50 bg-background/95 backdrop-blur-lg">
           <div className="flex items-center gap-3 mb-2">

@@ -17,7 +17,7 @@ import {
   type DiscoveryProfileFull,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart, X, Maximize2 } from "lucide-react";
+import { Filter, Heart, X, Maximize2, ChevronRight } from "lucide-react";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 
 const client = generateClient<Schema>();
@@ -113,6 +113,7 @@ export default function Discover() {
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
+  const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
 
   // Fetch profiles from backend
   useEffect(() => {
@@ -224,11 +225,11 @@ export default function Discover() {
     return filtered;
   }, [profiles, filters]);
 
-  // Queue: exclude already passed/liked so we don't show them again
+  // Queue: exclude already passed/liked and skipped profiles so we don't show them again
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
   const displayQueue = useMemo(() => {
     const filtered = filteredProfiles.filter(
-      (p) => !hasPassed(p.id) && !hasLiked(p.id)
+      (p) => !hasPassed(p.id) && !hasLiked(p.id) && !skippedProfileIds.has(p.id)
     );
     console.log("[Discover] displayQueue computed:", {
       inputProfilesCount: filteredProfiles.length,
@@ -241,7 +242,7 @@ export default function Discover() {
       tick, // Log tick to verify it's changing
     });
     return filtered;
-  }, [filteredProfiles, hasPassed, hasLiked, tick]);
+  }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
     const profile = displayQueue.find((p) => p.id === profileId);
@@ -264,6 +265,19 @@ export default function Discover() {
     }
   }, [scrollRef]);
 
+  // Handle "Next" - skip profile without recording decision
+  const handleNext = useCallback(() => {
+    if (displayQueue.length === 0) return;
+    const currentProfile = displayQueue[0];
+    if (!currentProfile) return;
+    
+    // Add to skipped set (temporarily hides it from queue)
+    setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
+    
+    // Scroll to top to show next profile smoothly
+    scrollToTop();
+  }, [displayQueue, scrollToTop]);
+
   // Scroll to top when a new profile loads (backup - also scrolls on button click)
   const handleProfileChange = useCallback((profileId: string) => {
     if (scrollRef.current) {
@@ -285,7 +299,7 @@ export default function Discover() {
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
       <SparkleBackground />
 
-      <div className="relative z-10 flex-1 flex flex-col min-h-0 max-w-[500px] mx-auto w-full">
+      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
         {/* Fixed header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
           <h1 className="font-display text-xl font-bold text-foreground">
@@ -369,18 +383,29 @@ export default function Discover() {
           )}
         </div>
 
-        {/* Fixed Like/Pass buttons at bottom */}
+        {/* Fixed Like/Pass/Next buttons at bottom */}
         {!loading && displayQueue.length > 0 && (
           <div className="shrink-0 border-t border-border/50 bg-background/80 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-6 py-4 px-4">
+            <div className="flex items-center justify-center gap-4 py-4 px-4">
               <Button
                 variant="outline"
                 size="icon"
                 className="h-14 w-14 rounded-full border-2 border-muted-foreground/50 hover:border-red-500 hover:bg-red-500/10"
                 onClick={() => handleSwipe(displayQueue[0]?.id, "pass")}
                 disabled={displayQueue.length === 0}
+                title="Pass"
               >
                 <X className="w-7 h-7 text-muted-foreground" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-12 w-12 rounded-full border-2 border-border/50 hover:border-primary/50 hover:bg-primary/10"
+                onClick={handleNext}
+                disabled={displayQueue.length === 0}
+                title="Next (Skip for now)"
+              >
+                <ChevronRight className="w-6 h-6 text-muted-foreground" />
               </Button>
               <Button
                 variant="default"
@@ -388,6 +413,7 @@ export default function Discover() {
                 className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90"
                 onClick={() => handleSwipe(displayQueue[0]?.id, "like")}
                 disabled={displayQueue.length === 0}
+                title="Like"
               >
                 <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
               </Button>

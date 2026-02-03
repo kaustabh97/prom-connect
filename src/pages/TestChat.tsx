@@ -37,7 +37,7 @@ const TestChat = () => {
   const isLoadingMessages = chatA.messagesLoading || chatB.messagesLoading;
 
   return (
-    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex flex-col">
+    <div className="min-h-screen bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
 
       {/* Header */}

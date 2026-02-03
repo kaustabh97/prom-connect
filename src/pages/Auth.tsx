@@ -139,7 +139,7 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col items-center justify-center p-4">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col items-center justify-center p-4 w-full">
       <SparkleBackground />
 
       <motion.div

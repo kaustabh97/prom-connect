@@ -14,7 +14,7 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4 w-full">
       <SparkleBackground />
       
       <motion.div

@@ -1479,7 +1479,7 @@ const Onboarding = () => {
   // Show loading while checking auth
   if (isCheckingAuth) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center">
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center w-full">
         <SparkleBackground />
         <div className="relative z-10 text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -1492,7 +1492,7 @@ const Onboarding = () => {
   // Show auth required modal
   if (showAuthModal || !isAuthenticated) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4 w-full">
         <SparkleBackground />
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -1523,14 +1523,14 @@ const Onboarding = () => {
   // Show only the centered banner if email is invalid
   if (isValidEmail === false) {
     return (
-      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4">
+      <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex items-center justify-center p-4 w-full">
         <SparkleBackground />
         
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="relative z-10 w-full max-w-md"
+          className="relative z-10 w-full max-w-md mx-auto"
         >
           <div className="glass rounded-3xl p-8 md:p-10 border border-white/20 shadow-float relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 pointer-events-none" />
@@ -1573,10 +1573,10 @@ const Onboarding = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
 
-      <div className="relative z-10 flex-1 flex flex-col">
+      <div className="relative z-10 flex-1 flex flex-col w-full max-w-[500px] mx-auto">
         {/* Back Button, Progress Indicator, and Logout */}
         <div className="px-4 pt-4 pb-3">
           {/* Top row: Back Button and Logout */}
@@ -1628,8 +1628,8 @@ const Onboarding = () => {
         </div>
 
         {/* Content */}
-        <main className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
+        <main className="flex-1 flex items-center justify-center p-4 w-full">
+          <div className="w-full max-w-md mx-auto">
             <div className="glass rounded-3xl p-6 md:p-8">
               <AnimatePresence mode="wait">
                 {renderStep()}
