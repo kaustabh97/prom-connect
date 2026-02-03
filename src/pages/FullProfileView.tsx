@@ -11,6 +11,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import SparkleBackground from "@/components/SparkleBackground";
 
 const client = generateClient<Schema>();
 
@@ -86,7 +87,7 @@ export default function FullProfileView() {
         if (data.profilePicKey) {
           try {
             const { url } = await getUrl({ path: data.profilePicKey, options: { bucket: "userPhotos" } });
-            transformed.photoUrls = [url];
+            transformed.photoUrls = [url.toString()];
           } catch {
             // ignore photo fetch error
           }
@@ -123,20 +124,26 @@ export default function FullProfileView() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 p-4">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-muted-foreground">Loading profile...</p>
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center w-full">
+        <SparkleBackground />
+        <div className="relative z-10 text-center">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3 mx-auto" />
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 p-4">
-        <p className="text-muted-foreground">{error ?? "Profile not found."}</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/discover/profile")}>
-          Back to Discover
-        </Button>
+      <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center p-4 w-full">
+        <SparkleBackground />
+        <div className="relative z-10 text-center">
+          <p className="text-muted-foreground mb-4">{error ?? "Profile not found."}</p>
+          <Button variant="outline" onClick={() => navigate("/discover/profile")}>
+            Back to Discover
+          </Button>
+        </div>
       </div>
     );
   }
@@ -150,13 +157,16 @@ export default function FullProfileView() {
   if (profile.favouritePlace) aboutItems.push({ icon: MapPin, label: profile.favouritePlace });
 
   return (
-    <div className="flex flex-col flex-1 bg-background min-h-0 w-full max-w-[500px] mx-auto">
-      <div
-        ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scroll-touch outline-none pb-4"
-        tabIndex={0}
-      >
-        <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border/50 bg-background/95 backdrop-blur shrink-0">
+    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
+      <SparkleBackground />
+      
+      <div className="relative z-10 flex flex-col flex-1 min-h-0 w-full max-w-[500px] mx-auto">
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scroll-touch outline-none pb-4"
+          tabIndex={0}
+        >
+          <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border/50 bg-background/95 backdrop-blur-md shrink-0">
           <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -382,7 +392,7 @@ export default function FullProfileView() {
       </div>
 
       {/* Fixed Like / Pass */}
-      <div className="fixed bottom-16 left-0 right-0 max-w-[500px] mx-auto px-4 py-3 border-t border-border/50 bg-background/95 backdrop-blur flex items-center justify-center gap-6 safe-area-pb">
+      <div className="fixed bottom-16 left-0 right-0 max-w-[500px] mx-auto px-4 py-3 border-t border-border/50 bg-background/95 backdrop-blur-md flex items-center justify-center gap-6 safe-area-pb z-20">
         <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={handlePass}>
           <X className="w-6 h-6" />
         </Button>
@@ -390,8 +400,9 @@ export default function FullProfileView() {
           <Heart className="w-6 h-6 fill-primary-foreground text-primary-foreground" />
         </Button>
       </div>
+    </div>
 
-      <MatchPopup
+    <MatchPopup
         open={matchPopupOpen}
         onOpenChange={setMatchPopupOpen}
         matchedProfile={profile}

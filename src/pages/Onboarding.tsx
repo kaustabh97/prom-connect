@@ -966,6 +966,11 @@ const Onboarding = () => {
                 </p>
               )}
             </div>
+            <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
+              <p className="text-xs text-muted-foreground text-center">
+                ⚠️ Please use your real name only. Do not use incorrect or pseudo names.
+              </p>
+            </div>
           </motion.div>
         );
 
@@ -1233,7 +1238,7 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Mess or outside?</Label>
+              <Label className="text-base mb-3 block">What type of a snack are you?</Label>
               <Select
                 value={profile.foodPreference}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, foodPreference: v }))}

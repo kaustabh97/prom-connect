@@ -5,6 +5,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile } from "@/utils/auth";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
+import { getUrl } from "aws-amplify/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +61,7 @@ type UserProfileData = {
   pollMorningOrAfternoon?: string | null;
   pollCROrLKP?: string | null;
   onboardingCompleted?: boolean | null;
+  profilePicKey?: string | null;
 };
 
 // This or That polls - IIMA specific
@@ -103,6 +105,7 @@ export default function Profile() {
   const [pollEditValues, setPollEditValues] = useState<Record<string, string>>({});
   const [savingFun, setSavingFun] = useState(false);
   const [savingPolls, setSavingPolls] = useState(false);
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
 
@@ -225,7 +228,21 @@ export default function Profile() {
         }
 
         if (profiles && profiles.length > 0) {
-          setProfile(profiles[0] as UserProfileData);
+          const backendProfile = profiles[0] as UserProfileData;
+          setProfile(backendProfile);
+          
+          // Fetch profile picture from S3 if available
+          if (backendProfile.profilePicKey) {
+            try {
+              const { url } = await getUrl({
+                path: backendProfile.profilePicKey,
+                options: { bucket: "userPhotos" },
+              });
+              setProfilePicUrl(url.toString());
+            } catch (err) {
+              console.warn("[Profile] Failed to get profile pic URL:", err);
+            }
+          }
         } else {
           setError("Profile not found. Please complete onboarding first.");
         }
@@ -401,7 +418,10 @@ export default function Profile() {
             >
               <div className="flex flex-col items-center text-center mb-6">
                 <Avatar className="h-24 w-24 border-4 border-primary/20 mb-4">
-                  <AvatarImage src={authProfile?.picture} alt={profile.name || "Profile"} />
+                  <AvatarImage 
+                    src={profilePicUrl || authProfile?.picture || undefined} 
+                    alt={profile.name || "Profile"} 
+                  />
                   <AvatarFallback className="bg-primary/20 text-primary text-3xl font-display">
                     {profile.name?.charAt(0)?.toUpperCase() || profile.email?.charAt(0)?.toUpperCase() || "?"}
                   </AvatarFallback>

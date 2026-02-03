@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
-import { Heart, Lock, Mail } from "lucide-react";
+import { Heart, Mail } from "lucide-react";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
@@ -283,18 +283,6 @@ const Auth = () => {
                   </div>
                 </>
               )}
-            </div>
-
-            {/* Security note */}
-            <div className="mt-6 p-4 rounded-xl bg-muted/30 border border-border/50">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Lock className="w-4 h-4 text-primary" />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Your identity stays anonymous until you choose to reveal
-                </p>
-              </div>
             </div>
 
             {/* Privacy note */}

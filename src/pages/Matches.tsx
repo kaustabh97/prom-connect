@@ -11,6 +11,7 @@ import { getUserProfile } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { getUrl } from "aws-amplify/storage";
 import { 
   Heart, 
   MessageCircle, 
@@ -48,6 +49,8 @@ const Matches = () => {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [showPromAsk, setShowPromAsk] = useState(false);
   const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
+  const [profilePicUrls, setProfilePicUrls] = useState<Record<string, string>>({});
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   
   // Load current user on mount
   useEffect(() => {
@@ -136,6 +139,34 @@ const Matches = () => {
     }
   };
 
+  // Fetch profile picture URLs for matches
+  useEffect(() => {
+    const fetchProfilePics = async () => {
+      const urls: Record<string, string> = {};
+      await Promise.all(
+        rawMatches.map(async (match) => {
+          const profilePicKey = match.otherUserProfile?.profilePicKey;
+          if (profilePicKey) {
+            try {
+              const { url } = await getUrl({
+                path: profilePicKey,
+                options: { bucket: "userPhotos" },
+              });
+              urls[match.id] = url.toString();
+            } catch (err) {
+              console.warn("[Matches] Failed to get profile pic URL for match", match.id, err);
+            }
+          }
+        })
+      );
+      setProfilePicUrls(urls);
+    };
+
+    if (rawMatches.length > 0) {
+      fetchProfilePics();
+    }
+  }, [rawMatches]);
+
   // Transform matches for UI
   const matchesForUI = rawMatches.map((m) => ({
     match: m,
@@ -143,6 +174,7 @@ const Matches = () => {
       m.otherUserProfile?.name ||
       m.otherUserEmail?.split("@")[0] ||
       "Anonymous",
+    profilePicUrl: profilePicUrls[m.id],
   }));
 
   // Open chat from URL param (matchId)
@@ -294,7 +326,7 @@ const Matches = () => {
           )}
 
           {/* Matches - name only, no email */}
-          {matchesForUI.map(({ match, uiDisplayName }) => (
+          {matchesForUI.map(({ match, uiDisplayName, profilePicUrl }) => (
             <motion.button
               key={match.id}
               whileHover={{ scale: 1.02 }}
@@ -310,14 +342,25 @@ const Matches = () => {
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-500" />
               
               <div className="flex items-start gap-3 relative z-10">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 overflow-hidden ${
                   activeChat === match.id 
-                    ? "bg-primary/30 ring-2 ring-primary/50" 
-                    : "bg-primary/20 ring-1 ring-primary/30"
-                }`}>
-                  <Heart className={`w-5 h-5 transition-colors ${
-                    activeChat === match.id ? "text-primary" : "text-primary/80"
-                  }`} />
+                    ? "ring-2 ring-primary/50" 
+                    : "ring-1 ring-primary/30"
+                } ${profilePicUrl && !imageErrors[match.id] ? "bg-muted" : "bg-primary/20"}`}>
+                  {profilePicUrl && !imageErrors[match.id] ? (
+                    <img
+                      src={profilePicUrl}
+                      alt={uiDisplayName}
+                      className="w-full h-full object-cover"
+                      onError={() => {
+                        setImageErrors((prev) => ({ ...prev, [match.id]: true }));
+                      }}
+                    />
+                  ) : (
+                    <Heart className={`w-5 h-5 transition-colors ${
+                      activeChat === match.id ? "text-primary" : "text-primary/80"
+                    }`} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className={`font-semibold block truncate transition-colors ${
@@ -397,12 +440,33 @@ const ChatView = ({
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const displayName =
     match.otherUserProfile?.name ||
     match.otherUserEmail?.split("@")[0] ||
     "Anonymous";
+
+  // Fetch profile picture URL
+  useEffect(() => {
+    const fetchProfilePic = async () => {
+      const profilePicKey = match.otherUserProfile?.profilePicKey;
+      if (profilePicKey) {
+        try {
+          const { url } = await getUrl({
+            path: profilePicKey,
+            options: { bucket: "userPhotos" },
+          });
+          setProfilePicUrl(url.toString());
+        } catch (err) {
+          console.warn("[ChatView] Failed to get profile pic URL:", err);
+        }
+      }
+    };
+    fetchProfilePic();
+  }, [match.otherUserProfile?.profilePicKey]);
 
   // Use the real chat hook
   const {
@@ -473,8 +537,19 @@ const ChatView = ({
             <X className="w-5 h-5" />
           </Button>
           
-          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-            <Heart className="w-5 h-5 text-primary" />
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ring-1 ring-primary/30 ${
+            profilePicUrl && !imageError ? "bg-muted" : "bg-primary/20"
+          }`}>
+            {profilePicUrl && !imageError ? (
+              <img
+                src={profilePicUrl}
+                alt={displayName}
+                className="w-full h-full object-cover"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <Heart className="w-5 h-5 text-primary" />
+            )}
           </div>
           
           <div>
