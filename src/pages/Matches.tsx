@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import SparkleBackground from "@/components/SparkleBackground";
 import PromAsk from "@/components/PromAsk";
 import { useChat } from "@/hooks/useChat";
@@ -21,7 +20,6 @@ import {
   MoreVertical,
   Flag,
   Trash2,
-  PartyPopper,
   Loader2,
   Plus,
   RefreshCw,
@@ -49,9 +47,6 @@ const Matches = () => {
   // UI state
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [showPromAsk, setShowPromAsk] = useState(false);
-  const [showCreateMatch, setShowCreateMatch] = useState(false);
-  const [newMatchEmail, setNewMatchEmail] = useState("");
-  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
   
   // Load current user on mount
@@ -111,7 +106,6 @@ const Matches = () => {
     isLoading: matchesLoading, 
     error: matchesError,
     refresh: refreshMatches,
-    createMatch,
     updateMatchConversation,
   } = useMatches({ 
     currentUserId, 
@@ -172,21 +166,6 @@ const Matches = () => {
     await updateMatchConversation(matchId, conversationId);
   };
 
-  // Create a new match (for testing)
-  const handleCreateMatch = async () => {
-    if (!newMatchEmail.trim()) return;
-    setIsCreatingMatch(true);
-    try {
-      // In production, you'd look up the user by email
-      // For now, we'll use the email as a pseudo-user-id
-      const otherUserId = newMatchEmail.trim();
-      await createMatch(otherUserId, newMatchEmail.trim(), 0.8);
-      setNewMatchEmail("");
-      setShowCreateMatch(false);
-    } finally {
-      setIsCreatingMatch(false);
-    }
-  };
 
   // Show loading while checking auth
   if (isAuthLoading) {
@@ -234,20 +213,6 @@ const Matches = () => {
             </div>
           </div>
           
-          <div className="flex gap-2">
-            <Button variant="glass" size="sm" className="flex-1">
-              All ({rawMatches.length})
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="flex-1"
-              onClick={() => setShowCreateMatch(true)}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add Match
-            </Button>
-          </div>
         </header>
 
         {/* Partner requests - confirm match */}
@@ -322,13 +287,9 @@ const Matches = () => {
             <div className="text-center py-8">
               <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
               <p className="text-muted-foreground mb-2">No matches yet</p>
-              <p className="text-sm text-muted-foreground/70 mb-4">
-                Complete discovery to get matched, or add a test match below.
+              <p className="text-sm text-muted-foreground/70">
+                Complete discovery to get matched.
               </p>
-              <Button variant="outline" size="sm" onClick={() => setShowCreateMatch(true)}>
-                <Plus className="w-4 h-4 mr-1" />
-                Create Test Match
-              </Button>
             </div>
           )}
 
@@ -339,21 +300,36 @@ const Matches = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setActiveChat(match.id)}
-              className={`w-full p-3 rounded-xl mb-2 text-left transition-colors ${
+              className={`w-full p-4 rounded-xl mb-3 text-left transition-all duration-300 relative overflow-hidden ${
                 activeChat === match.id 
-                  ? "bg-primary/20 border border-primary/30" 
-                  : "glass hover:bg-card/70"
+                  ? "bg-primary/25 border-2 border-primary/40 shadow-lg shadow-primary/20" 
+                  : "bg-background/30 backdrop-blur-md border border-primary/20 hover:bg-background/40 hover:border-primary/30 hover:shadow-md hover:shadow-primary/10"
               }`}
             >
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center shrink-0">
-                  <Heart className="w-5 h-5 text-primary" />
+              {/* Subtle shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-500" />
+              
+              <div className="flex items-start gap-3 relative z-10">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
+                  activeChat === match.id 
+                    ? "bg-primary/30 ring-2 ring-primary/50" 
+                    : "bg-primary/20 ring-1 ring-primary/30"
+                }`}>
+                  <Heart className={`w-5 h-5 transition-colors ${
+                    activeChat === match.id ? "text-primary" : "text-primary/80"
+                  }`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-foreground block truncate">
+                  <span className={`font-semibold block truncate transition-colors ${
+                    activeChat === match.id ? "text-foreground" : "text-foreground/90"
+                  }`}>
                     {uiDisplayName}
                   </span>
-                  <p className="text-sm text-primary mt-0.5">
+                  <p className={`text-sm mt-1 transition-colors ${
+                    activeChat === match.id 
+                      ? "text-primary font-medium" 
+                      : "text-primary/70"
+                  }`}>
                     {match.conversationId ? "Continue chat →" : "Start chat →"}
                   </p>
                 </div>
@@ -371,7 +347,6 @@ const Matches = () => {
             conversationId={activeConversationId}
             currentUserId={currentUserId}
             onBack={() => setActiveChat(null)}
-            onPromAsk={() => setShowPromAsk(true)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
           />
         ) : (
@@ -399,73 +374,6 @@ const Matches = () => {
         )}
       </AnimatePresence>
 
-      {/* Create Match Modal (for testing) */}
-      <AnimatePresence>
-        {showCreateMatch && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="glass rounded-3xl p-6 max-w-md w-full"
-            >
-              <h3 className="font-display text-xl font-bold mb-4">Create Test Match</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Enter another user's email or ID to create a match for testing.
-                Both users need to create a match with each other to chat.
-              </p>
-              
-              <Input
-                placeholder="Other user's email or ID"
-                value={newMatchEmail}
-                onChange={(e) => setNewMatchEmail(e.target.value)}
-                className="mb-4"
-              />
-
-              <div className="bg-muted/30 rounded-lg p-3 mb-4 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground mb-1">How to test:</p>
-                <ol className="list-decimal list-inside space-y-1">
-                  <li>Open the app in two different browsers</li>
-                  <li>Sign in with different Google accounts</li>
-                  <li>Each person creates a match with the other's email</li>
-                  <li>Both will see each other in their matches list</li>
-                  <li>Click to start chatting!</li>
-                </ol>
-              </div>
-
-              <div className="flex gap-3">
-                <Button 
-                  variant="glass" 
-                  className="flex-1"
-                  onClick={() => setShowCreateMatch(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  variant="gold" 
-                  className="flex-1"
-                  onClick={handleCreateMatch}
-                  disabled={!newMatchEmail.trim() || isCreatingMatch}
-                >
-                  {isCreatingMatch ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Create Match
-                    </>
-                  )}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
@@ -476,17 +384,15 @@ interface ChatViewProps {
   conversationId?: string;
   currentUserId: string;
   onBack: () => void;
-  onPromAsk: () => void;
-  onConversationCreated: (conversationId: string) => void;
+  onConversationCreated?: (conversationId: string) => void;
 }
 
 const ChatView = ({ 
   match, 
   conversationId, 
   currentUserId,
-  onBack, 
-  onPromAsk,
-  onConversationCreated 
+  onBack,
+  onConversationCreated,
 }: ChatViewProps) => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
@@ -583,11 +489,6 @@ const ChatView = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="rose" size="sm" onClick={onPromAsk}>
-            <PartyPopper className="w-4 h-4 mr-1" />
-            Ask to Prom
-          </Button>
-          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -615,7 +516,7 @@ const ChatView = ({
         </div>
       )}
 
-      {/* Messages - scrollable area */}
+      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messagesLoading && messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
