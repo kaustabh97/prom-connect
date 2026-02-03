@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { DiscoveryFilters } from "@/lib/dating";
 import { GENDER_OPTIONS, NON_NEGOTIABLE_OPTIONS } from "@/lib/dating";
+import { Sparkles } from "lucide-react";
 
 interface FiltersModalProps {
   open: boolean;
@@ -57,17 +58,34 @@ export default function FiltersModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[400px] max-h-[85dvh] overflow-y-auto bg-card border-border">
-        <DialogHeader>
-          <DialogTitle className="font-display">Filters</DialogTitle>
+      <DialogContent className="max-w-[420px] max-h-[85dvh] overflow-y-auto glass-strong border-primary/30 shadow-glow">
+        <DialogHeader className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <DialogTitle className="font-display text-2xl font-bold text-foreground">
+              Filters
+            </DialogTitle>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Customize your discovery preferences
+          </p>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
+        <div className="space-y-6 py-4">
           {/* Age range */}
-          <div>
-            <Label className="text-sm font-medium">Age range</Label>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-sm text-muted-foreground w-8">{local.ageMin}</span>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="space-y-3"
+          >
+            <Label className="text-base font-semibold text-foreground flex items-center gap-2">
+              <span className="text-primary">Age Range</span>
+            </Label>
+            <div className="flex items-center gap-4 px-2">
+              <span className="text-lg font-semibold text-primary w-10 text-center">
+                {local.ageMin}
+              </span>
               <Slider
                 value={[local.ageMin, local.ageMax]}
                 min={18}
@@ -78,62 +96,102 @@ export default function FiltersModal({
                 }
                 className="flex-1"
               />
-              <span className="text-sm text-muted-foreground w-8">{local.ageMax}</span>
+              <span className="text-lg font-semibold text-primary w-10 text-center">
+                {local.ageMax}
+              </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Gender(s) interested in */}
-          <div>
-            <Label className="text-sm font-medium">Interested in</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-3"
+          >
+            <Label className="text-base font-semibold text-foreground flex items-center gap-2">
+              <span className="text-primary">Interested In</span>
+            </Label>
+            <div className="flex flex-wrap gap-2">
               {GENDER_OPTIONS.map((g) => (
-                <Button
+                <motion.div
                   key={g}
-                  type="button"
-                  variant={local.gendersInterestedIn.includes(g) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleGender(g)}
-                  className={
-                    local.gendersInterestedIn.includes(g) ? "bg-primary/20 text-primary" : ""
-                  }
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  {g}
-                </Button>
+                  <Button
+                    type="button"
+                    variant={local.gendersInterestedIn.includes(g) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleGender(g)}
+                    className={
+                      local.gendersInterestedIn.includes(g)
+                        ? "bg-primary/25 text-primary border-primary/40 hover:bg-primary/30 shadow-md shadow-primary/20 font-semibold"
+                        : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
+                    }
+                  >
+                    {g}
+                  </Button>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Non-negotiables */}
-          <div>
-            <Label className="text-sm font-medium">Non-negotiables</Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              Only see profiles that match these
-            </p>
-            <div className="flex flex-wrap gap-2 mt-2">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-3"
+          >
+            <div>
+              <Label className="text-base font-semibold text-foreground flex items-center gap-2">
+                <span className="text-primary">Non-Negotiables</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1.5 ml-1">
+                Only see profiles that match these preferences
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {NON_NEGOTIABLE_OPTIONS.map((n) => (
-                <Button
+                <motion.div
                   key={n}
-                  type="button"
-                  variant={local.nonNegotiables.includes(n) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleNonNegotiable(n)}
-                  className={
-                    local.nonNegotiables.includes(n) ? "bg-primary/20 text-primary" : ""
-                  }
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  {n}
-                </Button>
+                  <Button
+                    type="button"
+                    variant={local.nonNegotiables.includes(n) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleNonNegotiable(n)}
+                    className={
+                      local.nonNegotiables.includes(n)
+                        ? "bg-primary/25 text-primary border-primary/40 hover:bg-primary/30 shadow-md shadow-primary/20 font-semibold"
+                        : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
+                    }
+                  >
+                    {n}
+                  </Button>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-2 pt-4 border-t border-primary/20">
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="hover:bg-background/60"
+          >
             Cancel
           </Button>
-          <Button variant="gold" onClick={handleSave}>
-            Save filters
+          <Button
+            variant="gold"
+            onClick={handleSave}
+            className="shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30"
+          >
+            Save Filters
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -4,11 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
-import { Heart, Mail } from "lucide-react";
+import { Heart, Mail, FlaskConical } from "lucide-react";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { BETA_MODE, GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -139,7 +139,17 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col items-center justify-center p-4 w-full">
+    <div className={`min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col items-center justify-center p-4 w-full ${BETA_MODE ? "pt-20" : ""}`}>
+      {BETA_MODE && (
+        <div
+          className="absolute top-0 left-0 right-0 z-20 flex items-center justify-center gap-3 py-4 px-5 bg-primary/15 border-b border-primary/30 text-primary text-lg font-medium"
+          role="status"
+          aria-label="Website is in beta testing"
+        >
+          <FlaskConical className="w-6 h-6 shrink-0" />
+          <span>This site is in beta testing. Thank you for helping us improve.</span>
+        </div>
+      )}
       <SparkleBackground />
 
       <motion.div

@@ -5,6 +5,17 @@
  * that can be easily toggled to control app behavior.
  */
 
+/**
+ * Beta testing mode
+ *
+ * When true:
+ * - Landing page shows a "Beta" banner at the top so visitors know the site is in beta.
+ *
+ * When false:
+ * - No beta messaging is shown.
+ */
+export const BETA_MODE = true;
+
 /** Base URL for the Prom Connect app (used in partner invite emails) */
 export const APP_URL =
   typeof window !== "undefined"

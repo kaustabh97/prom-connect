@@ -196,7 +196,7 @@ const Onboarding = () => {
           // Check if user has already completed onboarding
           const completed = await hasCompletedOnboarding();
           if (completed) {
-            navigate("/discover/profile");
+            navigate("/discover/profile?openFilters=1");
             return;
           }
         } else {
@@ -695,7 +695,7 @@ const Onboarding = () => {
         } catch (_) {}
         console.log("[Onboarding] Navigating to discover page...");
         console.log("[Onboarding] ========================================");
-        navigate("/discover/profile");
+        navigate("/discover/profile?openFilters=1");
       } catch (error) {
         console.error("[Onboarding] ❌ Failed to save user profile:", {
           error,
@@ -813,7 +813,7 @@ const Onboarding = () => {
         );
         hasPending = (requestsToMe ?? []).some((r: { status: string }) => r.status === "pending");
       } catch (_) {}
-      navigate(hasPending ? "/matches" : "/discover/profile");
+      navigate(hasPending ? "/matches" : "/discover/profile?openFilters=1");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
@@ -1582,55 +1582,57 @@ const Onboarding = () => {
       <SparkleBackground />
 
       <div className="relative z-10 flex-1 flex flex-col w-full max-w-[500px] mx-auto">
-        {/* Back Button, Progress Indicator, and Logout */}
-        <div className="px-4 pt-4 pb-3">
-          {/* Top row: Back Button and Logout */}
-          <div className="flex items-center justify-between mb-3">
-            {/* Back Button */}
-            {currentStepIndex > 0 ? (
+        {/* Onboarding header: back, progress, logout */}
+        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
+          <div className="px-4 pt-4 pb-4">
+            {/* Top row: Back + Log out */}
+            <div className="flex items-center justify-between mb-4">
+              {currentStepIndex > 0 ? (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={prevStep}
-                  className="text-muted-foreground hover:text-foreground"
+                  className="gap-1.5 border-primary/30 text-foreground/90 hover:bg-primary/10 hover:text-foreground hover:border-primary/50"
                 >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Oops, go back
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
                 </Button>
-            ) : (
-              <div /> // Spacer to keep logout aligned right
-            )}
-            
-            {/* Logout Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <LogOut className="w-4 h-4 mr-1" />
-              Logout
-            </Button>
+              ) : (
+                <div className="w-16" aria-hidden />
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              >
+                <LogOut className="w-4 h-4" />
+                Log out
+              </Button>
+            </div>
+            {/* Progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm font-semibold text-foreground">
+                  Step {currentStepIndex + 1} of {totalSteps}
+                </span>
+                {totalSteps - currentStepIndex - 1 > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {totalSteps - currentStepIndex - 1} to go
+                  </span>
+                )}
+              </div>
+              <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+                <motion.div
+                  className="h-full rounded-full bg-primary shadow-[0_0_12px_rgba(212,168,75,0.4)]"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                />
+              </div>
+            </div>
           </div>
-          
-          {/* Progress Indicator */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">
-              {currentStepIndex + 1} of {totalSteps}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {totalSteps - currentStepIndex - 1} to go – almost there!
-            </span>
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-primary"
-              initial={{ width: 0 }}
-              animate={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
-        </div>
+        </header>
 
         {/* Content */}
         <main className="flex-1 flex items-center justify-center p-4 w-full">

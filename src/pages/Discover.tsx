@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import DiscoverFeed from "@/components/discovery/DiscoverFeed";
 import FiltersModal from "@/components/discovery/FiltersModal";
@@ -15,9 +15,11 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 import {
   applyFilters,
   type DiscoveryProfileFull,
+  mapSexualOrientationToGenders,
+  FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart, X, Maximize2, ChevronRight } from "lucide-react";
+import { Filter, Heart, X, ChevronRight } from "lucide-react";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 
 const client = generateClient<Schema>();
@@ -103,6 +105,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
 
 export default function Discover() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<DiscoveryProfileFull[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +117,88 @@ export default function Discover() {
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
   const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
+  // When arriving from onboarding (or link with ?openFilters=1), open filters first and clean URL
+  useEffect(() => {
+    if (searchParams.get("openFilters") === "1") {
+      setFiltersOpen(true);
+      searchParams.delete("openFilters");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []);
+
+  // Fetch current user's profile and pre-populate filters
+  useEffect(() => {
+    const initializeFiltersFromProfile = async () => {
+      try {
+        // Check if filters have been initialized before
+        const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
+        const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
+        
+        if (hasBeenInitialized) {
+          setFiltersInitialized(true);
+          return;
+        }
+
+        // Get current user
+        const currentUser = await getUserProfile();
+        if (!currentUser?.email) {
+          console.log("[Discover] No authenticated user, skipping filter initialization");
+          setFiltersInitialized(true);
+          return;
+        }
+
+        // Fetch user's profile from backend
+        const filters = { filter: { email: { eq: currentUser.email } } };
+        let result;
+        if (!GOOGLE_LOGIN_CHECK) {
+          // @ts-expect-error - authMode option not in generated types yet
+          result = await client.models.UserProfile.list(filters, { authMode: 'apiKey' });
+        } else {
+          result = await client.models.UserProfile.list(filters);
+        }
+
+        const userProfiles = result.data;
+        if (!userProfiles || userProfiles.length === 0) {
+          console.log("[Discover] User profile not found, skipping filter initialization");
+          setFiltersInitialized(true);
+          return;
+        }
+
+        const userProfile = userProfiles[0];
+        
+        // Pre-populate only gender preference from sexual orientation (who they want to see).
+        // Do NOT pre-populate non-negotiables: that would require other profiles to match
+        // the user's exact lifestyle and often results in zero visible profiles.
+        const gendersInterestedIn = mapSexualOrientationToGenders(
+          userProfile.sexualOrientation,
+          userProfile.gender
+        );
+
+        setFilters((prev) => ({
+          ...prev,
+          gendersInterestedIn,
+        }));
+
+        // Mark as initialized
+        localStorage.setItem(filtersInitializedKey, "true");
+        setFiltersInitialized(true);
+
+        // Show filters modal on first visit
+        setFiltersOpen(true);
+
+        console.log("[Discover] Filters initialized from profile:", {
+          gendersInterestedIn,
+        });
+      } catch (err) {
+        console.error("[Discover] Error initializing filters from profile:", err);
+        setFiltersInitialized(true);
+      }
+    };
+
+    initializeFiltersFromProfile();
+  }, [setFilters]);
 
   // Fetch profiles from backend
   useEffect(() => {
@@ -305,30 +390,16 @@ export default function Discover() {
           <h1 className="font-display text-3xl font-bold text-foreground">
             Discover
           </h1>
-          <div className="flex items-center gap-1">
-            {displayQueue.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  const p = displayQueue[0];
-                  if (p) navigate(`/discover/profile/${p.id}`, { state: { profile: p } });
-                }}
-                className="text-muted-foreground"
-                title="View full profile"
-              >
-                <Maximize2 className="w-5 h-5" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setFiltersOpen(true)}
-              className="text-muted-foreground"
-            >
-              <Filter className="w-5 h-5" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFiltersOpen(true)}
+            className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
+            title="Adjust discovery filters"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+          </Button>
         </header>
 
         {/* Full-screen card area - scrollable */}
@@ -356,20 +427,24 @@ export default function Discover() {
             </div>
           ) : displayQueue.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-12 px-4">
-              <div className="text-center">
-                <p className="text-muted-foreground mb-2">
+              <div className="text-center space-y-4">
+                <p className="text-muted-foreground">
                   {filteredProfiles.length === 0
-                    ? "No profiles match your filters. Try adjusting your preferences."
+                    ? "No profiles available for your preferences right now."
                     : "You've seen all available profiles. Check back later!"}
                 </p>
-                {filteredProfiles.length === 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setFiltersOpen(true)}
-                  >
-                    Adjust Filters
-                  </Button>
-                )}
+                <p className="text-sm text-muted-foreground/80">
+                  {filteredProfiles.length === 0
+                    ? "Try adjusting your filters to see more profiles."
+                    : "You can adjust filters to change who you see next time."}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setFiltersOpen(true)}
+                  className="mt-2"
+                >
+                  Adjust filters
+                </Button>
               </div>
             </div>
           ) : (

@@ -3,8 +3,10 @@
  * Non-anonymous; profiles are visible at all times.
  */
 
-// =====================================================================// PROFILE (full, for discovery cards and profile view)
-// =====================================================================
+// ============================================================================
+// PROFILE (full, for discovery cards and profile view)
+// ============================================================================
+
 export interface DiscoveryProfileFull {
   id: string;
   name: string;
@@ -25,7 +27,6 @@ export interface DiscoveryProfileFull {
   favouritePlace?: string;
   teaOrCoffee?: string;
   mountainOrBeach?: string;
-  sexualOrientation?: string;
   // Fun answers (optional, added after onboarding)
   morningOrNightPerson?: string;
   idealWeekend?: string;
@@ -55,8 +56,10 @@ export interface DiscoveryProfileFull {
   nonNegotiables: string[];
 }
 
-// =====================================================================// FILTERS (intent-based, persisted)
-// =====================================================================
+// ============================================================================
+// FILTERS (intent-based, persisted)
+// ============================================================================
+
 export interface DiscoveryFilters {
   ageMin: number;
   ageMax: number;
@@ -86,8 +89,91 @@ export const NON_NEGOTIABLE_OPTIONS = [
 
 export const GENDER_OPTIONS = ["Woman", "Man", "Non-Binary"] as const;
 
-// =====================================================================// LIKE / PASS / MATCH (API contract)
-// =====================================================================
+/**
+ * Map user's sexual orientation and gender to gender preferences for filters
+ */
+export function mapSexualOrientationToGenders(
+  sexualOrientation: string | null | undefined,
+  userGender: string | null | undefined
+): string[] {
+  if (!sexualOrientation || !userGender) {
+    return [...GENDER_OPTIONS]; // Default: all genders
+  }
+
+  const orientation = sexualOrientation.toLowerCase();
+  const gender = userGender.toLowerCase();
+
+  // Straight: interested in opposite gender
+  if (orientation === "straight") {
+    if (gender === "man") return ["Woman"];
+    if (gender === "woman") return ["Man"];
+    // For non-binary, default to all
+    return [...GENDER_OPTIONS];
+  }
+
+  // Gay: interested in same gender
+  if (orientation === "gay") {
+    if (gender === "man") return ["Man"];
+    if (gender === "woman") return ["Woman"];
+    // For non-binary, default to all
+    return [...GENDER_OPTIONS];
+  }
+
+  // Bisexual, Queer, or other: interested in all genders
+  if (["bisexual", "queer", "pansexual", "other"].includes(orientation)) {
+    return [...GENDER_OPTIONS];
+  }
+
+  // Default: all genders
+  return [...GENDER_OPTIONS];
+}
+
+/**
+ * Map user's lifestyle preferences to non-negotiables for filters
+ */
+export function mapPreferencesToNonNegotiables(
+  smokingPreference?: string | null,
+  alcoholPreference?: string | null,
+  intention?: string | null,
+  foodPreference?: string | null
+): string[] {
+  const nonNegotiables: string[] = [];
+
+  // Smoking preferences
+  if (smokingPreference === "Never") {
+    nonNegotiables.push("Non-smoking");
+  } else if (smokingPreference === "Sometimes" || smokingPreference === "Regularly") {
+    nonNegotiables.push("Smoking okay");
+  }
+
+  // Alcohol preferences
+  if (alcoholPreference === "Never") {
+    nonNegotiables.push("No alcohol");
+  } else if (alcoholPreference === "Sometimes" || alcoholPreference === "Regularly") {
+    nonNegotiables.push("Alcohol okay");
+  }
+
+  // Intention preferences
+  if (intention === "Date for Prom" || intention === "In a relationship, looking for a prom date") {
+    nonNegotiables.push("Serious intent");
+  } else if (intention === "Not Sure") {
+    nonNegotiables.push("Casual / open");
+  }
+
+  // Food preferences
+  if (foodPreference === "Veg") {
+    nonNegotiables.push("Veg only");
+  } else if (foodPreference) {
+    nonNegotiables.push("No dietary preference");
+  }
+
+  return nonNegotiables;
+}
+
+// ============================================================================
+// LIKE / PASS / MATCH (API contract)
+// ============================================================================
+
 export type SwipeAction = "like" | "pass";
 
 export interface LikePayload {
@@ -102,8 +188,10 @@ export interface MatchRecord {
   createdAt: string;
 }
 
-// =====================================================================// PROFILE PHOTOS (place images in public/profile-photos/)
-// =====================================================================
+// ============================================================================
+// PROFILE PHOTOS (place images in public/profile-photos/)
+// ============================================================================
+
 /** Base path for dummy profile photos. Add p1.jpg, p2.jpg, ... p5.jpg (or .png) there. */
 export const PROFILE_PHOTOS_BASE = "/profile-photos";
 
@@ -112,8 +200,10 @@ export function getProfilePhotoUrl(profileId: string, ext = "jpg"): string {
   return `${PROFILE_PHOTOS_BASE}/${profileId}.${ext}`;
 }
 
-// =====================================================================// MOCK DATA (for UX; replace with API)
-// =====================================================================
+// ============================================================================
+// MOCK DATA (for UX; replace with API)
+// ============================================================================
+
 export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
   {
     id: "p1",
@@ -202,18 +292,35 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
   },
 ];
 
-/** Apply filters to a list of profiles (deterministic). */
+/** Normalize gender for comparison (filter options use "Woman" / "Man" / "Non-Binary"). */
+function normalizeGender(g: string): string {
+  const lower = (g || "").trim().toLowerCase();
+  if (lower === "woman" || lower === "man") return lower.charAt(0).toUpperCase() + lower.slice(1);
+  if (lower === "non-binary" || lower === "nonbinary") return "Non-Binary";
+  return g;
+}
+
+/**
+ * Apply filters to a list of profiles.
+ * For now only the sexual-orientation / "Interested in" (gender) filter is applied.
+ * Age range and non-negotiables are kept in the UI for future use but do not filter results.
+ */
 export function applyFilters(
   profiles: DiscoveryProfileFull[],
   filters: DiscoveryFilters
 ): DiscoveryProfileFull[] {
   return profiles.filter((p) => {
-    if (p.age < filters.ageMin || p.age > filters.ageMax) return false;
-    if (filters.gendersInterestedIn.length && !filters.gendersInterestedIn.includes(p.gender))
-      return false;
-    for (const nn of filters.nonNegotiables) {
-      if (!p.nonNegotiables.includes(nn)) return false;
+    // Only filter by gender (who the user is interested in)
+    if (filters.gendersInterestedIn.length > 0) {
+      const profileGender = normalizeGender(p.gender);
+      const matchesGender = filters.gendersInterestedIn.some(
+        (g) => normalizeGender(g) === profileGender
+      );
+      if (!matchesGender) return false;
     }
+    // Age and non-negotiables: not applied for now (filters UI kept for later)
+    // if (p.age < filters.ageMin || p.age > filters.ageMax) return false;
+    // for (const nn of filters.nonNegotiables) { ... }
     return true;
   });
 }

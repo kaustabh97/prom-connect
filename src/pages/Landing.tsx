@@ -1,10 +1,11 @@
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Heart, Users, Filter, CheckCircle2, MessageSquare } from "lucide-react";
+import { Sparkles, Heart, Users, Filter, CheckCircle2, MessageSquare, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import FeatureCard from "@/components/FeatureCard";
 import CountdownTimer from "@/components/CountdownTimer";
+import { BETA_MODE } from "@/config";
 
 const SparkleBackground = lazy(() => import("@/components/SparkleBackground"));
 
@@ -38,6 +39,16 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-gradient-midnight relative overflow-hidden w-full">
+      {BETA_MODE && (
+        <div
+          className="relative z-20 flex items-center justify-center gap-3 py-4 px-5 bg-primary/15 border-b border-primary/30 text-primary text-lg font-medium"
+          role="status"
+          aria-label="Website is in beta testing"
+        >
+          <FlaskConical className="w-6 h-6 shrink-0" />
+          <span>This site is in beta testing. Thank you for helping us improve.</span>
+        </div>
+      )}
       <Suspense fallback={null}>
         <SparkleBackground />
       </Suspense>

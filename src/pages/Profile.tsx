@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { signOut } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfile, clearTestUser } from "@/utils/auth";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote } from "lucide-react";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote, LogOut } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 
 const client = generateClient<Schema>();
@@ -98,6 +99,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [authProfile, setAuthProfile] = useState<{ email?: string; name?: string; picture?: string } | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFunEditSheet, setShowFunEditSheet] = useState(false);
   const [showPollsEditSheet, setShowPollsEditSheet] = useState(false);
@@ -108,6 +110,24 @@ export default function Profile() {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      if (GOOGLE_LOGIN_CHECK) {
+        await signOut();
+      } else {
+        clearTestUser();
+      }
+      navigate("/");
+    } catch (err) {
+      console.error("Error signing out:", err);
+      if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+      navigate("/");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const openFunEdit = () => {
     const vals: Record<string, string> = {};
@@ -723,6 +743,28 @@ export default function Profile() {
                 </div>
               </motion.div>
             )}
+
+            {/* Log out at end of profile */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="pt-2 pb-6"
+            >
+              <Button
+                variant="outline"
+                className="w-full gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4" />
+                )}
+                Log out
+              </Button>
+            </motion.div>
           </div>
         </div>
       </div>

@@ -27,13 +27,13 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
   function SwipeCard({ profile, isTop }, ref) {
     const mainPhoto = profile.photoUrls?.[0];
 
-    const aboutChips: { icon?: React.ElementType; label: string }[] = [];
-    if (profile.alcoholPreference) aboutChips.push({ icon: Wine, label: profile.alcoholPreference });
-    if (profile.smokingPreference) aboutChips.push({ icon: Cigarette, label: profile.smokingPreference });
-    if (profile.foodPreference) aboutChips.push({ icon: Utensils, label: profile.foodPreference });
-    if (profile.teaOrCoffee) aboutChips.push({ icon: Coffee, label: profile.teaOrCoffee });
-    if (profile.mountainOrBeach) aboutChips.push({ icon: Mountain, label: profile.mountainOrBeach });
-    if (profile.favouritePlace) aboutChips.push({ icon: MapPin, label: profile.favouritePlace });
+    const aboutChips: { key: string; icon?: React.ElementType; label: string }[] = [];
+    if (profile.alcoholPreference) aboutChips.push({ key: "alcohol", icon: Wine, label: profile.alcoholPreference });
+    if (profile.smokingPreference) aboutChips.push({ key: "smoking", icon: Cigarette, label: profile.smokingPreference });
+    if (profile.foodPreference) aboutChips.push({ key: "food", icon: Utensils, label: profile.foodPreference });
+    if (profile.teaOrCoffee) aboutChips.push({ key: "teaOrCoffee", icon: Coffee, label: profile.teaOrCoffee });
+    if (profile.mountainOrBeach) aboutChips.push({ key: "mountainOrBeach", icon: Mountain, label: profile.mountainOrBeach });
+    if (profile.favouritePlace) aboutChips.push({ key: "favouritePlace", icon: MapPin, label: profile.favouritePlace });
 
     return (
       <div ref={ref} className="relative w-full h-full flex flex-col min-h-[600px]">
@@ -111,7 +111,7 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                   <h3 className="text-sm font-bold text-foreground mb-3">About me</h3>
                   <div className="flex flex-wrap gap-2">
                     {aboutChips.map((item) => (
-                      <AttributeChip key={item.label} icon={item.icon} label={item.label} />
+                      <AttributeChip key={item.key} icon={item.icon} label={item.label} />
                     ))}
                   </div>
                 </section>
@@ -121,9 +121,9 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
                   <h3 className="text-sm font-bold text-foreground mb-3">I'm looking for</h3>
                   <div className="flex flex-wrap gap-2">
-                    {profile.nonNegotiables.map((n) => (
+                    {profile.nonNegotiables.map((n, i) => (
                       <span
-                        key={n}
+                        key={`nn-${i}-${n}`}
                         className="px-3 py-2 rounded-full bg-primary/15 text-primary text-sm font-medium border border-primary/20"
                       >
                         {n}
@@ -137,9 +137,9 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
                   <h3 className="text-sm font-bold text-foreground mb-3">My interests</h3>
                   <div className="flex flex-wrap gap-2">
-                    {profile.tags.map((tag) => (
+                    {profile.tags.map((tag, i) => (
                       <span
-                        key={tag}
+                        key={`tag-${i}-${tag}`}
                         className="px-3 py-2 rounded-full bg-muted/80 text-foreground text-sm border border-border/50"
                       >
                         {tag}
