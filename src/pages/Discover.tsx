@@ -5,7 +5,6 @@ import DiscoverFeed from "@/components/discovery/DiscoverFeed";
 import FiltersModal from "@/components/discovery/FiltersModal";
 import { useFilters } from "@/hooks/useFilters";
 import { useMatch } from "@/hooks/useMatch";
-import { useScrollWheel } from "@/hooks/useScrollWheel";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
@@ -20,6 +19,7 @@ import {
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
 import { Filter, Heart, ChevronRight, X } from "lucide-react";
+import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
@@ -116,7 +116,6 @@ export default function Discover() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { filters, setFilters } = useFilters();
   const { recordSwipe, loadLikesFromBackend, hasPassed, hasLiked, tick } = useMatch();
-  const scrollRef = useScrollWheel();
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
@@ -373,11 +372,12 @@ export default function Discover() {
 
   // Scroll to top so user sees top of card (photo, name) not bottom
   const scrollToTop = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-      scrollRef.current.scrollTo({ top: 0, behavior: "instant" });
+    const main = document.getElementById("app-main");
+    if (main) {
+      main.scrollTop = 0;
+      main.scrollTo({ top: 0, behavior: "instant" });
     }
-  }, [scrollRef]);
+  }, []);
 
   // Handle "Next" (arrow) - skip for now, can loop back later
   const handleNext = useCallback(() => {
@@ -397,62 +397,57 @@ export default function Discover() {
     }
   }, [displayQueue.length, skippedProfileIds.size, scrollToTop]);
 
-  // Scroll to top when a new profile loads (backup - also scrolls on button click)
-  const handleProfileChange = useCallback((profileId: string) => {
-    if (scrollRef.current) {
+  const handleProfileChange = useCallback((_profileId: string) => {
+    const main = document.getElementById("app-main");
+    if (main && main.scrollTop > 0) {
       requestAnimationFrame(() => {
-        if (scrollRef.current && scrollRef.current.scrollTop > 0) {
-          scrollRef.current.scrollTop = 0;
-        }
+        main.scrollTop = 0;
       });
     }
-  }, [scrollRef]);
+  }, []);
 
   // Scroll to top when profile changes so user sees top of new card (photo, name)
   useEffect(() => {
     const topId = displayQueue[0]?.id;
     if (!topId) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const scroll = () => {
-      el.scrollTop = 0;
-      el.scrollTo({ top: 0, behavior: "instant" });
-    };
-    scroll();
-    // Run after paint so new card is laid out
-    const raf = requestAnimationFrame(scroll);
-    return () => cancelAnimationFrame(raf);
+    const main = document.getElementById("app-main");
+    if (!main) return;
+    main.scrollTop = 0;
+    main.scrollTo({ top: 0, behavior: "instant" });
   }, [displayQueue[0]?.id]);
 
   return (
     <div className="min-h-dvh bg-gradient-midnight relative flex flex-col w-full">
       <SparkleBackground />
 
-      <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
+      <div className="relative z-10 flex flex-col w-full max-w-[500px] mx-auto min-h-dvh">
         {/* Fixed header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-border/50 shrink-0">
+        <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50 shrink-0">
           <h1 className="font-display text-3xl font-bold text-foreground">
             Discover
           </h1>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFiltersOpen(true)}
-            className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
-            title="Adjust discovery filters"
-          >
-            <Filter className="w-4 h-4" />
-            Filters
-          </Button>
+          <div className="flex items-center gap-2">
+            <ShareWhatsAppButton
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
+              label="Refer to friends"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFiltersOpen(true)}
+              className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
+              title="Adjust discovery filters"
+            >
+              <Filter className="w-4 h-4" />
+              Filters
+            </Button>
+          </div>
         </header>
 
-        {/* Card area - only this scrolls, shows top of card when switching */}
-        <div
-          ref={scrollRef}
-          data-scroll-container
-          className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain flex flex-col scroll-touch outline-none"
-          tabIndex={0}
-        >
+        {/* Card area - content flows, main scrolls (no nested scroll) */}
+        <div className="flex flex-col w-full min-w-0">
           {loading ? (
             <div className="flex-1 flex items-center justify-center py-12">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

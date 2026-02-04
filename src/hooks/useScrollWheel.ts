@@ -2,9 +2,8 @@ import { useRef, useEffect } from "react";
 
 /**
  * Returns a ref to attach to the scroll container. When the user uses
- * trackpad/wheel over it, the container scrolls and the event is consumed
- * so the document body doesn't scroll. Requires passive: false so we use
- * a native listener in useEffect.
+ * trackpad/wheel over it (anywhere inside, including children), the container
+ * scrolls. Uses capture phase so wheel events are handled before children.
  */
 export function useScrollWheel() {
   const ref = useRef<HTMLDivElement>(null);
@@ -21,14 +20,16 @@ export function useScrollWheel() {
       if (delta < 0 && canScrollUp) {
         el.scrollTop += delta;
         e.preventDefault();
+        e.stopPropagation();
       } else if (delta > 0 && canScrollDown) {
         el.scrollTop += delta;
         e.preventDefault();
+        e.stopPropagation();
       }
     };
 
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => el.removeEventListener("wheel", handleWheel);
+    el.addEventListener("wheel", handleWheel, { passive: false, capture: true });
+    return () => el.removeEventListener("wheel", handleWheel, { capture: true });
   }, []);
 
   return ref;

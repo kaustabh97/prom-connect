@@ -18,6 +18,29 @@ import { Flag, Loader2 } from "lucide-react";
 const client = generateClient<Schema>();
 const REPORT_EMAIL = "p24kaustabh@iima.ac.in";
 
+function openGmailReportFallback(
+  text: string,
+  context: string,
+  personName?: string,
+  personId?: string,
+  reporterEmail?: string,
+  reporterName?: string
+) {
+  const subject = encodeURIComponent("Prom Connect – Report");
+  const bodyParts: string[] = [];
+  if (personName || personId) {
+    bodyParts.push(`Reporting: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`);
+  }
+  bodyParts.push(`Context: ${context}`);
+  if (reporterEmail || reporterName) {
+    bodyParts.push(`Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim());
+  }
+  bodyParts.push("", "Report details:", "---", text, "---");
+  const body = encodeURIComponent(bodyParts.join("\n"));
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(REPORT_EMAIL)}&su=${subject}&body=${body}`;
+  window.open(gmailUrl, "_blank", "noopener,noreferrer");
+}
+
 interface ReportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,34 +95,22 @@ export default function ReportModal({
           toast({ title: "Could not send report", variant: "destructive" });
         }
       } else {
-        // Fallback: open mailto when backend sendReportEmail not deployed
-        const subject = encodeURIComponent("Prom Connect – Report");
-        const bodyParts: string[] = [];
-        if (personName || personId) {
-          bodyParts.push(`Reporting: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`);
-        }
-        bodyParts.push(`Context: ${context}`);
-        if (reporterEmail || reporterName) {
-          bodyParts.push(`Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim());
-        }
-        bodyParts.push("");
-        bodyParts.push("Report details:");
-        bodyParts.push("---");
-        bodyParts.push(text);
-        bodyParts.push("---");
-        const body = encodeURIComponent(bodyParts.join("\n"));
-        window.location.href = `mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`;
-        toast({ title: "Report opened", description: "Your email client will open with the report pre-filled." });
+        // Fallback: open Gmail when backend sendReportEmail not deployed
+        openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmail ?? undefined, reporterName ?? undefined);
+        toast({ title: "Report opened", description: "Gmail will open with the report pre-filled." });
         setReportText("");
         onOpenChange(false);
       }
     } catch (err) {
       console.error("[ReportModal] Send failed:", err);
+      openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmail ?? undefined, reporterName ?? undefined);
       toast({
-        title: "Could not send report",
-        description: err instanceof Error ? err.message : "Please try again later.",
+        title: "Could not send via app",
+        description: "Gmail opened – please send the report manually.",
         variant: "destructive",
       });
+      setReportText("");
+      onOpenChange(false);
     } finally {
       setSending(false);
     }
@@ -121,13 +132,12 @@ export default function ReportModal({
             Report
           </DialogTitle>
           <DialogDescription>
-            {personName || personId ? (
+            {personName ? (
               <>
                 Reporting{" "}
                 <span className="font-medium text-foreground">
-                  {personName || "this person"}
+                  {personName}
                 </span>
-                {personId ? ` (ID: ${personId})` : ""}
               </>
             ) : (
               "Describe the issue you wish to report."

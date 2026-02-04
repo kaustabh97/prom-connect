@@ -54,9 +54,9 @@ export default function DiscoverFeed({
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 px-2 py-2">
-      {/* Full-screen card display */}
-      <div className="relative flex-1 min-h-0">
+    <div className="flex flex-col w-full px-2 py-2">
+      {/* Card display - content flows, main scrolls */}
+      <div className="relative w-full">
         {/* Current profile card with fade transition */}
         <AnimatePresence mode="wait">
           {currentProfile && (
@@ -66,7 +66,7 @@ export default function DiscoverFeed({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="relative w-full h-full"
+              className="relative w-full"
             >
               <SwipeCard profile={currentProfile} isTop />
             </motion.div>

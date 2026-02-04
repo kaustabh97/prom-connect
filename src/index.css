@@ -110,6 +110,10 @@
     @apply border-border;
   }
 
+  html, body, #root {
+    min-height: 100dvh;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Nunito', sans-serif;
@@ -293,6 +297,11 @@
 /* Reserve space so page content never overlaps the fixed bottom nav (h-16 + safe area) */
 .content-above-nav {
   padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Chat input area: small extra padding to avoid cutoff */
+.chat-input-area-pb {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* Scrollbar styling */

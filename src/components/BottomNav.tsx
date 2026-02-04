@@ -1,35 +1,22 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Compass, Users, User, LogOut, Heart } from "lucide-react";
-import { signOut } from "aws-amplify/auth";
-import { Button } from "@/components/ui/button";
-import { clearTestUser, getUserProfile } from "@/utils/auth";
+import { Compass, Users, User } from "lucide-react";
+import { getUserProfile } from "@/utils/auth";
 import { usePromDate } from "@/hooks/usePromDate";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 
 const discoverNavItems = [
   { path: "/discover/profile", label: "Discover", icon: Compass },
   { path: "/matches", label: "Matches", icon: Users },
 ];
 
-const promDateNavItem = { path: "/prom-date", label: "Prom Date", icon: Heart };
-
 const client = generateClient<Schema>();
 
 export default function BottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const { promDate } = usePromDate({ currentUserId });
 
@@ -49,41 +36,25 @@ export default function BottomNav() {
   }, []);
 
   const hasPromDate = !!promDate;
-  const navItems = hasPromDate ? [promDateNavItem] : discoverNavItems;
+  const isOnPromDatePage = location.pathname === "/prom-date";
+  // Prom Date is a dead-end page – hide nav when on it or when matched (prevents nav after chat)
+  if (hasPromDate || isOnPromDatePage) return null;
+
+  const navItems = [...discoverNavItems, { path: "/profile", label: "Profile", icon: User }];
 
   const isActive = (path: string) => {
     if (path === "/discover/profile")
       return location.pathname === "/discover/profile" || location.pathname.startsWith("/discover/profile/");
     if (path === "/prom-date")
       return location.pathname === "/prom-date";
+    if (path === "/profile")
+      return location.pathname === "/profile";
     return location.pathname === path;
-  };
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      if (GOOGLE_LOGIN_CHECK) {
-        await signOut();
-      } else {
-        clearTestUser();
-      }
-      setProfileOpen(false);
-      navigate("/auth");
-    } catch (error) {
-      console.error("Error signing out:", error);
-      if (!GOOGLE_LOGIN_CHECK) {
-        clearTestUser();
-      }
-      setProfileOpen(false);
-      navigate("/auth");
-    } finally {
-      setIsLoggingOut(false);
-    }
   };
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/30 bg-black/40 backdrop-blur-md safe-area-pb">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/20 bg-transparent safe-area-pb">
         <div className="max-w-[500px] mx-auto flex items-center justify-around h-16 px-2">
           {navItems.map((item) => (
             <button
@@ -99,55 +70,8 @@ export default function BottomNav() {
               <span className="text-xs font-medium">{item.label}</span>
             </button>
           ))}
-          <button
-            onClick={() => setProfileOpen(true)}
-            className="flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-colors min-w-0 text-muted-foreground hover:text-foreground"
-          >
-            <User className="w-6 h-6" />
-            <span className="text-xs font-medium">Profile</span>
-          </button>
         </div>
       </nav>
-
-      <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl safe-area-pb">
-          <SheetHeader className="text-left pb-4 border-b border-border/50">
-            <SheetTitle className="font-display">Menu</SheetTitle>
-            <SheetDescription>Your account options</SheetDescription>
-          </SheetHeader>
-          <div className="py-6 space-y-3">
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-auto py-4 px-4"
-              onClick={() => {
-                setProfileOpen(false);
-                navigate("/profile");
-              }}
-            >
-              <User className="w-5 h-5" />
-              <span className="font-medium">Profile</span>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-3 h-auto py-4 px-4 text-muted-foreground hover:text-destructive hover:border-destructive"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-            >
-              {isLoggingOut ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span className="font-medium">Logging out...</span>
-                </>
-              ) : (
-                <>
-                  <LogOut className="w-5 h-5" />
-                  <span className="font-medium">Logout</span>
-                </>
-              )}
-            </Button>
-          </div>
-        </SheetContent>
-      </Sheet>
     </>
   );
 }

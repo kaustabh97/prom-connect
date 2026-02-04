@@ -38,8 +38,8 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
     return (
       <div ref={ref} className="relative w-full h-full flex flex-col min-h-[600px]">
         <div className="relative w-full h-full rounded-2xl overflow-hidden bg-background border border-border shadow-float flex flex-col">
-          {/* Single flow: photo + content (page scrolls, no inner scroll) */}
-          <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+          {/* Single flow: photo + content – parent (Discover card area) scrolls */}
+          <div className="flex-1 min-h-0 flex flex-col min-w-0">
             {/* Hero photo - flows with content */}
             <div className="relative aspect-[4/5] w-full bg-muted shrink-0 min-h-[400px]">
               {mainPhoto ? (

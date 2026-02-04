@@ -20,6 +20,7 @@ import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
+import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Amplify } from "aws-amplify";
@@ -31,8 +32,8 @@ Amplify.configure(outputs);
 const client = generateClient<Schema>();
 
 type OnboardingStep = 
-  | "choice"           // First: "Looking for a date" vs "Already a couple"
-  | "partnerRequest"   // Invite flow: accept/decline prom request
+  | "choice"             // First: "Looking for a date" vs "Already a couple"
+  | "partnerRequest"     // Invite flow: accept/decline prom request
   | "welcome" 
   | "dateOfBirth" 
   | "notifications" 
@@ -41,8 +42,11 @@ type OnboardingStep =
   | "hometown"
   | "lifestyle"
   | "photoUpload"
-  | "coupleYourName"   // Couple flow: your name
-  | "couplePartnerDetails"; // Couple flow: partner name + email
+  | "coupleYourName"     // Couple flow: your name
+  | "couplePhotoUpload"  // Couple flow: your photo
+  | "couplePartnerType"  // IIMA vs outside
+  | "couplePartnerOutside" // Outside: partner name only
+  | "couplePartnerIIMA";   // IIMA: partner name + email
 
 interface ProfileData {
   name: string;
@@ -59,6 +63,7 @@ interface ProfileData {
   partnerStatus: string; // "Still looking" vs "Already found" (set at choice step)
   partnerEmail: string;  // Partner's IIMA email (couple flow)
   partnerName: string;   // Partner's name (couple flow)
+  partnerType: "" | "iima" | "outside"; // IIMA vs outside (couple flow)
   // Lifestyle preferences
   alcoholPreference: string;
   smokingPreference: string;
@@ -84,8 +89,13 @@ const FULL_FLOW_STEPS: OnboardingStep[] = [
   "photoUpload",
 ];
 
-// Simplified couple flow (after "Already a couple")
-const COUPLE_FLOW_STEPS: OnboardingStep[] = ["coupleYourName", "couplePartnerDetails"];
+// Couple flow (after "Already a couple"): name → photo → partner type → partner details
+function getCoupleFlowSteps(partnerType: "" | "iima" | "outside"): OnboardingStep[] {
+  const base: OnboardingStep[] = ["coupleYourName", "couplePhotoUpload", "couplePartnerType"];
+  if (partnerType === "outside") return [...base, "couplePartnerOutside"];
+  if (partnerType === "iima") return [...base, "couplePartnerIIMA"];
+  return base;
+}
 
 // Invite flow: partner landed via invite link, sees request to accept/decline
 const INVITE_FLOW_STEPS: OnboardingStep[] = ["partnerRequest"];
@@ -147,6 +157,7 @@ const Onboarding = () => {
     partnerStatus: "",
     partnerEmail: "",
     partnerName: "",
+    partnerType: "",
     alcoholPreference: "",
     smokingPreference: "",
     foodPreference: "",
@@ -177,7 +188,7 @@ const Onboarding = () => {
         ? INVITE_FLOW_STEPS
         : flowChoice === "full"
           ? FULL_FLOW_STEPS
-          : COUPLE_FLOW_STEPS;
+          : getCoupleFlowSteps(profile.partnerType as "" | "iima" | "outside");
   const currentStepIndex = effectiveSteps.indexOf(step);
   const totalSteps = effectiveSteps.length;
 
@@ -517,9 +528,37 @@ const Onboarding = () => {
       return;
     }
 
-    // Couple flow: couplePartnerDetails is last → save couple to backend
-    if (step === "couplePartnerDetails") {
-      await saveCoupleToBackend();
+    // Couple flow: couplePhotoUpload - upload then next
+    if (step === "couplePhotoUpload") {
+      if (selectedFile && !profile.profilePicKey) {
+        try {
+          setIsUploading(true);
+          setUploadError(null);
+          const s3Key = await uploadPhotoToS3(selectedFile);
+          setProfile(prev => ({ ...prev, profilePicKey: s3Key }));
+        } catch (error) {
+          setUploadError(error instanceof Error ? error.message : "Failed to upload photo");
+          setIsUploading(false);
+          return;
+        }
+      }
+      const nextIndex = effectiveSteps.indexOf(step) + 1;
+      if (nextIndex < effectiveSteps.length) setStep(effectiveSteps[nextIndex]);
+      return;
+    }
+
+    // Couple flow: couplePartnerType - user picks IIMA/Outside (no Next button)
+    if (step === "couplePartnerType") return;
+
+    // Couple flow: couplePartnerOutside - save and go to couple-complete
+    if (step === "couplePartnerOutside") {
+      await saveCoupleOutside();
+      return;
+    }
+
+    // Couple flow: couplePartnerIIMA - save and send request or WhatsApp
+    if (step === "couplePartnerIIMA") {
+      await saveCoupleIIMA();
       return;
     }
 
@@ -795,7 +834,53 @@ const Onboarding = () => {
       }
   };
 
-  const saveCoupleToBackend = async () => {
+  const saveCoupleOutside = async () => {
+    console.log("[Onboarding] Saving couple flow (outside partner)...");
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const isAuthenticated = !!session.tokens;
+      const authMode = isAuthenticated ? "userPool" : "apiKey";
+      const partnerNameTrim = profile.partnerName.trim();
+      if (!partnerNameTrim) {
+        setSaveError("Please enter your partner's name.");
+        setIsSaving(false);
+        return;
+      }
+      // @ts-ignore
+      const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
+        { filter: { email: { eq: profile.email } } },
+        { authMode: authMode as "userPool" | "apiKey" }
+      );
+      if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
+      const minimalData = {
+        email: profile.email,
+        name: profile.name.trim() || undefined,
+        profilePicKey: profile.profilePicKey || undefined,
+        bio: `Partner: ${partnerNameTrim}`,
+        onboardingCompleted: true,
+      };
+      if (existingProfiles?.length) {
+        // @ts-ignore
+        await client.models.UserProfile.update(
+          { id: existingProfiles[0].id, ...minimalData },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+      } else {
+        // @ts-ignore
+        await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+      }
+      navigate(`/prom-date?partnerName=${encodeURIComponent(partnerNameTrim)}&outside=1`);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveCoupleIIMA = async () => {
     console.log("[Onboarding] Saving couple flow (minimal profile + partner link)...");
     setIsSaving(true);
     setSaveError(null);
@@ -827,6 +912,7 @@ const Onboarding = () => {
       const minimalData = {
         email: profile.email,
         name: profile.name.trim() || undefined,
+        profilePicKey: profile.profilePicKey || undefined,
         bio: profile.partnerName.trim() ? `Partner: ${profile.partnerName.trim()}` : undefined,
         onboardingCompleted: true,
       };
@@ -866,15 +952,7 @@ const Onboarding = () => {
           { authMode: authMode as "userPool" | "apiKey" }
         );
         if (!partner) {
-          try {
-            const baseUrl = typeof APP_URL === "string" && APP_URL ? APP_URL : "https://prom-connect.example.com";
-            const inviteUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(currentUserEmail)}`;
-            await client.queries.sendPartnerInviteEmail({
-              toEmail: partnerEmailTrim,
-              fromName: profile.name || "Someone",
-              appUrl: inviteUrl,
-            });
-          } catch (_) {}
+          sharePartnerInviteViaWhatsApp(profile.name || "Someone", currentUserEmail);
         }
       } catch (reqErr) {
         console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
@@ -890,7 +968,6 @@ const Onboarding = () => {
   };
 
   const prevStep = () => {
-    // From first step of a flow, go back to choice
     if (step === "welcome" || step === "coupleYourName") {
       setStep("choice");
       setFlowChoice(null);
@@ -901,6 +978,15 @@ const Onboarding = () => {
       setInviteRequest(null);
       setStep("choice");
       setFlowChoice(null);
+      return;
+    }
+    if (step === "couplePartnerOutside" || step === "couplePartnerIIMA") {
+      setStep("couplePartnerType");
+      setProfile(prev => ({ ...prev, partnerType: "" }));
+      return;
+    }
+    if (step === "couplePartnerType") {
+      setStep("couplePhotoUpload");
       return;
     }
     const prevIndex = currentStepIndex - 1;
@@ -1039,7 +1125,13 @@ const Onboarding = () => {
         return profile.profilePicKey !== "" || selectedFile !== null;
       case "coupleYourName":
         return profile.name.trim() !== "";
-      case "couplePartnerDetails": {
+      case "couplePhotoUpload":
+        return profile.profilePicKey !== "" || selectedFile !== null;
+      case "couplePartnerType":
+        return true; // Advance via option buttons
+      case "couplePartnerOutside":
+        return profile.partnerName.trim() !== "";
+      case "couplePartnerIIMA": {
         const email = profile.partnerEmail.trim().toLowerCase();
         if (!profile.partnerName.trim()) return false;
         if (!email.endsWith(IIMA_EMAIL_SUFFIX)) return false;
@@ -1662,7 +1754,104 @@ const Onboarding = () => {
           </motion.div>
         );
 
-      case "couplePartnerDetails":
+      case "couplePhotoUpload":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <h2 className="font-display text-2xl font-bold mb-2">Add your photo</h2>
+              <p className="text-muted-foreground">Your best shot – prom-ready vibes only</p>
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" id="couple-photo-upload" />
+            <div className="space-y-4">
+              <Label htmlFor="couple-photo-upload" className="text-base mb-3 block text-center">
+                {previewUrl ? "Profile photo" : "Upload your photo"}
+              </Label>
+              {previewUrl ? (
+                <div className="space-y-3">
+                  <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-2 border-border bg-muted cursor-pointer" onClick={() => setShowExpandedImage(true)}>
+                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}>
+                    Change photo
+                  </Button>
+                </div>
+              ) : (
+                <label htmlFor="couple-photo-upload" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary/50 transition-colors bg-muted/30">
+                  <ImageIcon className="w-10 h-10 text-muted-foreground mb-3" />
+                  <p className="text-sm font-semibold">Click to upload</p>
+                  <p className="text-xs text-muted-foreground">JPG or PNG, max 5MB</p>
+                </label>
+              )}
+            </div>
+            {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
+            {isUploading && <div className="flex items-center justify-center py-4"><div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}
+          </motion.div>
+        );
+
+      case "couplePartnerType":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">Where&apos;s your plus-one from?</h2>
+              <p className="text-muted-foreground">Same campus or bringing someone from the outside world?</p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                variant={profile.partnerType === "iima" ? "default" : "outline"}
+                className="h-14 w-full"
+                onClick={() => { setProfile(prev => ({ ...prev, partnerType: "iima" })); setStep("couplePartnerIIMA"); }}
+              >
+                Campus cutie – fellow IIMA-er
+              </Button>
+              <Button
+                variant={profile.partnerType === "outside" ? "default" : "outline"}
+                className="h-14 w-full"
+                onClick={() => { setProfile(prev => ({ ...prev, partnerType: "outside" })); setStep("couplePartnerOutside"); }}
+              >
+                My date&apos;s from beyond campus
+              </Button>
+            </div>
+          </motion.div>
+        );
+
+      case "couplePartnerOutside":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">Your partner&apos;s name</h2>
+              <p className="text-muted-foreground">That&apos;s all we need – you&apos;re all set!</p>
+            </div>
+            <div>
+              <Label htmlFor="partnerNameOutside" className="text-base mb-3 block">Partner&apos;s name</Label>
+              <Input
+                id="partnerNameOutside"
+                placeholder="Partner's name"
+                value={profile.partnerName}
+                onChange={(e) => setProfile(prev => ({ ...prev, partnerName: e.target.value }))}
+                className="text-base"
+              />
+            </div>
+          </motion.div>
+        );
+
+      case "couplePartnerIIMA":
         return (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1845,54 +2034,45 @@ const Onboarding = () => {
       <SparkleBackground />
 
       <div className="relative z-10 flex-1 flex flex-col w-full max-w-[500px] mx-auto">
-        {/* Onboarding header: back, progress, logout */}
-        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
+        {/* Onboarding header: back, step counter, logout on same line; progress bar below */}
+        <header className="shrink-0 border-b border-primary/20 bg-transparent">
           <div className="px-4 pt-4 pb-4">
-            {/* Top row: Back + Log out */}
-            <div className="flex items-center justify-between mb-4">
+            {/* Single row: Back | Step counter | Log out */}
+            <div className="flex items-center justify-between gap-3 mb-3">
               {currentStepIndex > 0 ? (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={prevStep}
-                  className="gap-1.5 border-primary/30 text-foreground/90 hover:bg-primary/10 hover:text-foreground hover:border-primary/50"
+                  className="gap-1.5 shrink-0 border-primary/30 text-foreground/90 hover:bg-primary/10 hover:text-foreground hover:border-primary/50"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </Button>
               ) : (
-                <div className="w-16" aria-hidden />
+                <div className="w-16 shrink-0" aria-hidden />
               )}
+              <span className="font-display text-sm font-semibold text-foreground shrink-0">
+                Step {currentStepIndex + 1} of {totalSteps}
+              </span>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleSignOut}
-                className="gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                className="gap-1.5 shrink-0 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
               >
                 <LogOut className="w-4 h-4" />
                 Log out
               </Button>
             </div>
-            {/* Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-display text-sm font-semibold text-foreground">
-                  Step {currentStepIndex + 1} of {totalSteps}
-                </span>
-                {totalSteps - currentStepIndex - 1 > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {totalSteps - currentStepIndex - 1} to go
-                  </span>
-                )}
-              </div>
-              <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full bg-primary shadow-[0_0_12px_rgba(212,168,75,0.4)]"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                />
-              </div>
+            {/* Progress bar */}
+            <div className="h-2 rounded-full bg-muted/60 overflow-hidden">
+              <motion.div
+                className="h-full rounded-full bg-primary shadow-[0_0_12px_rgba(212,168,75,0.4)]"
+                initial={{ width: 0 }}
+                animate={{ width: `${((currentStepIndex + 1) / totalSteps) * 100}%` }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+              />
             </div>
           </div>
         </header>
@@ -1908,8 +2088,8 @@ const Onboarding = () => {
           </div>
         </main>
 
-        {/* Next Button (hidden on choice/partnerRequest – user picks option to advance) */}
-        {step !== "choice" && step !== "partnerRequest" && (
+        {/* Next Button (hidden on choice/partnerRequest/couplePartnerType – user picks option to advance) */}
+        {step !== "choice" && step !== "partnerRequest" && step !== "couplePartnerType" && (
           <div className="px-4 pb-6 pt-4">
             {saveError && (
               <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20">

@@ -14,7 +14,6 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
-import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
 import { 
   Heart, 
@@ -57,6 +56,12 @@ const Matches = () => {
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, string>>({});
   
+  // Scroll to top when navigating to Matches
+  useEffect(() => {
+    const main = document.getElementById("app-main");
+    if (main) main.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname]);
+
   // Load current user on mount
   useEffect(() => {
     const loadUser = async () => {
@@ -302,12 +307,14 @@ const Matches = () => {
   };
 
 
-  // Redirect to Prom Date if user has one
+  // Redirect to Prom Date if user has one (unless they explicitly came to chat via ?matchId=)
   useEffect(() => {
+    const matchIdFromUrl = searchParams.get("matchId");
+    if (matchIdFromUrl) return; // User came to open chat with prom date
     if (!isAuthLoading && currentUserId && promDate) {
       navigate("/prom-date", { replace: true });
     }
-  }, [isAuthLoading, currentUserId, promDate, navigate]);
+  }, [isAuthLoading, currentUserId, promDate, navigate, searchParams]);
 
   // Show loading while checking auth
   if (isAuthLoading) {
@@ -492,7 +499,7 @@ const Matches = () => {
             match={activeMatch}
             conversationId={activeConversationId}
             currentUserId={currentUserId}
-            onBack={() => setActiveChat(null)}
+            onBack={() => location.state?.fromPromDate ? navigate("/prom-date", { replace: true }) : setActiveChat(null)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
             onAskToProm={() => setShowPromAsk(true)}
             showAskToProm={!activeMatch.isPromDate && !promAskFromMe.some((r) => r.toUserId === activeMatch.otherUserId)}
@@ -676,12 +683,6 @@ const ChatView = ({
 
   return (
     <div className="relative flex flex-col h-full min-h-0 overflow-hidden flex-1 w-full">
-      {/* Overlays - do not affect layout */}
-      <div className="absolute inset-0 pointer-events-none z-30">
-        <div className="pointer-events-auto">
-          <ReportFloatingButton onClick={() => setReportOpen(true)} />
-        </div>
-      </div>
       <ReportModal
         open={reportOpen}
         onOpenChange={setReportOpen}
@@ -689,8 +690,8 @@ const ChatView = ({
         personId={match.otherUserId}
         context="Chat"
       />
-      {/* Chat header - sticky so it stays visible if any parent scrolls */}
-      <header className="sticky top-0 shrink-0 z-20 p-3 sm:p-4 border-b border-border/50 flex items-center justify-between bg-background/95 backdrop-blur-sm min-h-[56px]">
+      {/* Chat header - same color as background, blends seamlessly */}
+      <header className="sticky top-0 shrink-0 z-20 p-3 sm:p-4 border-b border-primary/20 flex items-center justify-between bg-transparent min-h-[56px]">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to matches">
             <X className="w-5 h-5" />
@@ -870,9 +871,19 @@ const ChatView = ({
         </div>
       </div>
 
-      {/* Input - typing area */}
-      <div className="p-3 sm:p-4 shrink-0 safe-area-pb">
-        <div className="flex gap-2">
+      {/* Input - typing area - padding to clear nav and avoid cutoff */}
+      <div className="px-3 sm:px-4 pt-3 sm:pt-4 shrink-0 chat-input-area-pb">
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setReportOpen(true)}
+            className="h-12 w-12 shrink-0 rounded-xl border-muted-foreground/40 hover:border-destructive/50 hover:bg-destructive/10"
+            title="Report"
+            aria-label="Report"
+          >
+            <Flag className="h-5 w-5 text-muted-foreground" />
+          </Button>
           <input
             type="text"
             value={message}

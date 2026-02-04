@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { signOut } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { usePromDate } from "@/hooks/usePromDate";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote, LogOut } from "lucide-react";
+import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import SparkleBackground from "@/components/SparkleBackground";
 
 const client = generateClient<Schema>();
@@ -78,6 +87,14 @@ const POLLS: { key: keyof UserProfileData; optionA: string; optionB: string; lab
   { key: "pollCROrLKP", optionA: "CR", optionB: "LKP", label: "Weekend hangout?" },
 ];
 
+// Preference options (matches onboarding)
+const alcoholOptions = ["Never", "Sometimes", "Regularly"];
+const smokingOptions = ["Never", "Sometimes", "Regularly"];
+const foodOptions = ["Veg", "Non-Veg", "Eggetarian", "No preference"];
+const favouritePlaceOptions = ["Tea Post", "Library", "LKP", "CR", "Sports Complex", "Nestlé", "Heritage Walk", "Other"];
+const teaOrCoffeeOptions = ["Tea", "Coffee", "Both"];
+const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
+
 const FUN_QUESTIONS: { key: keyof UserProfileData; label: string; placeholder: string }[] = [
   // IIMA-specific
   { key: "favouriteChaiSpot", label: "Favourite chai adda on campus?", placeholder: "e.g. Tea Post, Nestlé, Room chai" },
@@ -96,6 +113,7 @@ const FUN_QUESTIONS: { key: keyof UserProfileData; label: string; placeholder: s
 
 export default function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
   const [authProfile, setAuthProfile] = useState<{ email?: string; name?: string; picture?: string } | null>(null);
@@ -107,9 +125,25 @@ export default function Profile() {
   const [pollEditValues, setPollEditValues] = useState<Record<string, string>>({});
   const [savingFun, setSavingFun] = useState(false);
   const [savingPolls, setSavingPolls] = useState(false);
+  const [showPreferencesEditSheet, setShowPreferencesEditSheet] = useState(false);
+  const [preferencesEditValues, setPreferencesEditValues] = useState<Record<string, string>>({});
+  const [savingPreferences, setSavingPreferences] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
+  const { promDate } = usePromDate({ currentUserId: profile?.id ?? "" });
+
+  useEffect(() => {
+    if (profile?.id && promDate) {
+      navigate("/prom-date", { replace: true });
+    }
+  }, [profile?.id, promDate, navigate]);
+
+  // Scroll to top when navigating to Profile
+  useEffect(() => {
+    const main = document.getElementById("app-main");
+    if (main) main.scrollTo({ top: 0, behavior: "instant" });
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -145,6 +179,39 @@ export default function Profile() {
     });
     setPollEditValues(vals);
     setShowPollsEditSheet(true);
+  };
+
+  const PREF_KEYS = ["alcoholPreference", "smokingPreference", "foodPreference", "favouritePlace", "teaOrCoffee", "mountainOrBeach"] as const;
+  const openPreferencesEdit = () => {
+    const vals: Record<string, string> = {};
+    PREF_KEYS.forEach((key) => {
+      vals[key] = profile?.[key]?.toString() || "";
+    });
+    setPreferencesEditValues(vals);
+    setShowPreferencesEditSheet(true);
+  };
+
+  const savePreferences = async () => {
+    if (!profile?.id) return;
+    setSavingPreferences(true);
+    try {
+      const prefData: Record<string, string | undefined> = {};
+      PREF_KEYS.forEach((key) => {
+        prefData[key] = preferencesEditValues[key] || undefined;
+      });
+      // @ts-ignore - authMode
+      const { errors } = await client.models.UserProfile.update(
+        { id: profile.id, email: profile.email, ...prefData },
+        authMode ? { authMode } : undefined
+      );
+      if (errors) throw new Error(errors[0]?.message);
+      setProfile((prev) => prev ? { ...prev, ...preferencesEditValues } : null);
+      setShowPreferencesEditSheet(false);
+    } catch (err) {
+      console.error("Failed to save preferences:", err);
+    } finally {
+      setSavingPreferences(false);
+    }
   };
 
   const savePolls = async () => {
@@ -328,7 +395,7 @@ export default function Profile() {
 
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
         {/* Header - aligned with Onboarding/Discover (glass, primary accents) */}
-        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
+        <header className="shrink-0 border-b border-primary/20 bg-transparent">
           <div className="px-4 pt-4 pb-3">
             <div className="flex items-center justify-between gap-3">
               <Button
@@ -722,9 +789,14 @@ export default function Profile() {
                 transition={{ delay: 0.3 }}
                 className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
               >
-                <h3 className="font-display font-semibold text-lg mb-4 flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-primary" />
-                  Preferences
+                <h3 className="font-display font-semibold text-lg mb-4 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-primary" />
+                    Preferences
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={openPreferencesEdit}>
+                    Edit
+                  </Button>
                 </h3>
                 <div className="space-y-3">
                   {profile.alcoholPreference && (
@@ -772,6 +844,172 @@ export default function Profile() {
                 </div>
               </motion.div>
             )}
+
+            {/* Add Preferences CTA - when none added yet */}
+            {!(profile.alcoholPreference ||
+              profile.smokingPreference ||
+              profile.foodPreference ||
+              profile.favouritePlace ||
+              profile.teaOrCoffee ||
+              profile.mountainOrBeach) && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
+              >
+                <h3 className="font-display font-semibold text-lg mb-2 flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-primary" />
+                  Preferences
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Alcohol, smoking, food, tea/coffee – help matches know your vibe.
+                </p>
+                <Button variant="outline" onClick={openPreferencesEdit}>
+                  Add preferences
+                </Button>
+              </motion.div>
+            )}
+
+            {/* Preferences Edit Sheet */}
+            <Sheet open={showPreferencesEditSheet} onOpenChange={setShowPreferencesEditSheet}>
+              <SheetContent side="right" className="overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Preferences</SheetTitle>
+                </SheetHeader>
+                <p className="text-sm text-muted-foreground mt-2 mb-6">
+                  Edit your lifestyle preferences. These influence discovery matching.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm">Alcohol</Label>
+                    <Select
+                      value={preferencesEditValues.alcoholPreference || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, alcoholPreference: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {alcoholOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Smoking</Label>
+                    <Select
+                      value={preferencesEditValues.smokingPreference || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, smokingPreference: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {smokingOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Food</Label>
+                    <Select
+                      value={preferencesEditValues.foodPreference || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, foodPreference: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {foodOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Tea or Coffee</Label>
+                    <Select
+                      value={preferencesEditValues.teaOrCoffee || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, teaOrCoffee: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teaOrCoffeeOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Mountain or Beach</Label>
+                    <Select
+                      value={preferencesEditValues.mountainOrBeach || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, mountainOrBeach: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mountainOrBeachOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-sm">Favourite place on campus</Label>
+                    <Select
+                      value={preferencesEditValues.favouritePlace || ""}
+                      onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, favouritePlace: v }))}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {favouritePlaceOptions.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-8">
+                  <Button variant="outline" onClick={() => setShowPreferencesEditSheet(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button onClick={savePreferences} disabled={savingPreferences} className="flex-1">
+                    {savingPreferences ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* Share via WhatsApp */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.32 }}
+              className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
+            >
+              <h3 className="font-display font-semibold text-lg mb-2 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary" />
+                Invite friends
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Share Prom Connect with your batchmates – the more, the merrier!
+              </p>
+              <ShareWhatsAppButton
+                variant="outline"
+                size="default"
+                className="w-full gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary"
+                showLabel={true}
+              />
+            </motion.div>
 
             {/* Log out at end of profile */}
             <motion.div
