@@ -285,18 +285,14 @@ const Matches = () => {
     lastMessageTime: lastMessageTimes[m.id] || "",
   }));
 
-  // Open chat from URL param (matchId)
+  // Open chat from URL param (matchId) – set immediately so chat opens when matches load
   useEffect(() => {
     const matchIdFromUrl = searchParams.get("matchId");
-    if (matchIdFromUrl && rawMatches.length > 0) {
-      const matchExists = rawMatches.some(m => m.id === matchIdFromUrl);
-      if (matchExists) {
-        setActiveChat(matchIdFromUrl);
-        // Clear URL param after opening
-        setSearchParams({}, { replace: true });
-      }
+    if (matchIdFromUrl) {
+      setActiveChat(matchIdFromUrl);
+      // Don't clear URL – keeps redirect from firing when fromPromDate
     }
-  }, [searchParams, rawMatches, setSearchParams]);
+  }, [searchParams]);
   
   const activeMatch = rawMatches.find(m => m.id === activeChat);
   const activeConversationId = activeMatch?.conversationId || undefined;
@@ -307,14 +303,15 @@ const Matches = () => {
   };
 
 
-  // Redirect to Prom Date if user has one (unless they explicitly came to chat via ?matchId=)
+  // Redirect to Prom Date if user has one (unless they explicitly came to chat via ?matchId= or fromPromDate)
   useEffect(() => {
     const matchIdFromUrl = searchParams.get("matchId");
     if (matchIdFromUrl) return; // User came to open chat with prom date
+    if (location.state?.fromPromDate) return; // User came from Prom Date to chat – stay on Matches
     if (!isAuthLoading && currentUserId && promDate) {
       navigate("/prom-date", { replace: true });
     }
-  }, [isAuthLoading, currentUserId, promDate, navigate, searchParams]);
+  }, [isAuthLoading, currentUserId, promDate, navigate, searchParams, location.state?.fromPromDate]);
 
   // Show loading while checking auth
   if (isAuthLoading) {

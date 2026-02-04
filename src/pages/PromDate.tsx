@@ -9,7 +9,9 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Heart, Loader2, MessageCircle } from "lucide-react";
+import { Heart, Loader2, LogOut, MessageCircle } from "lucide-react";
+import { signOut } from "aws-amplify/auth";
+import { clearTestUser } from "@/utils/auth";
 
 const client = generateClient<Schema>();
 
@@ -96,6 +98,21 @@ export default function PromDate() {
   const showOutsideView = isOutsidePartner && partnerNameFromUrl;
   const showBothView = promDate && !showOutsideView;
 
+  const handleLogout = async () => {
+    try {
+      if (GOOGLE_LOGIN_CHECK) {
+        await signOut();
+      } else {
+        clearTestUser();
+      }
+      navigate("/");
+    } catch (err) {
+      console.error("Logout failed:", err);
+      if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+      navigate("/");
+    }
+  };
+
   if (!currentUserId || (isLoading && !showOutsideView)) {
     return (
       <div className="h-dvh max-h-dvh overflow-hidden bg-gradient-midnight flex items-center justify-center">
@@ -122,6 +139,18 @@ export default function PromDate() {
   return (
     <div className="h-dvh max-h-dvh overflow-hidden bg-gradient-midnight relative flex flex-col">
       <SparkleBackground />
+      {/* Log out - top right */}
+      <div className="absolute top-4 right-4 z-20">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleLogout}
+          className="gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        >
+          <LogOut className="w-4 h-4" />
+          Log out
+        </Button>
+      </div>
       {/* Decorative floating hearts */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <Heart className="absolute top-16 left-8 w-6 h-6 text-primary/20 animate-pulse" />
