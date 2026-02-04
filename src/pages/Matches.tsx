@@ -14,6 +14,8 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
+import ReportFloatingButton from "@/components/ReportFloatingButton";
+import ReportModal from "@/components/ReportModal";
 import { 
   Heart, 
   MessageCircle, 
@@ -574,6 +576,7 @@ const ChatView = ({
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const displayName =
@@ -661,7 +664,15 @@ const ChatView = ({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 relative">
+      <ReportFloatingButton onClick={() => setReportOpen(true)} />
+      <ReportModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        personName={displayName}
+        personId={match.otherUserId}
+        context="Chat"
+      />
       {/* Chat Header - sticky at top */}
       <header className="sticky top-0 z-10 p-4 border-b border-border/50 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -714,7 +725,7 @@ const ChatView = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setReportOpen(true)}>
                 <Flag className="w-4 h-4 mr-2" />
                 Report
               </DropdownMenuItem>

@@ -21,6 +21,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Filter, Heart, ChevronRight, X } from "lucide-react";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
+import ReportFloatingButton from "@/components/ReportFloatingButton";
+import ReportModal from "@/components/ReportModal";
 import { usePromDate } from "@/hooks/usePromDate";
 
 const client = generateClient<Schema>();
@@ -123,6 +125,7 @@ export default function Discover() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
 
+  const [reportOpen, setReportOpen] = useState(false);
   const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
     toEmail: string;
     fromName?: string;
@@ -565,6 +568,19 @@ export default function Discover() {
         filters={filters}
         onSave={setFilters}
       />
+
+      {!loading && displayQueue.length > 0 && displayQueue[0] && (
+        <>
+          <ReportFloatingButton onClick={() => setReportOpen(true)} />
+          <ReportModal
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+            personName={displayQueue[0].name}
+            personId={displayQueue[0].id}
+            context="Discover"
+          />
+        </>
+      )}
 
       <MatchPopup
         open={matchPopupOpen}

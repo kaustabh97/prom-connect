@@ -12,6 +12,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import SparkleBackground from "@/components/SparkleBackground";
+import ReportFloatingButton from "@/components/ReportFloatingButton";
 
 const client = generateClient<Schema>();
 
@@ -67,6 +68,7 @@ export default function FullProfileView() {
   );
   const [loading, setLoading] = useState(!state?.profile);
   const [error, setError] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // Fetch profile from backend when not passed via state
   useEffect(() => {
@@ -162,6 +164,15 @@ export default function FullProfileView() {
   return (
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
+
+      <ReportFloatingButton onClick={() => setReportOpen(true)} />
+      <ReportModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        personName={profile.name}
+        personId={profile.id}
+        context="Profile"
+      />
       
       <div className="relative z-10 flex flex-col flex-1 min-h-0 w-full max-w-[500px] mx-auto">
         <div

@@ -1,5 +1,6 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
+import { sendReportEmail as sendReportEmailFn } from '../functions/send-report-email/resource';
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -182,6 +183,21 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
     .handler(a.handler.function(sendPartnerInvite)),
+
+  // Custom query to send report email (Lambda + SES)
+  sendReportEmail: a
+    .query()
+    .arguments({
+      personName: a.string(),
+      personId: a.string(),
+      context: a.string(),
+      reportText: a.string().required(),
+      reporterEmail: a.string(),
+      reporterName: a.string(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
+    .handler(a.handler.function(sendReportEmailFn)),
 
   // Individual messages within a conversation
   Message: a
