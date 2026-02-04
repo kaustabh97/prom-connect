@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
   onSwipe: (profileId: string, action: "like" | "pass") => void;
+  onNext?: () => void;
   onOpenFilters: () => void;
   onProfileChange?: (profileId: string) => void;
   scrollToTop?: () => void;
@@ -16,12 +17,13 @@ interface DiscoverFeedProps {
 export default function DiscoverFeed({
   profiles,
   onSwipe,
+  onNext,
   onOpenFilters,
   onProfileChange,
   scrollToTop,
 }: DiscoverFeedProps) {
   const currentProfile = profiles[0] ?? null;
-  
+
   // Notify parent when profile changes (for scroll-to-top)
   useEffect(() => {
     if (currentProfile?.id && onProfileChange) {
@@ -32,12 +34,16 @@ export default function DiscoverFeed({
   const handleSwipe = useCallback(
     (action: "like" | "pass") => {
       if (!currentProfile) return;
-      // Scroll to top first so next card shows from top
       if (scrollToTop) scrollToTop();
       onSwipe(currentProfile.id, action);
     },
     [currentProfile, onSwipe, scrollToTop]
   );
+
+  const handleNext = useCallback(() => {
+    if (scrollToTop) scrollToTop();
+    onNext?.();
+  }, [onNext, scrollToTop]);
 
   if (profiles.length === 0) {
     return (
@@ -68,7 +74,12 @@ export default function DiscoverFeed({
               transition={{ duration: 0.2 }}
               className="relative w-full"
             >
-              <SwipeCard profile={currentProfile} isTop />
+              <SwipeCard
+                profile={currentProfile}
+                isTop
+                onSwipe={handleSwipe}
+                onNext={handleNext}
+              />
             </motion.div>
           )}
         </AnimatePresence>

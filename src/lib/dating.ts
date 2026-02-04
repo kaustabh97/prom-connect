@@ -90,7 +90,8 @@ export const NON_NEGOTIABLE_OPTIONS = [
 export const GENDER_OPTIONS = ["Woman", "Man", "Non-Binary"] as const;
 
 /**
- * Map user's sexual orientation and gender to gender preferences for filters
+ * Map user's sexual orientation and gender to gender preferences for filters.
+ * Straight Man → Women; Straight Woman → Men; Gay/Lesbian → same gender; etc.
  */
 export function mapSexualOrientationToGenders(
   sexualOrientation: string | null | undefined,
@@ -100,31 +101,28 @@ export function mapSexualOrientationToGenders(
     return [...GENDER_OPTIONS]; // Default: all genders
   }
 
-  const orientation = sexualOrientation.toLowerCase();
-  const gender = userGender.toLowerCase();
+  const orientation = sexualOrientation.toLowerCase().trim();
+  const gender = userGender.toLowerCase().trim();
 
   // Straight: interested in opposite gender
   if (orientation === "straight") {
     if (gender === "man") return ["Woman"];
     if (gender === "woman") return ["Man"];
-    // For non-binary, default to all
     return [...GENDER_OPTIONS];
   }
 
-  // Gay: interested in same gender
-  if (orientation === "gay") {
+  // Gay or Lesbian: interested in same gender (Lesbian = woman interested in women)
+  if (["gay", "lesbian"].includes(orientation)) {
     if (gender === "man") return ["Man"];
     if (gender === "woman") return ["Woman"];
-    // For non-binary, default to all
     return [...GENDER_OPTIONS];
   }
 
-  // Bisexual, Queer, or other: interested in all genders
+  // Bisexual, Queer, Pansexual, Other: interested in all genders
   if (["bisexual", "queer", "pansexual", "other"].includes(orientation)) {
     return [...GENDER_OPTIONS];
   }
 
-  // Default: all genders
   return [...GENDER_OPTIONS];
 }
 

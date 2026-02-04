@@ -18,7 +18,7 @@ import {
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart, ChevronRight, X } from "lucide-react";
+import { Filter, Heart } from "lucide-react";
 import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
@@ -147,37 +147,27 @@ export default function Discover() {
     }
   }, []);
 
-  // Fetch current user's profile and pre-populate filters
+  // Sync filters from current user's profile whenever profile is loaded (after sign-in or refresh)
   useEffect(() => {
-    const initializeFiltersFromProfile = async () => {
+    const syncFiltersFromProfile = async () => {
       try {
-        const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
-        const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
-        
-        if (hasBeenInitialized) {
-          setFiltersInitialized(true);
-          return;
-        }
-
         const currentUser = await getUserProfile();
         if (!currentUser?.email) {
-          console.log("[Discover] No authenticated user, skipping filter initialization");
           setFiltersInitialized(true);
           return;
         }
 
-        const filters = { filter: { email: { eq: currentUser.email } } };
+        const listFilters = { filter: { email: { eq: currentUser.email } } };
         let result;
         if (!GOOGLE_LOGIN_CHECK) {
           // @ts-expect-error - authMode option not in generated types yet
-          result = await client.models.UserProfile.list(filters, { authMode: 'apiKey' });
+          result = await client.models.UserProfile.list(listFilters, { authMode: 'apiKey' });
         } else {
-          result = await client.models.UserProfile.list(filters);
+          result = await client.models.UserProfile.list(listFilters);
         }
 
         const userProfiles = result.data;
         if (!userProfiles || userProfiles.length === 0) {
-          console.log("[Discover] User profile not found, skipping filter initialization");
           setFiltersInitialized(true);
           return;
         }
@@ -193,20 +183,20 @@ export default function Discover() {
           gendersInterestedIn,
         }));
 
-        localStorage.setItem(filtersInitializedKey, "true");
+        const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
+        const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
+        if (!hasBeenInitialized) {
+          localStorage.setItem(filtersInitializedKey, "true");
+          setFiltersOpen(true);
+        }
         setFiltersInitialized(true);
-        setFiltersOpen(true);
-
-        console.log("[Discover] Filters initialized from profile:", {
-          gendersInterestedIn,
-        });
       } catch (err) {
-        console.error("[Discover] Error initializing filters from profile:", err);
+        console.error("[Discover] Error syncing filters from profile:", err);
         setFiltersInitialized(true);
       }
     };
 
-    initializeFiltersFromProfile();
+    syncFiltersFromProfile();
   }, [setFilters]);
 
   const { promDate } = usePromDate({ currentUserId: currentProfileId });
@@ -507,50 +497,13 @@ export default function Discover() {
             <DiscoverFeed
               profiles={displayQueue}
               onSwipe={handleSwipe}
+              onNext={handleNext}
               onOpenFilters={() => setFiltersOpen(true)}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}
             />
           )}
         </div>
-
-        {/* Fixed Like/Pass/Next buttons at bottom */}
-        {!loading && displayQueue.length > 0 && (
-          <div className="shrink-0 border-t border-border/50 bg-background/80 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-4 py-4 px-4">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-14 w-14 rounded-full border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10"
-                onClick={() => handleSwipe(displayQueue[0]?.id ?? "", "pass")}
-                disabled={displayQueue.length === 0}
-                title="Pass – won't see again"
-              >
-                <X className="w-7 h-7 text-red-500" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-12 w-12 rounded-full border-2 border-border/50 hover:border-primary/50 hover:bg-primary/10"
-                onClick={handleNext}
-                disabled={displayQueue.length === 0}
-                title="Next – skip for now, may see again"
-              >
-                <ChevronRight className="w-6 h-6 text-muted-foreground" />
-              </Button>
-              <Button
-                variant="default"
-                size="icon"
-                className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90"
-                onClick={() => handleSwipe(displayQueue[0]?.id, "like")}
-                disabled={displayQueue.length === 0}
-                title="Like"
-              >
-                <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
 
       <FiltersModal

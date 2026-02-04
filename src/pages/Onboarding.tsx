@@ -21,7 +21,7 @@ import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/a
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
 import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
-import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
@@ -1167,21 +1167,21 @@ const Onboarding = () => {
                 <Button
                   key={option}
                   variant={profile.partnerStatus === option ? "default" : "outline"}
-                  className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-start px-4 sm:px-6 py-4 sm:py-5 ${
+                  className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-center px-4 sm:px-6 py-4 sm:py-5 ${
                     profile.partnerStatus === option
                       ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
                       : "border-primary/30 hover:border-primary/50 hover:bg-primary/5"
                   }`}
                   onClick={() => handleChoice(option)}
                 >
-                  <span className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4 flex items-center justify-center shrink-0">
-                    {profile.partnerStatus === option ? (
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary/60" />
-                    )}
-                  </span>
-                  <span className="text-left flex-1">{option}</span>
+                  {profile.partnerStatus === option ? (
+                    <>
+                      <Check className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />
+                      <span>{option}</span>
+                    </>
+                  ) : (
+                    <span>{option}</span>
+                  )}
                 </Button>
               ))}
             </div>
@@ -1259,7 +1259,8 @@ const Onboarding = () => {
               Hey {profile.name || "you"} 👋
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Prom 2026 is calling – and so is your future date.{" "}
+              Prom 2026 is calling – and so is your future date.
+              <br />
               <span className="text-primary">(Saree or suit, we got you)</span>
             </p>
             <p className="text-muted-foreground mt-4">
