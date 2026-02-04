@@ -16,6 +16,7 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Flag, Loader2 } from "lucide-react";
 
 const client = generateClient<Schema>();
+const REPORT_EMAIL = "p24kaustabh@iima.ac.in";
 
 interface ReportModalProps {
   open: boolean;
@@ -50,23 +51,47 @@ export default function ReportModal({
     }
     setSending(true);
     try {
-      const result = await client.queries.sendReportEmail(
-        {
-          personName: personName ?? undefined,
-          personId: personId ?? undefined,
-          context,
-          reportText: text,
-          reporterEmail: reporterEmail ?? undefined,
-          reporterName: reporterName ?? undefined,
-        },
-        opts
-      );
-      if (result.data?.success !== false) {
-        toast({ title: "Report sent", description: "Thank you for helping keep Prom Connect safe." });
+      const sendReportEmail = client.queries?.sendReportEmail;
+      if (typeof sendReportEmail === "function") {
+        const result = await sendReportEmail(
+          {
+            personName: personName ?? undefined,
+            personId: personId ?? undefined,
+            context,
+            reportText: text,
+            reporterEmail: reporterEmail ?? undefined,
+            reporterName: reporterName ?? undefined,
+          },
+          opts
+        );
+        if (result.data?.success !== false) {
+          toast({ title: "Report sent", description: "Thank you for helping keep Prom Connect safe." });
+          setReportText("");
+          onOpenChange(false);
+        } else {
+          toast({ title: "Could not send report", variant: "destructive" });
+        }
+      } else {
+        // Fallback: open mailto when backend sendReportEmail not deployed
+        const subject = encodeURIComponent("Prom Connect – Report");
+        const bodyParts: string[] = [];
+        if (personName || personId) {
+          bodyParts.push(`Reporting: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`);
+        }
+        bodyParts.push(`Context: ${context}`);
+        if (reporterEmail || reporterName) {
+          bodyParts.push(`Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim());
+        }
+        bodyParts.push("");
+        bodyParts.push("Report details:");
+        bodyParts.push("---");
+        bodyParts.push(text);
+        bodyParts.push("---");
+        const body = encodeURIComponent(bodyParts.join("\n"));
+        window.location.href = `mailto:${REPORT_EMAIL}?subject=${subject}&body=${body}`;
+        toast({ title: "Report opened", description: "Your email client will open with the report pre-filled." });
         setReportText("");
         onOpenChange(false);
-      } else {
-        toast({ title: "Could not send report", variant: "destructive" });
       }
     } catch (err) {
       console.error("[ReportModal] Send failed:", err);

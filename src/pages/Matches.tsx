@@ -323,7 +323,7 @@ const Matches = () => {
   }
 
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
+    <div className={`bg-gradient-midnight relative flex flex-col w-full overflow-hidden ${activeChat ? 'h-full min-h-0 flex-1' : 'min-h-dvh'}`}>
       <SparkleBackground />
 
       {/* Dev mode banner */}
@@ -337,7 +337,7 @@ const Matches = () => {
         </div>
       )}
 
-      <div className="relative z-10 flex-1 flex min-h-0 w-full max-w-[500px] mx-auto">
+      <div className="relative z-10 flex-1 flex min-h-0 overflow-hidden w-full max-w-[500px] mx-auto">
 
       {/* Match List - full width when no chat open (same UX on all screen sizes) */}
       <aside className={`flex-1 min-w-0 w-full flex flex-col min-h-0 border-r border-border/50 ${activeChat ? 'hidden' : 'flex'}`}>
@@ -485,8 +485,8 @@ const Matches = () => {
         </div>
       </aside>
 
-      {/* Chat Area - full width when a match is selected (same UX on all screen sizes) */}
-      <main className={`flex-1 min-w-0 w-full flex flex-col min-h-0 ${!activeChat ? 'hidden' : 'flex'}`}>
+      {/* Chat Area - full screen when open, no scroll, only messages scroll */}
+      <main className={`flex-1 min-w-0 w-full flex flex-col min-h-0 overflow-hidden ${!activeChat ? 'hidden' : 'flex'}`}>
         {activeChat && activeMatch ? (
           <ChatView 
             match={activeMatch}
@@ -526,12 +526,12 @@ const Matches = () => {
             matchCompatScore={activeMatch.compatScore || 0}
             onClose={() => setShowPromAsk(false)}
             onSend={async (msg) => {
-              const ok = await sendPromAsk(activeMatch.otherUserId, activeMatch.id, msg);
-              if (ok) {
+              const result = await sendPromAsk(activeMatch.otherUserId, activeMatch.id, msg);
+              if (result.ok) {
                 await refreshPromAsk();
                 setShowPromAsk(false);
               }
-              return ok;
+              return result;
             }}
           />
         )}
@@ -617,9 +617,20 @@ const ChatView = ({
     currentUserId,
   });
 
-  // Auto-scroll to bottom when new messages arrive
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top when opening a new chat so header/name is visible
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = 0;
+    }
+  }, [match.id]);
+
+  // Auto-scroll to bottom when new messages arrive (after initial load)
+  useEffect(() => {
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   // Create conversation if none exists when component mounts
@@ -664,8 +675,13 @@ const ChatView = ({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
-      <ReportFloatingButton onClick={() => setReportOpen(true)} />
+    <div className="relative flex flex-col h-full min-h-0 overflow-hidden flex-1 w-full">
+      {/* Overlays - do not affect layout */}
+      <div className="absolute inset-0 pointer-events-none z-30">
+        <div className="pointer-events-auto">
+          <ReportFloatingButton onClick={() => setReportOpen(true)} />
+        </div>
+      </div>
       <ReportModal
         open={reportOpen}
         onOpenChange={setReportOpen}
@@ -673,8 +689,8 @@ const ChatView = ({
         personId={match.otherUserId}
         context="Chat"
       />
-      {/* Chat Header - sticky at top */}
-      <header className="sticky top-0 z-10 p-4 border-b border-border/50 flex items-center justify-between shrink-0">
+      {/* Chat header - sticky so it stays visible if any parent scrolls */}
+      <header className="sticky top-0 shrink-0 z-20 p-3 sm:p-4 border-b border-border/50 flex items-center justify-between bg-background/95 backdrop-blur-sm min-h-[56px]">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to matches">
             <X className="w-5 h-5" />
@@ -738,6 +754,8 @@ const ChatView = ({
         </div>
       </header>
 
+      {/* Messages area - ONLY scrollable section, takes remaining space */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden basis-0">
       {/* Prom Ask request from them - Accept / Decline */}
       {promAskFromThem && onAcceptPromAsk && onDeclinePromAsk && (
         <div className="px-4 py-3 bg-primary/10 border-b border-primary/20 shrink-0">
@@ -781,8 +799,8 @@ const ChatView = ({
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      {/* Messages - ONLY scrollable element on screen */}
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 space-y-4 overscroll-contain">
         {messagesLoading && messages.length === 0 && (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -833,9 +851,11 @@ const ChatView = ({
         })}
         <div ref={messagesEndRef} />
       </div>
+      </div>
 
-      {/* Icebreakers */}
-      <div className="px-4 py-2 border-t border-border/50 shrink-0 bg-background/80 backdrop-blur-sm">
+      {/* Icebreakers + Input - always visible at bottom */}
+      <div className="shrink-0 flex flex-col border-t border-border/50 bg-background/95 backdrop-blur-sm">
+      <div className="px-3 sm:px-4 py-2 shrink-0">
         <p className="text-xs text-muted-foreground mb-2">💡 Icebreakers</p>
         <div className="flex gap-2 overflow-x-auto pb-2">
           {icebreakers.map((icebreaker, i) => (
@@ -850,8 +870,8 @@ const ChatView = ({
         </div>
       </div>
 
-      {/* Input - fixed at bottom */}
-      <div className="p-4 border-t border-border/50 shrink-0 bg-background/80 backdrop-blur-sm">
+      {/* Input - typing area */}
+      <div className="p-3 sm:p-4 shrink-0 safe-area-pb">
         <div className="flex gap-2">
           <input
             type="text"
@@ -865,6 +885,7 @@ const ChatView = ({
             <Send className="w-5 h-5" />
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ interface PromAskProps {
   otherUserId: string;
   matchCompatScore: number;
   onClose: () => void;
-  onSend: (message?: string) => Promise<boolean>;
+  onSend: (message?: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: PromAskProps) => {
@@ -23,13 +23,16 @@ const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: Pr
   const handleSend = async () => {
     setSending(true);
     try {
-      const ok = await onSend(message.trim() || undefined);
-      if (ok) {
+      const result = await onSend(message.trim() || undefined);
+      if (result.ok) {
         setSent(true);
       } else {
+        const desc = result.error?.includes("PromAskRequest") || result.error?.toLowerCase().includes("not found")
+          ? "Deploy the backend first: run `npx ampx sandbox`"
+          : result.error || "Something went wrong.";
         toast({
           title: "Couldn't send",
-          description: "Something went wrong. Make sure the backend is deployed (PromAskRequest model).",
+          description: desc,
           variant: "destructive",
         });
       }

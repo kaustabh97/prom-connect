@@ -15,7 +15,7 @@ interface UsePromAskReturn {
   pendingToMe: PromAskItem[];
   pendingFromMe: PromAskItem[];
   isLoading: boolean;
-  sendPromAsk: (toUserId: string, matchId: string, message?: string) => Promise<boolean>;
+  sendPromAsk: (toUserId: string, matchId: string, message?: string) => Promise<{ ok: boolean; error?: string }>;
   acceptPromAsk: (requestId: string, matchId: string) => Promise<boolean>;
   declinePromAsk: (requestId: string) => Promise<boolean>;
   refresh: () => Promise<void>;
@@ -60,7 +60,7 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
   }, [load]);
 
   const sendPromAsk = useCallback(
-    async (toUserId: string, matchId: string, message?: string): Promise<boolean> => {
+    async (toUserId: string, matchId: string, message?: string): Promise<{ ok: boolean; error?: string }> => {
       try {
         await client.models.PromAskRequest.create(
           {
@@ -74,10 +74,11 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
           opts
         );
         await load();
-        return true;
+        return { ok: true };
       } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
         console.error("[usePromAsk] Send failed:", err);
-        return false;
+        return { ok: false, error: msg };
       }
     },
     [currentUserId, opts, load]

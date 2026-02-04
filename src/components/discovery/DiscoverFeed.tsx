@@ -32,17 +32,8 @@ export default function DiscoverFeed({
   const handleSwipe = useCallback(
     (action: "like" | "pass") => {
       if (!currentProfile) return;
-      console.log("[DiscoverFeed] Button clicked:", {
-        action,
-        profileId: currentProfile.id,
-        profileName: currentProfile.name,
-      });
-      // Scroll to top immediately when button is clicked (before profile changes)
-      // This ensures we're at the top when the new profile appears
-      if (scrollToTop) {
-        scrollToTop();
-      }
-      // Immediately remove profile from queue
+      // Scroll to top first so next card shows from top
+      if (scrollToTop) scrollToTop();
       onSwipe(currentProfile.id, action);
     },
     [currentProfile, onSwipe, scrollToTop]

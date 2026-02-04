@@ -356,20 +356,9 @@ export default function Discover() {
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
   const displayQueue = useMemo(() => {
-    const filtered = filteredProfiles.filter(
+    return filteredProfiles.filter(
       (p) => !hasPassed(p.id) && !hasLiked(p.id) && !skippedProfileIds.has(p.id)
     );
-    console.log("[Discover] displayQueue computed:", {
-      inputProfilesCount: filteredProfiles.length,
-      outputQueueCount: filtered.length,
-      excludedCount: filteredProfiles.length - filtered.length,
-      queueProfileIds: filtered.map(p => p.id),
-      excludedProfileIds: filteredProfiles
-        .filter(p => hasPassed(p.id) || hasLiked(p.id))
-        .map(p => p.id),
-      tick, // Log tick to verify it's changing
-    });
-    return filtered;
   }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
@@ -382,13 +371,10 @@ export default function Discover() {
     }
   };
 
-  // Scroll function to pass to DiscoverFeed - scrolls immediately
+  // Scroll to top so user sees top of card (photo, name) not bottom
   const scrollToTop = useCallback(() => {
     if (scrollRef.current) {
-      console.log("[Discover] scrollToTop called, current scrollTop:", scrollRef.current.scrollTop);
-      // Use instant scroll for immediate effect
       scrollRef.current.scrollTop = 0;
-      // Also try scrollTo as backup
       scrollRef.current.scrollTo({ top: 0, behavior: "instant" });
     }
   }, [scrollRef]);
@@ -414,22 +400,32 @@ export default function Discover() {
   // Scroll to top when a new profile loads (backup - also scrolls on button click)
   const handleProfileChange = useCallback((profileId: string) => {
     if (scrollRef.current) {
-      console.log("[Discover] Profile changed, ensuring scroll to top:", {
-        profileId,
-        currentScrollTop: scrollRef.current.scrollTop,
-      });
-      // Use requestAnimationFrame to ensure DOM is updated, then scroll
       requestAnimationFrame(() => {
         if (scrollRef.current && scrollRef.current.scrollTop > 0) {
-          console.log("[Discover] Scrolling to top (profile change callback)");
           scrollRef.current.scrollTop = 0;
         }
       });
     }
   }, [scrollRef]);
 
+  // Scroll to top when profile changes so user sees top of new card (photo, name)
+  useEffect(() => {
+    const topId = displayQueue[0]?.id;
+    if (!topId) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const scroll = () => {
+      el.scrollTop = 0;
+      el.scrollTo({ top: 0, behavior: "instant" });
+    };
+    scroll();
+    // Run after paint so new card is laid out
+    const raf = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(raf);
+  }, [displayQueue[0]?.id]);
+
   return (
-    <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col">
+    <div className="min-h-dvh bg-gradient-midnight relative flex flex-col w-full">
       <SparkleBackground />
 
       <div className="relative z-10 flex-1 flex flex-col min-h-0 w-full max-w-[500px] mx-auto">
@@ -450,11 +446,11 @@ export default function Discover() {
           </Button>
         </header>
 
-        {/* Full-screen card area - scrollable */}
+        {/* Card area - only this scrolls, shows top of card when switching */}
         <div
           ref={scrollRef}
           data-scroll-container
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain flex flex-col scroll-touch outline-none"
+          className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain flex flex-col scroll-touch outline-none"
           tabIndex={0}
         >
           {loading ? (
