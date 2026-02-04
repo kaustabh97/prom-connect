@@ -19,7 +19,7 @@ import {
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart, X, ChevronRight } from "lucide-react";
+import { Filter, Heart, ChevronRight, X } from "lucide-react";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import { usePromDate } from "@/hooks/usePromDate";
 
@@ -390,18 +390,23 @@ export default function Discover() {
     }
   }, [scrollRef]);
 
-  // Handle "Next" - skip profile without recording decision
+  // Handle "Next" (arrow) - skip for now, can loop back later
   const handleNext = useCallback(() => {
     if (displayQueue.length === 0) return;
     const currentProfile = displayQueue[0];
     if (!currentProfile) return;
     
-    // Add to skipped set (temporarily hides it from queue)
     setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
-    
-    // Scroll to top to show next profile smoothly
     scrollToTop();
   }, [displayQueue, scrollToTop]);
+
+  // When all profiles done, loop back: show profiles that were only "next'd" (not passed)
+  useEffect(() => {
+    if (displayQueue.length === 0 && skippedProfileIds.size > 0) {
+      setSkippedProfileIds(new Set());
+      scrollToTop();
+    }
+  }, [displayQueue.length, skippedProfileIds.size, scrollToTop]);
 
   // Scroll to top when a new profile loads (backup - also scrolls on button click)
   const handleProfileChange = useCallback((profileId: string) => {
@@ -522,12 +527,12 @@ export default function Discover() {
               <Button
                 variant="outline"
                 size="icon"
-                className="h-14 w-14 rounded-full border-2 border-muted-foreground/50 hover:border-red-500 hover:bg-red-500/10"
-                onClick={() => handleSwipe(displayQueue[0]?.id, "pass")}
+                className="h-14 w-14 rounded-full border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10"
+                onClick={() => handleSwipe(displayQueue[0]?.id ?? "", "pass")}
                 disabled={displayQueue.length === 0}
-                title="Pass"
+                title="Pass – won't see again"
               >
-                <X className="w-7 h-7 text-muted-foreground" />
+                <X className="w-7 h-7 text-red-500" />
               </Button>
               <Button
                 variant="outline"
@@ -535,7 +540,7 @@ export default function Discover() {
                 className="h-12 w-12 rounded-full border-2 border-border/50 hover:border-primary/50 hover:bg-primary/10"
                 onClick={handleNext}
                 disabled={displayQueue.length === 0}
-                title="Next (Skip for now)"
+                title="Next – skip for now, may see again"
               >
                 <ChevronRight className="w-6 h-6 text-muted-foreground" />
               </Button>

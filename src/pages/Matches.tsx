@@ -514,10 +514,11 @@ const Matches = () => {
       </main>
       </div>
 
-      {/* Prom Ask Modal */}
+      {/* Prom Ask Modal - portal renders at body level */}
       <AnimatePresence>
         {showPromAsk && activeMatch && (
           <PromAsk
+            key="prom-ask-modal"
             matchId={activeMatch.id}
             otherUserId={activeMatch.otherUserId}
             matchCompatScore={activeMatch.compatScore || 0}
@@ -551,6 +552,7 @@ interface ChatViewProps {
   onAcceptPromAsk?: (requestId: string) => void;
   onDeclinePromAsk?: (requestId: string) => Promise<boolean>;
   refreshPromAsk?: () => Promise<void>;
+  acceptingPromAskId?: string | null;
 }
 
 const ChatView = ({ 
@@ -694,6 +696,17 @@ const ChatView = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {showAskToProm && onAskToProm && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onAskToProm}
+              className="bg-primary hover:bg-primary/90"
+            >
+              <Heart className="w-4 h-4 mr-2" />
+              Ask to Prom
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">

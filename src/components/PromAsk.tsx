@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import SparkleBackground from "@/components/SparkleBackground";
-import { Heart, Sparkles, ArrowLeft, PartyPopper, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Heart, Sparkles, PartyPopper, X } from "lucide-react";
 
 interface PromAskProps {
   matchId: string;
@@ -18,18 +18,33 @@ const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: Pr
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
+  const { toast } = useToast();
 
   const handleSend = async () => {
     setSending(true);
     try {
       const ok = await onSend(message.trim() || undefined);
-      if (ok) setSent(true);
+      if (ok) {
+        setSent(true);
+      } else {
+        toast({
+          title: "Couldn't send",
+          description: "Something went wrong. Make sure the backend is deployed (PromAskRequest model).",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to send Prom Ask",
+        variant: "destructive",
+      });
     } finally {
       setSending(false);
     }
   };
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -150,7 +165,8 @@ const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: Pr
           )}
         </AnimatePresence>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };
 

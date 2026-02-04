@@ -33,20 +33,23 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
     if (!currentUserId) return;
     setIsLoading(true);
     try {
-      const [toMe, fromMe] = await Promise.all([
-        client.models.PromAskRequest.listPromAskRequestByToUserId(
-          { toUserId: currentUserId },
+      // Use list with filter (works with or without secondary indexes)
+      const [toMeRes, fromMeRes] = await Promise.all([
+        client.models.PromAskRequest.list(
+          { filter: { toUserId: { eq: currentUserId } } },
           opts
         ),
-        client.models.PromAskRequest.listPromAskRequestByFromUserId(
-          { fromUserId: currentUserId },
+        client.models.PromAskRequest.list(
+          { filter: { fromUserId: { eq: currentUserId } } },
           opts
         ),
       ]);
-      setPendingToMe((toMe.data ?? []).filter((r) => r.status === "pending"));
-      setPendingFromMe((fromMe.data ?? []).filter((r) => r.status === "pending"));
+      setPendingToMe((toMeRes.data ?? []).filter((r) => r.status === "pending"));
+      setPendingFromMe((fromMeRes.data ?? []).filter((r) => r.status === "pending"));
     } catch (err) {
       console.error("[usePromAsk] Failed to load:", err);
+      setPendingToMe([]);
+      setPendingFromMe([]);
     } finally {
       setIsLoading(false);
     }
