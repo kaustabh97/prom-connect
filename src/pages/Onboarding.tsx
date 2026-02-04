@@ -18,6 +18,8 @@ import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
+import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
+import { APP_URL } from "@/config";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Amplify } from "aws-amplify";
@@ -30,6 +32,7 @@ const client = generateClient<Schema>();
 
 type OnboardingStep = 
   | "choice"           // First: "Looking for a date" vs "Already a couple"
+  | "partnerRequest"   // Invite flow: accept/decline prom request
   | "welcome" 
   | "dateOfBirth" 
   | "notifications" 
@@ -84,6 +87,9 @@ const FULL_FLOW_STEPS: OnboardingStep[] = [
 // Simplified couple flow (after "Already a couple")
 const COUPLE_FLOW_STEPS: OnboardingStep[] = ["coupleYourName", "couplePartnerDetails"];
 
+// Invite flow: partner landed via invite link, sees request to accept/decline
+const INVITE_FLOW_STEPS: OnboardingStep[] = ["partnerRequest"];
+
 const alcoholOptions = ["Never", "Sometimes", "Regularly"];
 const smokingOptions = ["Never", "Sometimes", "Regularly"];
 const foodOptions = ["Veg", "Non-Veg", "Eggetarian", "No preference"];
@@ -117,7 +123,15 @@ const Onboarding = () => {
 
   // Profile state
   const [step, setStep] = useState<OnboardingStep>("choice");
-  const [flowChoice, setFlowChoice] = useState<"full" | "couple" | null>(null); // Set when user picks at choice step
+  const [flowChoice, setFlowChoice] = useState<"full" | "couple" | "invite" | null>(null);
+  const [inviteRequest, setInviteRequest] = useState<{
+    id: string;
+    fromUserId: string;
+    fromEmail: string;
+    fromName?: string;
+  } | null>(null);
+  const [inviteAccepting, setInviteAccepting] = useState(false);
+  const [inviteDeclining, setInviteDeclining] = useState(false);
   const [profile, setProfile] = useState<ProfileData>({
     name: "",
     email: "",
@@ -143,6 +157,7 @@ const Onboarding = () => {
   });
 
   const [partnerEmailError, setPartnerEmailError] = useState<string | null>(null);
+  const [partnerCheckStatus, setPartnerCheckStatus] = useState<"idle" | "checking" | "registered" | "not_registered">("idle");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   
@@ -154,13 +169,15 @@ const Onboarding = () => {
   const [showExpandedImage, setShowExpandedImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Current steps: choice only, or full flow, or couple flow
+  // Current steps: choice only, or full flow, or couple flow, or invite flow
   const effectiveSteps =
     flowChoice === null
       ? CHOICE_STEP
-      : flowChoice === "full"
-        ? FULL_FLOW_STEPS
-        : COUPLE_FLOW_STEPS;
+      : flowChoice === "invite"
+        ? INVITE_FLOW_STEPS
+        : flowChoice === "full"
+          ? FULL_FLOW_STEPS
+          : COUPLE_FLOW_STEPS;
   const currentStepIndex = effectiveSteps.indexOf(step);
   const totalSteps = effectiveSteps.length;
 
@@ -198,6 +215,34 @@ const Onboarding = () => {
           if (completed) {
             navigate("/discover/profile?openFilters=1");
             return;
+          }
+
+          // Invite flow: partner landed via invite link, has pending MatchRequest
+          const inviteFrom = getInviteFrom();
+          if (inviteFrom && inviteFrom !== authProfile.email?.toLowerCase()) {
+            try {
+              const { fetchAuthSession } = await import("aws-amplify/auth");
+              const session = await fetchAuthSession();
+              const auth = !!session.tokens;
+              const authMode = auth ? "userPool" : "apiKey";
+              const { data: requests } = await client.models.MatchRequest.listMatchRequestByToEmail(
+                { toEmail: authProfile.email!.toLowerCase() },
+                { authMode: authMode as "userPool" | "apiKey" }
+              );
+              const pending = (requests ?? []).find(
+                (r) => r.status === "pending" && r.fromEmail?.toLowerCase() === inviteFrom.toLowerCase()
+              );
+              if (pending) {
+                setInviteRequest({
+                  id: pending.id,
+                  fromUserId: pending.fromUserId ?? "",
+                  fromEmail: pending.fromEmail ?? "",
+                  fromName: pending.fromName ?? undefined,
+                });
+                setFlowChoice("invite");
+                setStep("partnerRequest");
+              }
+            } catch (_) {}
           }
         } else {
           setIsAuthenticated(false);
@@ -348,6 +393,35 @@ const Onboarding = () => {
     } else {
       setFlowChoice("couple");
       setStep("coupleYourName");
+    }
+  };
+
+  // Check if partner email is already registered (has a UserProfile)
+  const checkPartnerRegistered = async (email: string) => {
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed.endsWith(IIMA_EMAIL_SUFFIX)) {
+      setPartnerCheckStatus("idle");
+      return;
+    }
+    if (trimmed === profile.email.trim().toLowerCase()) {
+      setPartnerCheckStatus("idle");
+      return;
+    }
+    setPartnerCheckStatus("checking");
+    setPartnerEmailError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const isAuthenticated = !!session.tokens;
+      const authMode = isAuthenticated ? "userPool" : "apiKey";
+      const { data: partnerProfiles } = await client.models.UserProfile.list(
+        { filter: { email: { eq: trimmed } } },
+        { authMode: authMode as "userPool" | "apiKey" }
+      );
+      const isRegistered = (partnerProfiles?.length ?? 0) > 0;
+      setPartnerCheckStatus(isRegistered ? "registered" : "not_registered");
+    } catch (_) {
+      setPartnerCheckStatus("idle");
     }
   };
 
@@ -757,18 +831,19 @@ const Onboarding = () => {
         onboardingCompleted: true,
       };
 
+      let senderProfileId: string;
       if (existingProfiles?.length) {
         // @ts-ignore - update args
         await client.models.UserProfile.update(
           { id: existingProfiles[0].id, ...minimalData },
           { authMode: authMode as "userPool" | "apiKey" }
         );
+        senderProfileId = existingProfiles[0].id;
       } else {
         // @ts-ignore - create args
-        await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+        const { data: created } = await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+        senderProfileId = created?.id ?? "";
       }
-
-      const currentUserId = currentUser?.userId ?? existingProfiles?.[0]?.id ?? "";
       const currentUserEmail = profile.email.trim().toLowerCase();
       try {
         // @ts-ignore - authMode
@@ -777,14 +852,14 @@ const Onboarding = () => {
           { authMode: authMode as "userPool" | "apiKey" }
         );
         const partner = partnerProfiles?.[0];
-        // @ts-ignore - MatchRequest create
+        // @ts-ignore - MatchRequest create (fromUserId = UserProfile id for Match consistency)
         await client.models.MatchRequest.create(
           {
-            fromUserId: currentUserId,
+            fromUserId: senderProfileId,
             fromEmail: currentUserEmail,
             fromName: profile.name || undefined,
             toEmail: partnerEmailTrim,
-            toUserId: partner?.userId ?? undefined,
+            toUserId: partner?.id ?? undefined,
             status: "pending",
             createdAt: new Date().toISOString(),
           },
@@ -792,11 +867,12 @@ const Onboarding = () => {
         );
         if (!partner) {
           try {
-            const appUrl = (await import("@/config")).APP_URL;
+            const baseUrl = typeof APP_URL === "string" && APP_URL ? APP_URL : "https://prom-connect.example.com";
+            const inviteUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(currentUserEmail)}`;
             await client.queries.sendPartnerInviteEmail({
               toEmail: partnerEmailTrim,
               fromName: profile.name || "Someone",
-              appUrl,
+              appUrl: inviteUrl,
             });
           } catch (_) {}
         }
@@ -804,16 +880,8 @@ const Onboarding = () => {
         console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
       }
 
-      let hasPending = false;
-      try {
-        // @ts-ignore - MatchRequest list
-        const { data: requestsToMe } = await client.models.MatchRequest.listMatchRequestByToEmail(
-          { toEmail: currentUserEmail },
-          { authMode: authMode as "userPool" | "apiKey" }
-        );
-        hasPending = (requestsToMe ?? []).some((r: { status: string }) => r.status === "pending");
-      } catch (_) {}
-      navigate(hasPending ? "/matches" : "/discover/profile?openFilters=1");
+      // Sender always goes to discover; show "request pending with partner" there
+      navigate("/discover/profile?openFilters=1");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
@@ -828,9 +896,122 @@ const Onboarding = () => {
       setFlowChoice(null);
       return;
     }
+    if (step === "partnerRequest") {
+      clearInviteFrom();
+      setInviteRequest(null);
+      setStep("choice");
+      setFlowChoice(null);
+      return;
+    }
     const prevIndex = currentStepIndex - 1;
     if (prevIndex >= 0) {
       setStep(effectiveSteps[prevIndex]);
+    }
+  };
+
+  const handleInviteAccept = async () => {
+    if (!inviteRequest || !profile.email) return;
+    setInviteAccepting(true);
+    setSaveError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const auth = !!session.tokens;
+      const authMode = auth ? "userPool" : "apiKey";
+      const opts = { authMode: authMode as "userPool" | "apiKey" };
+
+      // Create or get partner's UserProfile (partner might not have one yet)
+      const { data: partnerProfiles } = await client.models.UserProfile.list(
+        { filter: { email: { eq: profile.email } } },
+        opts
+      );
+      let partnerProfileId: string;
+      if (partnerProfiles?.[0]?.id) {
+        partnerProfileId = partnerProfiles[0].id;
+        await client.models.UserProfile.update(
+          { id: partnerProfileId, onboardingCompleted: true },
+          opts
+        );
+      } else {
+        const { data: created } = await client.models.UserProfile.create(
+          {
+            email: profile.email,
+            name: profile.name || userName || undefined,
+            userId: (await getUserProfile())?.userId ?? "",
+            onboardingCompleted: true,
+          },
+          opts
+        );
+        partnerProfileId = created?.id ?? "";
+      }
+      if (!partnerProfileId) throw new Error("Could not create profile");
+
+      await client.models.MatchRequest.update(
+        { id: inviteRequest.id, status: "accepted" },
+        opts
+      );
+      await client.models.Match.create(
+        {
+          user1Id: inviteRequest.fromUserId,
+          user2Id: partnerProfileId,
+          user1Email: inviteRequest.fromEmail,
+          user2Email: profile.email,
+          isPromDate: true,
+          status: "active",
+          createdAt: new Date().toISOString(),
+        },
+        opts
+      );
+      const { data: myProfiles } = await client.models.UserProfile.list(
+        { filter: { email: { eq: profile.email } } },
+        opts
+      );
+      const { data: theirProfiles } = await client.models.UserProfile.list(
+        { filter: { email: { eq: inviteRequest.fromEmail } } },
+        opts
+      );
+      if (myProfiles?.[0]?.id) {
+        await client.models.UserProfile.update(
+          { id: myProfiles[0].id, excludeFromDiscovery: true },
+          opts
+        );
+      }
+      if (theirProfiles?.[0]?.id) {
+        await client.models.UserProfile.update(
+          { id: theirProfiles[0].id, excludeFromDiscovery: true },
+          opts
+        );
+      }
+      clearInviteFrom();
+      navigate("/prom-date");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to accept. Please try again.");
+    } finally {
+      setInviteAccepting(false);
+    }
+  };
+
+  const handleInviteDecline = async () => {
+    if (!inviteRequest) return;
+    setInviteDeclining(true);
+    setSaveError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const auth = !!session.tokens;
+      const authMode = auth ? "userPool" : "apiKey";
+      await client.models.MatchRequest.update(
+        { id: inviteRequest.id, status: "declined" },
+        { authMode: authMode as "userPool" | "apiKey" }
+      );
+      clearInviteFrom();
+      setInviteRequest(null);
+      setFlowChoice("full");
+      setStep("welcome");
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to decline. Please try again.");
+    } finally {
+      setInviteDeclining(false);
     }
   };
 
@@ -838,6 +1019,8 @@ const Onboarding = () => {
     switch (step) {
       case "choice":
         return true; // Advance via option buttons, not Next
+      case "partnerRequest":
+        return true; // Advance via Accept/Decline buttons
       case "welcome":
         return true;
       case "dateOfBirth":
@@ -900,6 +1083,65 @@ const Onboarding = () => {
                 </Button>
               ))}
             </div>
+          </motion.div>
+        );
+
+      case "partnerRequest":
+        return (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <div className="text-center mb-6">
+              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h2 className="font-display text-2xl font-bold mb-2">You&apos;ve got a prom invite!</h2>
+              <p className="text-muted-foreground">
+                {inviteRequest?.fromName || inviteRequest?.fromEmail?.split("@")[0] || "Someone"} wants to go to Prom with you.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button
+                variant="default"
+                className="w-full h-14 text-base"
+                onClick={handleInviteAccept}
+                disabled={inviteAccepting || inviteDeclining}
+              >
+                {inviteAccepting ? (
+                  <>
+                    <span className="inline-block w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                    Accepting...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-5 h-5 mr-2" />
+                    Accept – Let&apos;s match!
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full h-14 text-base"
+                onClick={handleInviteDecline}
+                disabled={inviteAccepting || inviteDeclining}
+              >
+                {inviteDeclining ? (
+                  <>
+                    <span className="inline-block w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                    Declining...
+                  </>
+                ) : (
+                  <>
+                    <X className="w-5 h-5 mr-2" />
+                    Decline – I&apos;ll discover on my own
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              If you decline, you&apos;ll continue with the full onboarding and can discover, chat, and match later.
+            </p>
           </motion.div>
         );
 
@@ -1456,21 +1698,42 @@ const Onboarding = () => {
                 onChange={(e) => {
                   setProfile((prev) => ({ ...prev, partnerEmail: e.target.value }));
                   setPartnerEmailError(null);
+                  setPartnerCheckStatus("idle");
                 }}
                 onBlur={() => {
                   const email = profile.partnerEmail.trim().toLowerCase();
                   if (email && !email.endsWith(IIMA_EMAIL_SUFFIX)) {
                     setPartnerEmailError("Please enter a valid @iima.ac.in email");
+                    setPartnerCheckStatus("idle");
                   } else if (email && email === profile.email.trim().toLowerCase()) {
                     setPartnerEmailError("You cannot add your own email");
+                    setPartnerCheckStatus("idle");
                   } else {
                     setPartnerEmailError(null);
+                    if (email) void checkPartnerRegistered(email);
                   }
                 }}
                 className="text-base"
               />
               {partnerEmailError && (
                 <p className="text-sm text-destructive mt-2">{partnerEmailError}</p>
+              )}
+              {partnerCheckStatus === "checking" && (
+                <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                  <span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  Checking if they&apos;re on Prom Connect...
+                </p>
+              )}
+              {partnerCheckStatus === "registered" && (
+                <p className="text-sm text-green-600 dark:text-green-400 mt-2 flex items-center gap-2">
+                  <Check className="w-4 h-4 shrink-0" />
+                  They&apos;re on Prom Connect – they&apos;ll get a match request when they accept.
+                </p>
+              )}
+              {partnerCheckStatus === "not_registered" && (
+                <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+                  No profile yet – we&apos;ll send them an invite to join.
+                </p>
               )}
             </div>
           </motion.div>
@@ -1645,8 +1908,8 @@ const Onboarding = () => {
           </div>
         </main>
 
-        {/* Next Button (hidden on choice step – user picks an option to advance) */}
-        {step !== "choice" && (
+        {/* Next Button (hidden on choice/partnerRequest – user picks option to advance) */}
+        {step !== "choice" && step !== "partnerRequest" && (
           <div className="px-4 pb-6 pt-4">
             {saveError && (
               <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20">

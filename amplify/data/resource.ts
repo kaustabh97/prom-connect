@@ -99,6 +99,25 @@ const schema = a.schema({
       allow.authenticated(),
     ]),
 
+  /** Prom Ask: user A (fromUserId) asks match B (toUserId) to go to prom. Both are already matched. */
+  PromAskRequest: a
+    .model({
+      fromUserId: a.string().required(),       // UserProfile id of requester
+      toUserId: a.string().required(),         // UserProfile id of recipient (the match)
+      matchId: a.string().required(),          // The Match id linking these two
+      message: a.string(),                     // Optional personal message
+      status: a.string().default("pending"),   // pending, accepted, declined
+      createdAt: a.datetime(),
+    })
+    .secondaryIndexes((index) => [
+      index("toUserId"),                       // Find prom asks for me
+      index("fromUserId"),                     // Find prom asks I sent
+    ])
+    .authorization((allow) => [
+      allow.publicApiKey(),
+      allow.authenticated(),
+    ]),
+
   /** Like: user A (fromUserId) liked user B (toUserId). UserProfile ids. */
   Like: a
     .model({
@@ -121,6 +140,7 @@ const schema = a.schema({
       compatScore: a.float(),                   // Compatibility score (0-1)
       status: a.string().default("active"),     // active, unmatched, blocked
       conversationId: a.string(),               // Link to conversation when created
+      isPromDate: a.boolean(),                  // true = confirmed prom date, both out of discovery
       createdAt: a.datetime(),
     })
     .secondaryIndexes((index) => [

@@ -95,6 +95,7 @@ export function useMatchRequests({
             user2Email: currentUserEmail,
             compatScore: 1,
             status: "active",
+            isPromDate: true,
             createdAt: new Date().toISOString(),
           },
           authMode ? { authMode } : undefined

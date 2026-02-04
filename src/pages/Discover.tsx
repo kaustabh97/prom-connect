@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Filter, Heart, X, ChevronRight } from "lucide-react";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
+import { usePromDate } from "@/hooks/usePromDate";
 
 const client = generateClient<Schema>();
 
@@ -120,6 +121,12 @@ export default function Discover() {
   const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [currentProfileId, setCurrentProfileId] = useState<string>("");
+
+  const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
+    toEmail: string;
+    fromName?: string;
+  } | null>(null);
 
   // When user clicks Discover in nav (or same tab), refetch profiles and clear refresh state
   useEffect(() => {
@@ -142,7 +149,6 @@ export default function Discover() {
   useEffect(() => {
     const initializeFiltersFromProfile = async () => {
       try {
-        // Check if filters have been initialized before
         const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
         const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
         
@@ -151,7 +157,6 @@ export default function Discover() {
           return;
         }
 
-        // Get current user
         const currentUser = await getUserProfile();
         if (!currentUser?.email) {
           console.log("[Discover] No authenticated user, skipping filter initialization");
@@ -159,7 +164,6 @@ export default function Discover() {
           return;
         }
 
-        // Fetch user's profile from backend
         const filters = { filter: { email: { eq: currentUser.email } } };
         let result;
         if (!GOOGLE_LOGIN_CHECK) {
@@ -177,10 +181,6 @@ export default function Discover() {
         }
 
         const userProfile = userProfiles[0];
-        
-        // Pre-populate only gender preference from sexual orientation (who they want to see).
-        // Do NOT pre-populate non-negotiables: that would require other profiles to match
-        // the user's exact lifestyle and often results in zero visible profiles.
         const gendersInterestedIn = mapSexualOrientationToGenders(
           userProfile.sexualOrientation,
           userProfile.gender
@@ -191,11 +191,8 @@ export default function Discover() {
           gendersInterestedIn,
         }));
 
-        // Mark as initialized
         localStorage.setItem(filtersInitializedKey, "true");
         setFiltersInitialized(true);
-
-        // Show filters modal on first visit
         setFiltersOpen(true);
 
         console.log("[Discover] Filters initialized from profile:", {
@@ -210,12 +207,20 @@ export default function Discover() {
     initializeFiltersFromProfile();
   }, [setFilters]);
 
+  const { promDate } = usePromDate({ currentUserId: currentProfileId });
+  useEffect(() => {
+    if (currentProfileId && promDate) {
+      navigate("/prom-date", { replace: true });
+    }
+  }, [currentProfileId, promDate, navigate]);
+
   // Fetch profiles from backend
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
         setLoading(true);
         setError(null);
+        setPendingOutgoingRequest(null);
 
         // Load already-liked profile ids so we exclude them from the feed
         await loadLikesFromBackend();
@@ -225,6 +230,31 @@ export default function Discover() {
         // Get current user to exclude their profile
         const currentUser = await getUserProfile();
         const currentUserEmail = currentUser?.email;
+
+        // Check for pending outgoing partner request (sender has requested, waiting for partner to accept)
+        const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+        const opts = authMode ? { authMode } : undefined;
+        const { data: myProfiles } = await client.models.UserProfile.list(
+          { filter: { email: { eq: currentUserEmail } } },
+          opts
+        );
+        const myProfileId = myProfiles?.[0]?.id;
+        setCurrentProfileId(myProfileId ?? "");
+        if (myProfileId) {
+          try {
+            const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+              { fromUserId: myProfileId },
+              opts
+            );
+            const pending = (outgoing ?? []).find((r) => r.status === "pending");
+            if (pending) {
+              setPendingOutgoingRequest({
+                toEmail: pending.toEmail ?? "",
+                fromName: pending.fromName ?? undefined,
+              });
+            }
+          } catch (_) {}
+        }
         
         // Fetch all profiles - we'll filter for completed onboarding client-side
         // Note: Amplify Data client list() doesn't support boolean filters well,
@@ -433,6 +463,23 @@ export default function Discover() {
                 >
                   Retry
                 </Button>
+              </div>
+            </div>
+          ) : pendingOutgoingRequest ? (
+            <div className="flex-1 flex items-center justify-center py-12 px-4">
+              <div className="text-center max-w-sm">
+                <Heart className="w-14 h-14 text-primary/60 mx-auto mb-4" />
+                <h3 className="font-display text-lg font-semibold mb-2">Request pending</h3>
+                <p className="text-muted-foreground mb-2">
+                  Your prom invitation is pending with{" "}
+                  <span className="text-primary font-medium">
+                    {pendingOutgoingRequest.fromName || pendingOutgoingRequest.toEmail.split("@")[0] || "your partner"}
+                  </span>
+                  .
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  When they accept, you&apos;ll be matched and can chat from the Matches tab.
+                </p>
               </div>
             </div>
           ) : displayQueue.length === 0 ? (

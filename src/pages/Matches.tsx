@@ -7,6 +7,8 @@ import PromAsk from "@/components/PromAsk";
 import { useChat } from "@/hooks/useChat";
 import { useMatches, type MatchWithDetails } from "@/hooks/useMatches";
 import { useMatchRequests } from "@/hooks/useMatchRequests";
+import { usePromAsk } from "@/hooks/usePromAsk";
+import { usePromDate } from "@/hooks/usePromDate";
 import { getUserProfile } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -48,6 +50,7 @@ const Matches = () => {
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [showPromAsk, setShowPromAsk] = useState(false);
   const [acceptingRequestId, setAcceptingRequestId] = useState<string | null>(null);
+  const [acceptingPromAskId, setAcceptingPromAskId] = useState<string | null>(null);
   const [profilePicUrls, setProfilePicUrls] = useState<Record<string, string>>({});
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, string>>({});
@@ -124,14 +127,44 @@ const Matches = () => {
     declineRequest,
   } = useMatchRequests({ currentUserId, currentUserEmail });
 
+  const {
+    pendingToMe: promAskToMe,
+    pendingFromMe: promAskFromMe,
+    sendPromAsk,
+    acceptPromAsk,
+    declinePromAsk,
+    refresh: refreshPromAsk,
+  } = usePromAsk({ currentUserId });
+
+  const { promDate, refresh: refreshPromDate } = usePromDate({ currentUserId });
+
   // When user clicks Matches in nav, refetch matches and requests and clear refresh state
   useEffect(() => {
     if (location.state?.refresh) {
       refreshMatches();
       refreshRequests();
+      refreshPromAsk();
+      refreshPromDate();
       navigate(location.pathname, { state: {}, replace: true });
     }
-  }, [location.state?.refresh, location.pathname, navigate, refreshMatches, refreshRequests]);
+  }, [location.state?.refresh, location.pathname, navigate, refreshMatches, refreshRequests, refreshPromAsk, refreshPromDate]);
+
+  const handleAcceptPromAsk = async (requestId: string, matchId: string) => {
+    setAcceptingPromAskId(requestId);
+    try {
+      const ok = await acceptPromAsk(requestId, matchId);
+      if (ok) {
+        await refreshMatches();
+        await refreshPromAsk();
+        await refreshPromDate();
+        navigate("/prom-date", { replace: true });
+      }
+    } catch (err) {
+      console.error("[Matches] Accept Prom Ask failed:", err);
+    } finally {
+      setAcceptingPromAskId(null);
+    }
+  };
 
   const handleAcceptRequest = async (
     requestId: string,
@@ -142,7 +175,11 @@ const Matches = () => {
     setAcceptingRequestId(requestId);
     try {
       const ok = await acceptRequest(requestId, fromUserId, fromEmail, fromName);
-      if (ok) await refreshMatches();
+      if (ok) {
+        await refreshMatches();
+        await refreshPromDate();
+        navigate("/prom-date");
+      }
     } finally {
       setAcceptingRequestId(null);
     }
@@ -262,6 +299,13 @@ const Matches = () => {
     await updateMatchConversation(matchId, conversationId);
   };
 
+
+  // Redirect to Prom Date if user has one
+  useEffect(() => {
+    if (!isAuthLoading && currentUserId && promDate) {
+      navigate("/prom-date", { replace: true });
+    }
+  }, [isAuthLoading, currentUserId, promDate, navigate]);
 
   // Show loading while checking auth
   if (isAuthLoading) {
@@ -448,6 +492,13 @@ const Matches = () => {
             currentUserId={currentUserId}
             onBack={() => setActiveChat(null)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
+            onAskToProm={() => setShowPromAsk(true)}
+            showAskToProm={!activeMatch.isPromDate && !promAskFromMe.some((r) => r.toUserId === activeMatch.otherUserId)}
+            promAskFromThem={promAskToMe.find((r) => r.fromUserId === activeMatch.otherUserId)}
+            onAcceptPromAsk={(reqId) => handleAcceptPromAsk(reqId, activeMatch.id)}
+            acceptingPromAskId={acceptingPromAskId}
+            onDeclinePromAsk={declinePromAsk}
+            refreshPromAsk={refreshPromAsk}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -468,8 +519,17 @@ const Matches = () => {
         {showPromAsk && activeMatch && (
           <PromAsk
             matchId={activeMatch.id}
+            otherUserId={activeMatch.otherUserId}
             matchCompatScore={activeMatch.compatScore || 0}
             onClose={() => setShowPromAsk(false)}
+            onSend={async (msg) => {
+              const ok = await sendPromAsk(activeMatch.otherUserId, activeMatch.id, msg);
+              if (ok) {
+                await refreshPromAsk();
+                setShowPromAsk(false);
+              }
+              return ok;
+            }}
           />
         )}
       </AnimatePresence>
@@ -485,6 +545,12 @@ interface ChatViewProps {
   currentUserId: string;
   onBack: () => void;
   onConversationCreated?: (conversationId: string) => void;
+  onAskToProm?: () => void;
+  showAskToProm?: boolean;
+  promAskFromThem?: { id: string; fromUserId: string; message?: string | null } | undefined;
+  onAcceptPromAsk?: (requestId: string) => void;
+  onDeclinePromAsk?: (requestId: string) => Promise<boolean>;
+  refreshPromAsk?: () => Promise<void>;
 }
 
 const ChatView = ({ 
@@ -493,6 +559,13 @@ const ChatView = ({
   currentUserId,
   onBack,
   onConversationCreated,
+  onAskToProm,
+  showAskToProm,
+  promAskFromThem,
+  onAcceptPromAsk,
+  onDeclinePromAsk,
+  refreshPromAsk,
+  acceptingPromAskId,
 }: ChatViewProps) => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
@@ -640,6 +713,42 @@ const ChatView = ({
           </DropdownMenu>
         </div>
       </header>
+
+      {/* Prom Ask request from them - Accept / Decline */}
+      {promAskFromThem && onAcceptPromAsk && onDeclinePromAsk && (
+        <div className="px-4 py-3 bg-primary/10 border-b border-primary/20 shrink-0">
+          <p className="text-sm font-medium text-foreground mb-1">
+            {displayName} asked you to Prom!
+          </p>
+          {promAskFromThem.message && (
+            <p className="text-sm text-muted-foreground mb-3 italic">&quot;{promAskFromThem.message}&quot;</p>
+          )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDeclinePromAsk(promAskFromThem.id).then(() => refreshPromAsk?.())}
+              disabled={!!acceptingPromAskId}
+            >
+              Decline
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onAcceptPromAsk(promAskFromThem.id)}
+              disabled={!!acceptingPromAskId}
+            >
+              {acceptingPromAskId === promAskFromThem.id ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Accepting...
+                </>
+              ) : (
+                "Accept – Let&apos;s go!"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Error display */}
       {error && (

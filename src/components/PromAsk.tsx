@@ -8,17 +8,25 @@ import { Heart, Sparkles, ArrowLeft, PartyPopper, X } from "lucide-react";
 
 interface PromAskProps {
   matchId: string;
+  otherUserId: string;
   matchCompatScore: number;
   onClose: () => void;
+  onSend: (message?: string) => Promise<boolean>;
 }
 
-const PromAsk = ({ matchId, matchCompatScore, onClose }: PromAskProps) => {
+const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: PromAskProps) => {
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const handleSend = () => {
-    // In real app, send prom ask request
-    setSent(true);
+  const handleSend = async () => {
+    setSending(true);
+    try {
+      const ok = await onSend(message.trim() || undefined);
+      if (ok) setSent(true);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -124,12 +132,18 @@ const PromAsk = ({ matchId, matchCompatScore, onClose }: PromAskProps) => {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="glass" className="flex-1" onClick={onClose}>
+                <Button variant="glass" className="flex-1" onClick={onClose} disabled={sending}>
                   Maybe Later
                 </Button>
-                <Button variant="gold" className="flex-1" onClick={handleSend}>
-                  <Heart className="w-4 h-4 mr-2" />
-                  Send Prom Ask
+                <Button variant="gold" className="flex-1" onClick={handleSend} disabled={sending}>
+                  {sending ? (
+                    <span className="inline-block w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <Heart className="w-4 h-4 mr-2" />
+                      Send Prom Ask
+                    </>
+                  )}
                 </Button>
               </div>
             </motion.div>

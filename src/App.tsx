@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -12,13 +12,25 @@ import FullProfileView from "./pages/FullProfileView";
 import Matches from "./pages/Matches";
 import TestChat from "./pages/TestChat";
 import Profile from "./pages/Profile";
+import PromDate from "./pages/PromDate";
 import NotFound from "./pages/NotFound";
 
+import { useEffect } from "react";
 import { Amplify } from "aws-amplify";
 import outputs from "../amplify_outputs.json";
+import { captureInviteFromUrl } from "@/utils/invite";
 import "@aws-amplify/ui-react/styles.css";
 
 Amplify.configure(outputs);
+
+/** Captures ?invite=email from URL on load and route changes */
+function InviteCapture() {
+  const location = useLocation();
+  useEffect(() => {
+    captureInviteFromUrl();
+  }, [location.search]);
+  return null;
+}
 
 const queryClient = new QueryClient();
 
@@ -28,6 +40,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <InviteCapture />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
@@ -37,6 +50,7 @@ const App = () => (
             <Route path="/discover/profile" element={<Discover />} />
             <Route path="/discover/profile/:profileId" element={<FullProfileView />} />
             <Route path="/matches" element={<Matches />} />
+            <Route path="/prom-date" element={<PromDate />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="/test-chat" element={<TestChat />} />
