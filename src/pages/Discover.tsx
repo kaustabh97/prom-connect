@@ -431,7 +431,7 @@ export default function Discover() {
               variant="outline"
               size="sm"
               className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
-              label="Refer to friends"
+              label="Refer"
             />
             <Button
               variant="outline"
@@ -447,13 +447,13 @@ export default function Discover() {
         </header>
 
         {/* Card area - content flows, main scrolls (no nested scroll) */}
-        <div className="flex flex-col w-full min-w-0">
+        <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
           {loading ? (
-            <div className="flex-1 flex items-center justify-center py-12">
+            <div className="flex-1 flex items-center justify-center min-h-0 py-12">
               <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           ) : error ? (
-            <div className="flex-1 flex items-center justify-center py-12 px-4">
+            <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">
               <div className="text-center">
                 <p className="text-destructive mb-2">{error}</p>
                 <Button
@@ -465,7 +465,7 @@ export default function Discover() {
               </div>
             </div>
           ) : pendingOutgoingRequest ? (
-            <div className="flex-1 flex items-center justify-center py-12 px-4">
+            <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">
               <div className="text-center max-w-sm">
                 <Heart className="w-14 h-14 text-primary/60 mx-auto mb-4" />
                 <h3 className="font-display text-lg font-semibold mb-2">Request pending</h3>
@@ -482,7 +482,7 @@ export default function Discover() {
               </div>
             </div>
           ) : displayQueue.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center py-12 px-4">
+            <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">
               <div className="text-center space-y-4">
                 <p className="text-muted-foreground">
                   {filteredProfiles.length === 0

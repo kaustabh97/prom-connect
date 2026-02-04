@@ -21,7 +21,7 @@ import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/a
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
 import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
-import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X, Sparkles } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
@@ -1151,27 +1151,37 @@ const Onboarding = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
+            className="space-y-6 w-full"
           >
-            <div className="text-center mb-6">
-              <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
-              <h2 className="font-display text-2xl font-bold mb-2">Are you here for a date or already a couple?</h2>
+            <div className="text-center mb-8">
+              <Heart className="w-14 h-14 sm:w-16 sm:h-16 text-primary mx-auto mb-5" />
+              <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3 px-2 leading-tight">
+                Are you here for a date or already a couple?
+              </h2>
               <p className="text-muted-foreground">
                 We’ll tailor the next steps to you.
               </p>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 sm:space-y-4">
               {partnerStatusOptions.map((option) => (
                 <Button
                   key={option}
                   variant={profile.partnerStatus === option ? "default" : "outline"}
-                  className="w-full h-14 text-base justify-start px-6"
+                  className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-start px-4 sm:px-6 py-4 sm:py-5 ${
+                    profile.partnerStatus === option
+                      ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                      : "border-primary/30 hover:border-primary/50 hover:bg-primary/5"
+                  }`}
                   onClick={() => handleChoice(option)}
                 >
-                  <span className="w-5 h-5 mr-3 flex items-center justify-center shrink-0">
-                    {profile.partnerStatus === option ? <Check className="w-5 h-5" /> : null}
+                  <span className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4 flex items-center justify-center shrink-0">
+                    {profile.partnerStatus === option ? (
+                      <Check className="w-5 h-5 sm:w-6 sm:h-6" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-primary/60" />
+                    )}
                   </span>
-                  {option}
+                  <span className="text-left flex-1">{option}</span>
                 </Button>
               ))}
             </div>
@@ -2035,7 +2045,7 @@ const Onboarding = () => {
 
       <div className="relative z-10 flex-1 flex flex-col w-full max-w-[500px] mx-auto">
         {/* Onboarding header: back, step counter, logout on same line; progress bar below */}
-        <header className="shrink-0 border-b border-primary/20 bg-transparent">
+        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
           <div className="px-4 pt-4 pb-4">
             {/* Single row: Back | Step counter | Log out */}
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -2078,9 +2088,9 @@ const Onboarding = () => {
         </header>
 
         {/* Content */}
-        <main className="flex-1 flex items-center justify-center p-4 w-full">
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 w-full min-h-0">
           <div className="w-full max-w-md mx-auto">
-            <div className="glass rounded-3xl p-6 md:p-8">
+            <div className="glass rounded-3xl p-6 sm:p-8 md:p-10">
               <AnimatePresence mode="wait">
                 {renderStep()}
               </AnimatePresence>

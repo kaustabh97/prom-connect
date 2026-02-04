@@ -53,7 +53,7 @@ const Landing = () => {
         <SparkleBackground />
       </Suspense>
       
-      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20 w-full max-w-[600px] mx-auto">
+      <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-10 w-full max-w-[600px] mx-auto">
         <div
           className="absolute top-20 left-10 w-32 h-32 rounded-full bg-primary/10 blur-3xl animate-float"
           style={{ animationDuration: "8s" }}
@@ -123,8 +123,7 @@ const Landing = () => {
             transition={{ delay: 0.6, duration: 0.8 }}
             className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto"
           >
-            IIMA’s campus-only matchmaking for Prom. Discover compatible peers, set your preferences, 
-            and when it’s mutual—match and chat. No masks, no mystery—just real people and a real prom date.
+            Find your prom match on campus. Set your preferences, discover compatible peers, and chat when it’s mutual. Real people. Real connections.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -158,7 +157,7 @@ const Landing = () => {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Sign in with your IIMA email
+              Sign in with IIMA email
             </Button>
             <Button
               variant="gold-outline"
@@ -182,7 +181,7 @@ const Landing = () => {
       </section>
 
       {/* Features Section */}
-      <section id="how-it-works" className="relative py-24 px-4">
+      <section id="how-it-works" className="relative py-10 px-4">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -208,7 +207,7 @@ const Landing = () => {
       </section>
 
       {/* Why This Works for IMA Section */}
-      <section className="relative py-24 px-4">
+      <section className="relative py-10 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -252,7 +251,7 @@ const Landing = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="relative py-24 px-4 text-center">
+      <section className="relative py-20 px-4 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -273,15 +272,10 @@ const Landing = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-4 border-t border-border/50">
+      <footer className="py-5 px-4 border-t border-border/50">
         <div className="max-w-6xl mx-auto flex flex-col gap-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
             <p>© 2026 Prom IIMA. Built with 💛 for the campus.</p>
-            <div className="flex gap-6">
-              <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-primary transition-colors">Terms</a>
-              <a href="#" className="hover:text-primary transition-colors">Help</a>
-            </div>
           </div>
           <div className="text-center text-xs text-muted-foreground/60 pt-2">
             Created by{" "}

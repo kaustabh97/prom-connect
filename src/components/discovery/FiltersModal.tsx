@@ -58,7 +58,7 @@ export default function FiltersModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[420px] max-h-[85dvh] overflow-y-auto glass-strong border-primary/30 shadow-glow">
+      <DialogContent className="max-w-[420px] max-h-[85dvh] overflow-y-auto rounded-2xl glass-strong border-primary/30 shadow-glow">
         <DialogHeader className="relative">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-primary" />
