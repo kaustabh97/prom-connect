@@ -240,9 +240,11 @@ export default function Discover() {
             );
             const pending = (outgoing ?? []).find((r) => r.status === "pending");
             if (pending) {
+              const toEmail = pending.toEmail ?? "";
               setPendingOutgoingRequest({
-                toEmail: pending.toEmail ?? "",
-                fromName: pending.fromName ?? undefined,
+                id: pending.id,
+                toEmail,
+                partnerDisplayName: toEmail.split("@")[0] || "your partner",
               });
             }
           } catch (_) {}
@@ -414,7 +416,7 @@ export default function Discover() {
         {/* Fixed header */}
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50 shrink-0">
           <h1 className="font-display text-3xl font-bold text-foreground">
-            Discover
+            {pendingOutgoingRequest ? "Your Prom Invite ✨" : "Discover"}
           </h1>
           <div className="flex items-center gap-2">
             <ShareWhatsAppButton
@@ -455,21 +457,46 @@ export default function Discover() {
               </div>
             </div>
           ) : pendingOutgoingRequest ? (
-            <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">
-              <div className="text-center max-w-sm">
-                <Heart className="w-14 h-14 text-primary/60 mx-auto mb-4" />
-                <h3 className="font-display text-lg font-semibold mb-2">Request pending</h3>
-                <p className="text-muted-foreground mb-2">
-                  Your prom invitation is pending with{" "}
-                  <span className="text-primary font-medium">
-                    {pendingOutgoingRequest.fromName || pendingOutgoingRequest.toEmail.split("@")[0] || "your partner"}
-                  </span>
-                  .
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  When they accept, you&apos;ll be matched and can chat from the Matches tab.
-                </p>
-              </div>
+            <div className="flex-1 flex flex-col min-h-0">
+              <PendingPartnerRequestView
+                partnerDisplayName={pendingOutgoingRequest.partnerDisplayName}
+                onWithdraw={async () => {
+                  if (!pendingOutgoingRequest?.id) return;
+                  setWithdrawing(true);
+                  try {
+                    const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+                    const opts = authMode ? { authMode } : undefined;
+                    await client.models.MatchRequest.update(
+                      { id: pendingOutgoingRequest.id, status: "declined" },
+                      opts
+                    );
+                    const currentUser = await getUserProfile();
+                    const { data: myProfiles } = await client.models.UserProfile.list(
+                      { filter: { email: { eq: currentUser?.email } } },
+                      opts
+                    );
+                    if (myProfiles?.[0]?.id) {
+                      await client.models.UserProfile.update(
+                        {
+                          id: myProfiles[0].id,
+                          partnerStatus: "Still looking for my prom date 💫",
+                          partnerEmail: "",
+                          partnerName: "",
+                        },
+                        opts
+                      );
+                    }
+                    setPendingOutgoingRequest(null);
+                    setRefreshKey((k) => k + 1);
+                  } catch (e) {
+                    console.error("[Discover] Withdraw failed:", e);
+                  } finally {
+                    setWithdrawing(false);
+                  }
+                }}
+                onShare={() => {}}
+                isWithdrawing={withdrawing}
+              />
             </div>
           ) : displayQueue.length === 0 ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">

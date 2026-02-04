@@ -77,16 +77,16 @@ interface ProfileData {
 // First step: ask "Looking for a date" vs "Already a couple"
 const CHOICE_STEP: OnboardingStep[] = ["choice"];
 
-// Full profile flow (after "Looking for a date")
+// Full profile flow (after "Looking for a date") – photo right after name/DOB
 const FULL_FLOW_STEPS: OnboardingStep[] = [
   "welcome",
   "dateOfBirth",
+  "photoUpload",
   "notifications",
   "ageCohortGender",
   "sexualityIntention",
   "hometown",
   "lifestyle",
-  "photoUpload",
 ];
 
 // Couple flow (after "Already a couple"): name → photo → partner type → partner details
@@ -509,16 +509,13 @@ const Onboarding = () => {
     // Choice step: user advances by clicking an option (no Next button)
     if (step === "choice") return;
 
-    // Full flow: photoUpload is last → upload then save
+    // Full flow: photoUpload — upload then advance (save happens at lifestyle step)
     if (step === "photoUpload") {
-      let uploadedS3Key: string | undefined;
-      // If photo is selected but not uploaded yet, upload it first
       if (selectedFile && !profile.profilePicKey) {
         try {
           setIsUploading(true);
           setUploadError(null);
           const s3Key = await uploadPhotoToS3(selectedFile);
-          uploadedS3Key = s3Key;
           setProfile(prev => ({ ...prev, profilePicKey: s3Key }));
         } catch (error) {
           setUploadError(error instanceof Error ? error.message : "Failed to upload photo");
@@ -526,10 +523,14 @@ const Onboarding = () => {
           return;
         }
       }
-      
-      // photoUpload is the last step — save profile to backend
-      // Pass uploadedS3Key directly - React setState is async, so profile.profilePicKey may not be updated yet
-      await saveProfileToBackend(uploadedS3Key);
+      const nextIndex = effectiveSteps.indexOf(step) + 1;
+      if (nextIndex < effectiveSteps.length) setStep(effectiveSteps[nextIndex]);
+      return;
+    }
+
+    // Full flow: lifestyle is last step — save profile to backend
+    if (step === "lifestyle") {
+      await saveProfileToBackend();
       return;
     }
 
@@ -1167,7 +1168,7 @@ const Onboarding = () => {
               </h2>
               <p className="text-muted-foreground">
                 {inviteRequest
-                  ? "Accept their request to become prom dates, or discover on your own."
+                  ? "Say yes and become prom dates, or explore on your own – your call!"
                   : "We'll tailor the next steps to you."}
               </p>
             </div>

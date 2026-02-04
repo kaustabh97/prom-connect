@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
+import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import { 
   Heart, 
   MessageCircle, 
@@ -55,6 +56,12 @@ const Matches = () => {
   const [profilePicUrls, setProfilePicUrls] = useState<Record<string, string>>({});
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const [lastMessageTimes, setLastMessageTimes] = useState<Record<string, string>>({});
+  const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
+    id: string;
+    toEmail: string;
+    partnerDisplayName: string;
+  } | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
   
   // Scroll to top when navigating to Matches
   useEffect(() => {
@@ -145,6 +152,35 @@ const Matches = () => {
 
   const { promDate, refresh: refreshPromDate } = usePromDate({ currentUserId });
 
+  const loadPendingOutgoing = useCallback(async () => {
+    if (!currentUserId) return;
+    const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+    const opts = authMode ? { authMode } : undefined;
+    try {
+      const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+        { fromUserId: currentUserId },
+        opts
+      );
+      const pending = (outgoing ?? []).find((r) => r.status === "pending");
+      if (pending) {
+        const toEmail = pending.toEmail ?? "";
+        setPendingOutgoingRequest({
+          id: pending.id,
+          toEmail,
+          partnerDisplayName: toEmail.split("@")[0] || "your partner",
+        });
+      } else {
+        setPendingOutgoingRequest(null);
+      }
+    } catch (_) {
+      setPendingOutgoingRequest(null);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    loadPendingOutgoing();
+  }, [loadPendingOutgoing]);
+
   // When user clicks Matches in nav, refetch matches and requests and clear refresh state
   useEffect(() => {
     if (location.state?.refresh) {
@@ -152,9 +188,10 @@ const Matches = () => {
       refreshRequests();
       refreshPromAsk();
       refreshPromDate();
+      loadPendingOutgoing();
       navigate(location.pathname, { state: {}, replace: true });
     }
-  }, [location.state?.refresh, location.pathname, navigate, refreshMatches, refreshRequests, refreshPromAsk, refreshPromDate]);
+  }, [location.state?.refresh, location.pathname, navigate, refreshMatches, refreshRequests, refreshPromAsk, refreshPromDate, loadPendingOutgoing]);
 
   const handleAcceptPromAsk = async (requestId: string, matchId: string) => {
     setAcceptingPromAskId(requestId);
@@ -321,6 +358,60 @@ const Matches = () => {
         <div className="relative z-10 text-center">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
           <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Pending outgoing partner request – no access to chat or discover
+  if (pendingOutgoingRequest && !authError) {
+    return (
+      <div className="min-h-dvh bg-gradient-midnight relative flex flex-col w-full">
+        <SparkleBackground />
+        <div className="relative z-10 flex flex-col flex-1 w-full max-w-[500px] mx-auto">
+          <header className="p-4 border-b border-border/50 shrink-0">
+            <h1 className="font-display text-3xl font-bold">Your Prom Invite ✨</h1>
+          </header>
+          <div className="flex-1 flex flex-col min-h-0">
+            <PendingPartnerRequestView
+              partnerDisplayName={pendingOutgoingRequest.partnerDisplayName}
+              onWithdraw={async () => {
+                if (!pendingOutgoingRequest?.id) return;
+                setWithdrawing(true);
+                try {
+                  const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+                  const opts = authMode ? { authMode } : undefined;
+                  await client.models.MatchRequest.update(
+                    { id: pendingOutgoingRequest.id, status: "declined" },
+                    opts
+                  );
+                  const { data: myProfiles } = await client.models.UserProfile.list(
+                    { filter: { email: { eq: currentUserEmail } } },
+                    opts
+                  );
+                  if (myProfiles?.[0]?.id) {
+                    await client.models.UserProfile.update(
+                      {
+                        id: myProfiles[0].id,
+                        partnerStatus: "Still looking for my prom date 💫",
+                        partnerEmail: "",
+                        partnerName: "",
+                      },
+                      opts
+                    );
+                  }
+                  setPendingOutgoingRequest(null);
+                  await loadPendingOutgoing();
+                  navigate("/discover/profile", { state: { refresh: true } });
+                } catch (e) {
+                  console.error("[Matches] Withdraw failed:", e);
+                } finally {
+                  setWithdrawing(false);
+                }
+              }}
+              isWithdrawing={withdrawing}
+            />
+          </div>
         </div>
       </div>
     );
