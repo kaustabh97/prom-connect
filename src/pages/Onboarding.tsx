@@ -228,33 +228,32 @@ const Onboarding = () => {
             return;
           }
 
-          // Invite flow: partner landed via invite link, has pending MatchRequest
-          const inviteFrom = getInviteFrom();
-          if (inviteFrom && inviteFrom !== authProfile.email?.toLowerCase()) {
-            try {
-              const { fetchAuthSession } = await import("aws-amplify/auth");
-              const session = await fetchAuthSession();
-              const auth = !!session.tokens;
-              const authMode = auth ? "userPool" : "apiKey";
-              const { data: requests } = await client.models.MatchRequest.listMatchRequestByToEmail(
-                { toEmail: authProfile.email!.toLowerCase() },
-                { authMode: authMode as "userPool" | "apiKey" }
-              );
-              const pending = (requests ?? []).find(
-                (r) => r.status === "pending" && r.fromEmail?.toLowerCase() === inviteFrom.toLowerCase()
-              );
-              if (pending) {
-                setInviteRequest({
-                  id: pending.id,
-                  fromUserId: pending.fromUserId ?? "",
-                  fromEmail: pending.fromEmail ?? "",
-                  fromName: pending.fromName ?? undefined,
-                });
-                setFlowChoice("invite");
-                setStep("partnerRequest");
-              }
-            } catch (_) {}
-          }
+          // Check for pending partner request (invite link or someone sent request to this email)
+          try {
+            const { fetchAuthSession } = await import("aws-amplify/auth");
+            const session = await fetchAuthSession();
+            const auth = !!session.tokens;
+            const authMode = auth ? "userPool" : "apiKey";
+            const { data: requests } = await client.models.MatchRequest.listMatchRequestByToEmail(
+              { toEmail: authProfile.email!.toLowerCase() },
+              { authMode: authMode as "userPool" | "apiKey" }
+            );
+            const pendingList = (requests ?? []).filter((r) => r.status === "pending");
+            const inviteFrom = getInviteFrom();
+            // Prefer request from invite link if present, else use first pending
+            const pending = inviteFrom && inviteFrom !== authProfile.email?.toLowerCase()
+              ? pendingList.find((r) => r.fromEmail?.toLowerCase() === inviteFrom.toLowerCase())
+              : pendingList[0];
+            if (pending) {
+              setInviteRequest({
+                id: pending.id,
+                fromUserId: pending.fromUserId ?? "",
+                fromEmail: pending.fromEmail ?? "",
+                fromName: pending.fromName ?? undefined,
+              });
+              // Stay on choice step; show "You have a request from X" vs "Look for a date"
+            }
+          } catch (_) {}
         } else {
           setIsAuthenticated(false);
           setShowAuthModal(true);
@@ -395,8 +394,14 @@ const Onboarding = () => {
     }
   };
 
-  // When user picks "Looking for a date" or "Already a couple" at the choice step
-  const handleChoice = (option: (typeof partnerStatusOptions)[number]) => {
+  // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
+  const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
+    if (option === "request") {
+      // User chose to accept the pending partner request
+      setFlowChoice("invite");
+      setStep("partnerRequest");
+      return;
+    }
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
       setFlowChoice("full");
@@ -1156,34 +1161,51 @@ const Onboarding = () => {
             <div className="text-center mb-8">
               <Heart className="w-14 h-14 sm:w-16 sm:h-16 text-primary mx-auto mb-5" />
               <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3 px-2 leading-tight">
-                Are you here for a date or already a couple?
+                {inviteRequest
+                  ? "Someone wants to go to Prom with you!"
+                  : "Are you here for a date or already a couple?"}
               </h2>
               <p className="text-muted-foreground">
-                We’ll tailor the next steps to you.
+                {inviteRequest
+                  ? "Accept their request to become prom dates, or discover on your own."
+                  : "We'll tailor the next steps to you."}
               </p>
             </div>
             <div className="space-y-3 sm:space-y-4">
-              {partnerStatusOptions.map((option) => (
-                <Button
-                  key={option}
-                  variant={profile.partnerStatus === option ? "default" : "outline"}
-                  className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-center px-4 sm:px-6 py-4 sm:py-5 ${
-                    profile.partnerStatus === option
-                      ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
-                      : "border-primary/30 hover:border-primary/50 hover:bg-primary/5"
-                  }`}
-                  onClick={() => handleChoice(option)}
-                >
-                  {profile.partnerStatus === option ? (
-                    <>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />
-                      <span>{option}</span>
-                    </>
-                  ) : (
-                    <span>{option}</span>
-                  )}
-                </Button>
-              ))}
+              {((() => {
+                const hasPendingRequest = !!inviteRequest;
+                const requestOptionLabel = inviteRequest
+                  ? `You have a request from ${inviteRequest.fromName || inviteRequest.fromEmail?.split("@")[0] || "Someone"} ✨`
+                  : null;
+                const choiceOptions = hasPendingRequest
+                  ? ([requestOptionLabel!, "Still looking for my prom date 💫"] as const)
+                  : partnerStatusOptions;
+                return choiceOptions.map((option) => {
+                  const isRequestOption = hasPendingRequest && option === requestOptionLabel;
+                  const isSelected = isRequestOption ? false : profile.partnerStatus === option;
+                  return (
+                    <Button
+                      key={option}
+                      variant={isSelected ? "default" : "outline"}
+                      className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-center px-4 sm:px-6 py-4 sm:py-5 ${
+                        isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
+                          : "border-primary/30 hover:border-primary/50 hover:bg-primary/5"
+                      }`}
+                      onClick={() => handleChoice(isRequestOption ? "request" : option)}
+                    >
+                      {isSelected ? (
+                        <>
+                          <Check className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />
+                          <span>{option}</span>
+                        </>
+                      ) : (
+                        <span>{option}</span>
+                      )}
+                    </Button>
+                  );
+                });
+              })())}
             </div>
           </motion.div>
         );

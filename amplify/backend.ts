@@ -24,12 +24,11 @@ sendPartnerInviteLambda.addToRolePolicy(
   })
 );
 
-// Grant SES send email permission for report emails
+// Report emails use Resend API (no SES). Add RESEND_API_KEY env var:
+// AWS Console → Lambda → send-report-email → Configuration → Environment variables
+// Or: export RESEND_API_KEY=re_xxx before `npx ampx sandbox`
 const sendReportEmailLambda = backend.sendReportEmail.resources.lambda;
-sendReportEmailLambda.addToRolePolicy(
-  new iam.PolicyStatement({
-    sid: 'AllowSesSendEmail',
-    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-    resources: ['*'],
-  })
+sendReportEmailLambda.addEnvironment(
+  'RESEND_API_KEY',
+  process.env.RESEND_API_KEY ?? ''
 );

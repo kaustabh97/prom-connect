@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,14 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "../../amplify/data/resource";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { getUserProfile } from "@/utils/auth";
 import { Flag, Loader2 } from "lucide-react";
-
-const client = generateClient<Schema>();
 const REPORT_EMAIL = "p24kaustabh@iima.ac.in";
 
+/** Fallback: open Gmail with report pre-filled */
 function openGmailReportFallback(
   text: string,
   context: string,
@@ -41,6 +38,34 @@ function openGmailReportFallback(
   window.open(gmailUrl, "_blank", "noopener,noreferrer");
 }
 
+/** Send report via FormSubmit (no sign-up; recipient confirms email once) */
+async function sendReportViaFormSubmit(
+  text: string,
+  context: string,
+  personName?: string,
+  personId?: string,
+  reporterEmail?: string,
+  reporterName?: string
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`https://formsubmit.co/ajax/${REPORT_EMAIL}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({
+      _subject: "Prom Connect – Report",
+      _template: "table",
+      _captcha: "false",
+      "Report details": text,
+      "Reported person": personName || "Unknown",
+      "Reported person ID": personId || "",
+      Context: context,
+      "Reporter email": reporterEmail || "",
+      "Reporter name": reporterName || "",
+    }),
+  });
+  const data = await res.json();
+  return { ok: res.ok && (data as { success?: boolean }).success !== false };
+}
+
 interface ReportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -62,9 +87,17 @@ export default function ReportModal({
 }: ReportModalProps) {
   const [reportText, setReportText] = useState("");
   const [sending, setSending] = useState(false);
+  const [reporterInfo, setReporterInfo] = useState<{ email?: string; name?: string }>({});
   const { toast } = useToast();
-  const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
-  const opts = authMode ? { authMode } : undefined;
+
+  // Fetch current user (reporter) when modal opens
+  useEffect(() => {
+    if (open) {
+      getUserProfile().then((p) => {
+        setReporterInfo({ email: p?.email, name: p?.name });
+      });
+    }
+  }, [open]);
 
   const handleSubmit = async () => {
     const text = reportText.trim();
@@ -74,41 +107,32 @@ export default function ReportModal({
     }
     setSending(true);
     try {
-      const sendReportEmail = client.queries?.sendReportEmail;
-      if (typeof sendReportEmail === "function") {
-        const result = await sendReportEmail(
-          {
-            personName: personName ?? undefined,
-            personId: personId ?? undefined,
-            context,
-            reportText: text,
-            reporterEmail: reporterEmail ?? undefined,
-            reporterName: reporterName ?? undefined,
-          },
-          opts
-        );
-        if (result.data?.success !== false) {
-          toast({ title: "Report sent", description: "Thank you for helping keep Prom Connect safe." });
-          setReportText("");
-          onOpenChange(false);
-        } else {
-          toast({ title: "Could not send report", variant: "destructive" });
-        }
+      const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
+      const reporterNameToUse = reporterName ?? reporterInfo.name;
+      const result = await sendReportViaFormSubmit(
+        text,
+        context,
+        personName ?? undefined,
+        personId,
+        reporterEmailToUse,
+        reporterNameToUse
+      );
+      if (result.ok) {
+        toast({ title: "Report sent", description: "Thank you for helping keep Prom Connect safe." });
+        setReportText("");
+        onOpenChange(false);
       } else {
-        // Fallback: open Gmail when backend sendReportEmail not deployed
-        openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmail ?? undefined, reporterName ?? undefined);
-        toast({ title: "Report opened", description: "Gmail will open with the report pre-filled." });
+        openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmailToUse, reporterNameToUse);
+        toast({ title: "Opened email app", description: "Please send the report manually." });
         setReportText("");
         onOpenChange(false);
       }
     } catch (err) {
-      console.error("[ReportModal] Send failed:", err);
-      openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmail ?? undefined, reporterName ?? undefined);
-      toast({
-        title: "Could not send via app",
-        description: "Gmail opened – please send the report manually.",
-        variant: "destructive",
-      });
+      console.warn("[ReportModal] FormSubmit failed, falling back to Gmail:", err);
+      const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
+      const reporterNameToUse = reporterName ?? reporterInfo.name;
+      openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmailToUse, reporterNameToUse);
+      toast({ title: "Opened email app", description: "Please send the report manually." });
       setReportText("");
       onOpenChange(false);
     } finally {

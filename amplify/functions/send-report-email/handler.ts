@@ -13,47 +13,56 @@ export const handler = async (event: { arguments: ReportArgs }) => {
   const { personName, personId, context, reportText, reporterEmail, reporterName } =
     event.arguments;
 
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error("[sendReportEmail] RESEND_API_KEY not set");
+    throw new Error("Email service not configured. Add RESEND_API_KEY to the Lambda environment.");
+  }
+
+  const subject = "Prom Connect – Report";
+  const reportedLine =
+    personName || personId
+      ? `Reported person: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`
+      : "";
+  const reporterLine =
+    reporterEmail || reporterName
+      ? `Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim()
+      : "";
+  const text = [
+    "A user has submitted a report via Prom Connect.",
+    "",
+    reportedLine,
+    `Context: ${context || "Not specified"}`,
+    reporterLine,
+    "",
+    "Report details:",
+    "---",
+    reportText,
+    "---",
+  ]
+    .filter((s) => s !== "")
+    .join("\n");
+
   try {
-    // @ts-expect-error - Package will be installed by Amplify during build
-    const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
-    const ses = new SESClient({ region: process.env.AWS_REGION || "us-east-1" });
-
-    const subject = "Prom Connect – Report";
-    const reportedLine =
-      personName || personId
-        ? `Reported person: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`
-        : "";
-    const reporterLine =
-      reporterEmail || reporterName
-        ? `Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim()
-        : "";
-    const body = [
-      "A user has submitted a report via Prom Connect.",
-      "",
-      reportedLine,
-      `Context: ${context || "Not specified"}`,
-      reporterLine,
-      "",
-      "Report details:",
-      "---",
-      reportText,
-      "---",
-    ]
-      .filter((s) => s !== "")
-      .join("\n");
-
-    const command = new SendEmailCommand({
-      Source: process.env.SES_FROM_EMAIL || "noreply@iima.ac.in",
-      Destination: { ToAddresses: [REPORT_TO_EMAIL] },
-      Message: {
-        Subject: { Data: subject, Charset: "UTF-8" },
-        Body: {
-          Text: { Data: body, Charset: "UTF-8" },
-        },
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
       },
+      body: JSON.stringify({
+        from: "Prom Connect <onboarding@resend.dev>",
+        to: [REPORT_TO_EMAIL],
+        subject,
+        text,
+      }),
     });
 
-    await ses.send(command);
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("[sendReportEmail] Resend API error:", res.status, errBody);
+      throw new Error(`Failed to send report email: ${res.status}`);
+    }
     return { success: true };
   } catch (err) {
     console.error("[sendReportEmail] Error:", err);
