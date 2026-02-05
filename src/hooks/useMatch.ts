@@ -3,6 +3,7 @@ import type { SwipeAction } from "@/lib/dating";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -36,7 +37,8 @@ export function useMatch() {
           { filter: { email: { eq: authProfile.email } } },
           opts
         );
-      const currentUserProfile = profiles?.[0];
+      const canonicalId = authProfile.email ? getIdFromEmail(authProfile.email) : null;
+      const currentUserProfile = profiles?.find((p) => p.id === canonicalId) ?? profiles?.[0];
       if (!currentUserProfile?.id) return;
 
       // Fetch Likes where fromUserId = current user (who we've liked)
@@ -76,7 +78,8 @@ export function useMatch() {
                 { filter: { email: { eq: authProfile.email } } },
                 opts
               );
-            const currentUserProfile = profiles?.[0];
+            const canonicalId = authProfile.email ? getIdFromEmail(authProfile.email) : null;
+            const currentUserProfile = profiles?.find((p) => p.id === canonicalId) ?? profiles?.[0];
             if (currentUserProfile?.id) {
               fromUserId = currentUserProfile.id;
               const currentUserEmail = currentUserProfile.email ?? authProfile.email;

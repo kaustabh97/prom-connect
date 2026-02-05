@@ -11,8 +11,6 @@ type Message = Schema["Message"]["type"];
 interface UseChatOptions {
   conversationId?: string;
   currentUserId: string;
-  currentUserEmail?: string;
-  otherUserEmail?: string;
 }
 
 interface UseChatReturn {
@@ -101,8 +99,6 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
       const { data, errors } = await client.models.Conversation.create({
         user1Id: currentUserId,
         user2Id: otherUserId,
-        user1Email: currentUserEmail ?? undefined,
-        user2Email: otherUserEmail ?? undefined,
         user1Revealed: false,
         user2Revealed: false,
         lastMessageAt: new Date().toISOString(),
@@ -119,7 +115,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
     } finally {
       setIsLoading(false);
     }
-  }, [currentUserId, currentUserEmail, otherUserEmail]);
+  }, [currentUserId]);
 
   // Send a message in the current conversation
   const sendMessage = useCallback(async (content: string) => {
@@ -132,7 +128,6 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
       const { errors } = await client.models.Message.create({
         conversationId: conversation.id,
         senderId: currentUserId,
-        senderEmail: currentUserEmail ?? undefined,
         content: content.trim(),
         sentAt: now,
       });
@@ -149,7 +144,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
     } catch (err) {
       console.error("Failed to send message:", err);
     }
-  }, [conversation?.id, currentUserId, currentUserEmail]);
+  }, [conversation?.id, currentUserId]);
 
   // Reveal identity to the other user
   const revealIdentity = useCallback(async () => {

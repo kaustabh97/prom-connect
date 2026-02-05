@@ -1,6 +1,7 @@
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -24,7 +25,8 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
       opts
     );
     if (!profiles?.[0]) return null;
-    const userProfile = profiles[0];
+    const canonicalId = profile.email ? getIdFromEmail(profile.email) : null;
+    const userProfile = profiles.find((p) => p.id === canonicalId) ?? profiles[0];
     const userId = userProfile.id;
     const bio = userProfile.bio;
 

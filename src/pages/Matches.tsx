@@ -20,6 +20,7 @@ import ReportModal from "@/components/ReportModal";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { dispatchBadgeRefresh, dispatchViewingMatch } from "@/utils/badgeRefresh";
+import { getIdFromEmail } from "@/utils/userId";
 import { 
   Heart, 
   MessageCircle, 
@@ -29,7 +30,6 @@ import {
   Flag,
   Trash2,
   Loader2,
-  Plus,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -44,7 +44,7 @@ const client = generateClient<Schema>();
 const Matches = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   
   // Auth state
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -101,7 +101,8 @@ const Matches = () => {
         };
 
         const { data: userProfiles } = await listUserProfiles();
-        const backendProfile = userProfiles?.[0];
+        const canonicalId = profile.email ? getIdFromEmail(profile.email) : null;
+        const backendProfile = userProfiles?.find((p) => p.id === canonicalId) ?? userProfiles?.[0];
 
         if (!backendProfile?.id) {
           setAuthError("Complete onboarding to start matching.");
@@ -140,7 +141,6 @@ const Matches = () => {
   // Partner link requests (accept/decline)
   const {
     pendingRequests,
-    isLoading: requestsLoading,
     refresh: refreshRequests,
     acceptRequest,
     declineRequest,
@@ -635,7 +635,6 @@ const Matches = () => {
             match={activeMatch}
             conversationId={activeConversationId}
             currentUserId={currentUserId}
-            currentUserEmail={currentUserEmail}
             onBack={() => location.state?.fromPromDate ? navigate("/prom-date", { replace: true }) : setActiveChat(null)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
             onAskToProm={() => setShowPromAsk(true)}
@@ -690,7 +689,6 @@ interface ChatViewProps {
   match: MatchWithDetails;
   conversationId?: string;
   currentUserId: string;
-  currentUserEmail?: string;
   onBack: () => void;
   onConversationCreated?: (conversationId: string) => void;
   onAskToProm?: () => void;
@@ -706,7 +704,6 @@ const ChatView = ({
   match, 
   conversationId, 
   currentUserId,
-  currentUserEmail,
   onBack,
   onConversationCreated,
   onAskToProm,
@@ -761,8 +758,6 @@ const ChatView = ({
   } = useChat({
     conversationId,
     currentUserId,
-    currentUserEmail,
-    otherUserEmail: match.otherUserEmail,
   });
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);

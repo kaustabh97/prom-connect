@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { getIdFromEmail } from "@/utils/userId";
 
 const client = generateClient<Schema>();
 
@@ -114,15 +115,19 @@ export function useMatchRequests({
             { filter: { email: { eq: fromEmail } } },
             authMode ? { authMode } : undefined
           );
-          if (myProfiles?.[0]?.id) {
+          const myCanonicalId = currentUserEmail ? getIdFromEmail(currentUserEmail) : null;
+          const theirCanonicalId = fromEmail ? getIdFromEmail(fromEmail) : null;
+          const myProfile = myProfiles?.find((p) => p.id === myCanonicalId) ?? myProfiles?.[0];
+          const theirProfile = theirProfiles?.find((p) => p.id === theirCanonicalId) ?? theirProfiles?.[0];
+          if (myProfile?.id) {
             await client.models.UserProfile.update(
-              { id: myProfiles[0].id, excludeFromDiscovery: true },
+              { id: myProfile.id, excludeFromDiscovery: true },
               authMode ? { authMode } : undefined
             );
           }
-          if (theirProfiles?.[0]?.id) {
+          if (theirProfile?.id) {
             await client.models.UserProfile.update(
-              { id: theirProfiles[0].id, excludeFromDiscovery: true },
+              { id: theirProfile.id, excludeFromDiscovery: true },
               authMode ? { authMode } : undefined
             );
           }

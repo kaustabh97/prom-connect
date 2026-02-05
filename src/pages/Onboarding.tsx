@@ -18,6 +18,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
@@ -696,6 +697,7 @@ const Onboarding = () => {
           // @ts-ignore - TypeScript types don't match runtime behavior for create arguments
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
+              id: getIdFromEmail(profileData.email),
               email: profileData.email,
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
@@ -789,7 +791,10 @@ const Onboarding = () => {
         );
       } else {
         // @ts-ignore
-        await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+        await client.models.UserProfile.create(
+          { id: getIdFromEmail(profile.email), ...minimalData },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
       }
       navigate(`/prom-date?partnerName=${encodeURIComponent(partnerNameTrim)}&outside=1`);
     } catch (error) {
@@ -854,7 +859,10 @@ const Onboarding = () => {
         senderProfileId = existingProfiles[0].id;
       } else {
         // @ts-ignore - create args
-        const { data: created } = await client.models.UserProfile.create(minimalData, { authMode: authMode as "userPool" | "apiKey" });
+        const { data: created } = await client.models.UserProfile.create(
+          { id: getIdFromEmail(profile.email), ...minimalData },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
         senderProfileId = created?.id ?? "";
       }
       const currentUserEmail = profile.email.trim().toLowerCase();
@@ -954,6 +962,7 @@ const Onboarding = () => {
       } else {
         const { data: created } = await client.models.UserProfile.create(
           {
+            id: getIdFromEmail(profile.email),
             email: profile.email,
             name: profile.name || userName || undefined,
             userId: (await getUserProfile())?.userId ?? "",

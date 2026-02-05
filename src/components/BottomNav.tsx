@@ -12,6 +12,7 @@ import { BADGE_REFRESH_EVENT } from "@/utils/badgeRefresh";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { getIdFromEmail } from "@/utils/userId";
 
 const discoverNavItems = [
   { path: "/discover/profile", label: "Discover", icon: Compass },
@@ -116,7 +117,8 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
           { filter: { email: { eq: p.email } } },
           opts
         );
-        const profile = data?.[0];
+        const canonicalId = p.email ? getIdFromEmail(p.email) : null;
+        const profile = data?.find((x) => x.id === canonicalId) ?? data?.[0];
         setCurrentUserId(profile?.id ?? "");
         setCurrentUserEmail(profile?.email ?? p.email ?? "");
       } catch {
