@@ -19,7 +19,7 @@ export const handler = async (event: { arguments: ReportArgs }) => {
     throw new Error("Email service not configured. Add RESEND_API_KEY to the Lambda environment.");
   }
 
-  const subject = "Prom Connect – Report";
+  const subject = "Starlit by the Brick – Report";
   const reportedLine =
     personName || personId
       ? `Reported person: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`
@@ -29,7 +29,7 @@ export const handler = async (event: { arguments: ReportArgs }) => {
       ? `Reporter: ${reporterName || ""} ${reporterEmail ? `<${reporterEmail}>` : ""}`.trim()
       : "";
   const text = [
-    "A user has submitted a report via Prom Connect.",
+    "A user has submitted a report via Starlit by the Brick.",
     "",
     reportedLine,
     `Context: ${context || "Not specified"}`,
@@ -51,7 +51,7 @@ export const handler = async (event: { arguments: ReportArgs }) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from: "Prom Connect <onboarding@resend.dev>",
+        from: "Starlit by the Brick <onboarding@resend.dev>",
         to: [REPORT_TO_EMAIL],
         subject,
         text,

@@ -304,10 +304,19 @@ export default function Discover() {
           } catch (_) {}
         }
         
+        // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
+        let requestPendingUserIds = new Set<string>();
+        try {
+          const { data: matchRequests } = await client.models.MatchRequest.list({}, opts);
+          (matchRequests ?? [])
+            .filter((r) => r.status === "pending" && r.fromUserId)
+            .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
+        } catch (_) {}
+
         // Fetch all profiles - we'll filter for completed onboarding client-side
         // Note: Amplify Data client list() doesn't support boolean filters well,
         // so we fetch all and filter client-side
-        // Use API key auth mode when Google login is disabled
+        // Use API key auth mode when User login is disabled
         let result;
         if (!GOOGLE_LOGIN_CHECK) {
           // @ts-ignore - TypeScript types don't match runtime behavior for authMode
@@ -336,11 +345,14 @@ export default function Discover() {
           currentUserEmail,
         });
 
-        // Filter: exclude current user and only completed onboarding
+        // Filter: exclude current user, only completed onboarding, exclude prom date & request pending
         const filteredBackend = backendProfiles.filter(
           (p) =>
             p.email !== currentUserEmail &&
-            p.onboardingCompleted === true
+            p.onboardingCompleted === true &&
+            p.excludeFromDiscovery !== true &&
+            !p.bio?.trim().startsWith("Partner:") &&
+            !requestPendingUserIds.has(p.id ?? "")
         );
 
         // Transform to DiscoveryProfileFull format (same length as filteredBackend)

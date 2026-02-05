@@ -18,8 +18,12 @@ function PromDateGate({
   const [checked, setChecked] = useState(false);
 
   const isOnPromDatePage = location.pathname === "/prom-date";
+  const isMatchesWithChat =
+    location.pathname === "/matches" &&
+    new URLSearchParams(location.search).get("matchId");
   const shouldCheck =
     !isOnPromDatePage &&
+    !isMatchesWithChat &&
     PROM_DATE_CHECK_ROUTES.some(
       (p) => location.pathname === p || location.pathname.startsWith(p + "/")
     );
@@ -56,7 +60,11 @@ export default function AppLayout() {
   const location = useLocation();
   const isPromDate = location.pathname === "/prom-date";
   const isRequestPending = location.pathname === "/request-pending";
-  const hideNavForPage = isPromDate || isRequestPending;
+  const isChatFromPromDate =
+    location.pathname === "/matches" &&
+    new URLSearchParams(location.search).get("matchId") &&
+    (location.state as { fromPromDate?: boolean } | null)?.fromPromDate;
+  const hideNavForPage = isPromDate || isRequestPending || !!isChatFromPromDate;
   const [isCheckingPromDateRedirect, setIsCheckingPromDateRedirect] = useState(false);
 
   return (

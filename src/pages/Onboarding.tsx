@@ -2045,13 +2045,13 @@ const Onboarding = () => {
               {partnerCheckStatus === "checking" && (
                 <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
                   <span className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  Checking if they&apos;re on Prom Connect...
+                  Checking if they&apos;re on Starlit by the Brick...
                 </p>
               )}
               {partnerCheckStatus === "registered" && (
                 <p className="text-sm text-green-600 dark:text-green-400 mt-2 flex items-center gap-2">
                   <Check className="w-4 h-4 shrink-0" />
-                  They&apos;re on Prom Connect – they&apos;ll get a match request when they accept.
+                  They&apos;re on Starlit by the Brick – they&apos;ll get a match request when they accept.
                 </p>
               )}
               {partnerCheckStatus === "not_registered" && (
@@ -2097,7 +2097,7 @@ const Onboarding = () => {
             </div>
             <h2 className="font-display text-xl font-bold mb-2">Hey, you need to sign in first</h2>
             <p className="text-sm text-muted-foreground mb-6">
-              Prom Connect is IIMA-only – sign in with your campus email to get started.
+              Starlit by the Brick is IIMA-only – sign in with your campus email to get started.
             </p>
             <Button 
               variant="gold" 
@@ -2142,7 +2142,7 @@ const Onboarding = () => {
               </h2>
 
               <p className="text-muted-foreground mb-2 leading-relaxed">
-                Prom matchmaking is exclusively for the IIMA community.
+                Starlit by the Brick is exclusively for the IIMA community.
               </p>
               <p className="text-muted-foreground mb-8 leading-relaxed">
                 Please sign in with your{" "}
@@ -2174,7 +2174,7 @@ const Onboarding = () => {
           <div className="px-4 pt-4 pb-4">
             {/* Single row: Back | Step counter | Log out */}
             <div className="flex items-center justify-between gap-3 mb-3">
-              {currentStepIndex > 0 ? (
+              {(currentStepIndex > 0 || step === "couplePartnerType") ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -2306,7 +2306,7 @@ const Onboarding = () => {
             </DialogTitle>
             <DialogDescription className="text-center text-muted-foreground pt-2 space-y-3 overflow-y-auto max-h-[40vh]">
               <p>
-                You can invite your partner to join Prom Connect and accept your invitation via WhatsApp.
+                You can invite your partner to join Starlit by the Brick and accept your invitation via WhatsApp.
               </p>
               <p className="text-sm">
                 When you click &quot;Open WhatsApp&quot;, a message will be prepared with all the details your partner needs to join and accept your request.

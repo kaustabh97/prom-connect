@@ -32,11 +32,11 @@ const IS_BETA_DOMAIN = HOSTNAME === BETA_DOMAIN;
 const RAW_BETA_MODE = true;
 export const BETA_MODE = RAW_BETA_MODE && !IS_PROD_DOMAIN;
 
-/** Base URL for the Prom Connect app (used in partner invite emails) */
+/** Base URL for Starlit by the Brick (used in partner invite emails) */
 export const APP_URL =
   typeof window !== "undefined"
     ? window.location.origin
-    : (import.meta.env?.VITE_APP_URL as string) || "https://prom-connect.example.com";
+    : (import.meta.env?.VITE_APP_URL as string) || "https://starlitbythebricks.in";
 
 /**
  * Enable/disable backend profile fetching

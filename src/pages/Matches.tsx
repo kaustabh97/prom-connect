@@ -9,6 +9,7 @@ import { useMatches, type MatchWithDetails } from "@/hooks/useMatches";
 import { useMatchRequests } from "@/hooks/useMatchRequests";
 import { usePromAsk } from "@/hooks/usePromAsk";
 import { usePromDate } from "@/hooks/usePromDate";
+import { useViewedMatches } from "@/hooks/useViewedMatches";
 import { getUserProfile } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -17,6 +18,7 @@ import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
+import { dispatchBadgeRefresh } from "@/utils/badgeRefresh";
 import { 
   Heart, 
   MessageCircle, 
@@ -153,6 +155,7 @@ const Matches = () => {
   } = usePromAsk({ currentUserId });
 
   const { promDate, refresh: refreshPromDate } = usePromDate({ currentUserId });
+  const { markMatchViewed } = useViewedMatches(currentUserId);
 
   const loadPendingOutgoing = useCallback(async () => {
     if (!currentUserId) return;
@@ -203,6 +206,7 @@ const Matches = () => {
         await refreshMatches();
         await refreshPromAsk();
         await refreshPromDate();
+        dispatchBadgeRefresh();
         navigate("/prom-date", { replace: true });
       }
     } catch (err) {
@@ -210,6 +214,12 @@ const Matches = () => {
     } finally {
       setAcceptingPromAskId(null);
     }
+  };
+
+  const handleDeclinePromAsk = async (requestId: string) => {
+    const ok = await declinePromAsk(requestId);
+    if (ok) await refreshPromAsk();
+    dispatchBadgeRefresh();
   };
 
   const handleAcceptRequest = async (
@@ -224,11 +234,18 @@ const Matches = () => {
       if (ok) {
         await refreshMatches();
         await refreshPromDate();
+        dispatchBadgeRefresh();
         navigate("/prom-date");
       }
     } finally {
       setAcceptingRequestId(null);
     }
+  };
+
+  const handleDeclineRequest = async (requestId: string) => {
+    const ok = await declineRequest(requestId);
+    if (ok) await refreshRequests();
+    dispatchBadgeRefresh();
   };
 
   // Helper function to format last message time
@@ -329,9 +346,10 @@ const Matches = () => {
     const matchIdFromUrl = searchParams.get("matchId");
     if (matchIdFromUrl) {
       setActiveChat(matchIdFromUrl);
+      markMatchViewed(matchIdFromUrl);
       // Don't clear URL – keeps redirect from firing when fromPromDate
     }
-  }, [searchParams]);
+  }, [searchParams, markMatchViewed]);
   
   const activeMatch = rawMatches.find(m => m.id === activeChat);
   const activeConversationId = activeMatch?.conversationId || undefined;
@@ -479,7 +497,7 @@ const Matches = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => declineRequest(req.id)}
+                    onClick={() => handleDeclineRequest(req.id)}
                     disabled={!!acceptingRequestId}
                   >
                     Decline
@@ -543,7 +561,10 @@ const Matches = () => {
               key={match.id}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => setActiveChat(match.id)}
+              onClick={() => {
+                setActiveChat(match.id);
+                markMatchViewed(match.id);
+              }}
               className={`w-full p-4 rounded-xl mb-3 text-left transition-all duration-300 relative overflow-hidden ${
                 activeChat === match.id 
                   ? "bg-primary/25 border-2 border-primary/40 shadow-lg shadow-primary/20" 
@@ -612,7 +633,7 @@ const Matches = () => {
             promAskFromThem={promAskToMe.find((r) => r.fromUserId === activeMatch.otherUserId)}
             onAcceptPromAsk={(reqId) => handleAcceptPromAsk(reqId, activeMatch.id)}
             acceptingPromAskId={acceptingPromAskId}
-            onDeclinePromAsk={declinePromAsk}
+            onDeclinePromAsk={handleDeclinePromAsk}
             refreshPromAsk={refreshPromAsk}
           />
         ) : (
@@ -867,7 +888,7 @@ const ChatView = ({
       {promAskFromThem && onAcceptPromAsk && onDeclinePromAsk && (
         <div className="px-4 py-3 bg-primary/10 border-b border-primary/20 shrink-0">
           <p className="text-sm font-medium text-foreground mb-1">
-            {displayName} asked you to Prom!
+            {displayName} wants to go to Prom with you!
           </p>
           {promAskFromThem.message && (
             <p className="text-sm text-muted-foreground mb-3 italic">&quot;{promAskFromThem.message}&quot;</p>
@@ -876,10 +897,10 @@ const ChatView = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onDeclinePromAsk(promAskFromThem.id).then(() => refreshPromAsk?.())}
+              onClick={() => onDeclinePromAsk(promAskFromThem.id)}
               disabled={!!acceptingPromAskId}
             >
-              Decline
+              Maybe another time
             </Button>
             <Button
               size="sm"
@@ -889,10 +910,10 @@ const ChatView = ({
               {acceptingPromAskId === promAskFromThem.id ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Accepting...
+                  Making it official...
                 </>
               ) : (
-                "Accept – Let&apos;s go!"
+                "Yes, let's go"
               )}
             </Button>
           </div>

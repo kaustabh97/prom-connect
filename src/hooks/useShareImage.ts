@@ -15,9 +15,9 @@ export function useShareImage() {
       } = {}
     ) => {
       const {
-        filename = "prom-connect-share.png",
-        shareTitle = "Prom Connect",
-        shareText = "Check out Prom Connect!",
+        filename = "starlitbythebrick-share.png",
+        shareTitle = "Starlit by the Brick",
+        shareText = "Check out Starlit by the Brick!",
         imageUrls = [],
       } = options;
 

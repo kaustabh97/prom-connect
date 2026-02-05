@@ -1143,7 +1143,7 @@ export default function Profile() {
                 Invite friends
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Share Prom Connect with your batchmates – the more, the merrier!
+                Share Starlit by the Brick with your batchmates – the more, the merrier!
               </p>
               <ShareWhatsAppButton
                 variant="outline"

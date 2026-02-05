@@ -8,11 +8,11 @@ export const handler = async (event: { arguments: PartnerInviteArgs }) => {
     const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
     const ses = new SESClient({ region: process.env.AWS_REGION || "us-east-1" });
 
-    const subject = "Your partner wants to link with you on Prom Connect!";
+    const subject = "Your partner wants to link with you on Starlit by the Brick!";
     const body = `
 Hi there!
 
-${fromName || "Someone"} wants to link with you as their partner on Prom Connect - the IIMA Prom matchmaking app.
+${fromName || "Someone"} wants to link with you as their partner on Starlit by the Brick - the IIMA Prom matchmaking app.
 
 Create your profile and accept their request to get matched:
 ${appUrl}
@@ -20,7 +20,7 @@ ${appUrl}
 You'll need to sign in with your @iima.ac.in email.
 
 See you at Prom!
-The Prom Connect Team
+The Starlit by the Brick Team
 `.trim();
 
     const command = new SendEmailCommand({

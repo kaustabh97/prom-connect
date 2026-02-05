@@ -140,9 +140,13 @@ export default function PromDate() {
           img.setAttribute("src", imageDataUrls[src]);
         }
       });
-      const countdownEl = shareRef.current.querySelector("[data-share-hide]") as HTMLElement | null;
-      const originalDisplay = countdownEl?.style.display ?? "";
-      if (countdownEl) countdownEl.style.display = "none";
+      const elementsToHide = shareRef.current.querySelectorAll("[data-share-hide]");
+      const originalDisplays: string[] = [];
+      elementsToHide.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        originalDisplays.push(htmlEl.style.display ?? "");
+        htmlEl.style.display = "none";
+      });
 
       // Wait for images to load after src change
       await Promise.all(
@@ -158,7 +162,9 @@ export default function PromDate() {
 
       // Restore original state
       restores.forEach(({ img, src }) => img.setAttribute("src", src));
-      if (countdownEl) countdownEl.style.display = originalDisplay;
+      elementsToHide.forEach((el, i) => {
+        (el as HTMLElement).style.display = originalDisplays[i] ?? "";
+      });
       canvas.toBlob(
         async (blob) => {
           if (!blob) {
@@ -172,8 +178,8 @@ export default function PromDate() {
             try {
               const shareData: ShareData = {
                 files: [file],
-                title: "Prom Date – Save the date!",
-                text: "We're going to Prom together! 15th Feb, 8 PM",
+                title: "Prom Date",
+                text: "You're coming to Prom with me!",
               };
               if (navigator.canShare?.(shareData) !== false) {
                 await navigator.share(shareData);
@@ -418,9 +424,10 @@ export default function PromDate() {
           <CountdownTimer targetDate="2026-02-15T20:00:00" />
         </motion.div>
 
-        {/* Chat button - only when both from IIMA */}
+        {/* Chat button - only when both from IIMA (hidden in share image) */}
         {showBothView && promDate?.match?.id && (
           <motion.div
+            data-share-hide
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
@@ -441,7 +448,7 @@ export default function PromDate() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="mt-auto pt-20 md:pt-24 pb-6 text-base font-playfair text-primary text-center"
+          className="mt-auto pt-8 pb-8 text-lg font-playfair text-primary text-center"
         >
           See you on the dance floor.
         </motion.p>

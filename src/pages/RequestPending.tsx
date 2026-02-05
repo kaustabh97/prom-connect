@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { signOut } from "aws-amplify/auth";
 import { getUrl } from "aws-amplify/storage";
 import SparkleBackground from "@/components/SparkleBackground";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfile, clearTestUser } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, LogOut } from "lucide-react";
 
 const client = generateClient<Schema>();
 
@@ -127,6 +129,21 @@ export default function RequestPending() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      if (GOOGLE_LOGIN_CHECK) {
+        await signOut();
+      } else {
+        clearTestUser();
+      }
+      navigate("/");
+    } catch (err) {
+      console.error("Logout failed:", err);
+      if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+      navigate("/");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-dvh bg-gradient-midnight flex items-center justify-center w-full">
@@ -148,12 +165,25 @@ export default function RequestPending() {
       <SparkleBackground />
       <div className="relative z-10 flex flex-col flex-1 w-full max-w-[500px] mx-auto">
         <header className="p-4 border-b border-border/50 shrink-0">
-          <h1 className="font-display text-2xl sm:text-3xl font-bold">
-            Request Pending
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Waiting for {partnerDisplayName} to accept your invite
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold">
+                Request Pending
+              </h1>
+              <p className="text-muted-foreground text-sm mt-1">
+                Waiting for {partnerDisplayName} to accept your invite
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="gap-1.5 shrink-0 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            >
+              <LogOut className="w-4 h-4" />
+              Log out
+            </Button>
+          </div>
         </header>
         <div className="flex-1 flex flex-col min-h-0">
           <PendingPartnerRequestView

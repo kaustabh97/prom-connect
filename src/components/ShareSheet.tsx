@@ -46,12 +46,12 @@ export default function ShareSheet(props: ShareSheetProps) {
     await captureAndShare(cardRef.current, {
       filename:
         props.variant === "referral"
-          ? "prom-connect-referral.png"
-          : "prom-connect-invite.png",
-      shareTitle: "Prom Connect",
+          ? "starlitbythebrick-referral.png"
+          : "starlitbythebrick-invite.png",
+      shareTitle: "Starlit by the Brick",
       shareText:
         props.variant === "referral"
-          ? "Prom Connect – IIMA's anonymous matchmaking for Prom 2026!"
+          ? "Starlit by the Brick – IIMA's anonymous matchmaking for Prom 2026!"
           : `${props.fromName} wants to go to Prom with you!`,
       imageUrls,
     });

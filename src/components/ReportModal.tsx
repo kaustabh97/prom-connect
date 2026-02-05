@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getUserProfile } from "@/utils/auth";
 import { Flag, Loader2 } from "lucide-react";
-const REPORT_EMAIL = "p24kaustabh@iima.ac.in";
+const REPORT_EMAIL = "mosaic@iima.ac.in";
 
 /** Fallback: open Gmail with report pre-filled */
 function openGmailReportFallback(
@@ -23,7 +23,7 @@ function openGmailReportFallback(
   reporterEmail?: string,
   reporterName?: string
 ) {
-  const subject = encodeURIComponent("Prom Connect – Report");
+  const subject = encodeURIComponent("Starlit by the Brick – Report");
   const bodyParts: string[] = [];
   if (personName || personId) {
     bodyParts.push(`Reporting: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`);
@@ -51,7 +51,7 @@ async function sendReportViaFormSubmit(
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({
-      _subject: "Prom Connect – Report",
+      _subject: "Starlit by the Brick – Report",
       _template: "table",
       _captcha: "false",
       "Report details": text,
@@ -81,7 +81,7 @@ export default function ReportModal({
   onOpenChange,
   personName,
   personId,
-  context = "Prom Connect",
+  context = "Starlit by the Brick",
   reporterEmail,
   reporterName,
 }: ReportModalProps) {
@@ -118,7 +118,7 @@ export default function ReportModal({
         reporterNameToUse
       );
       if (result.ok) {
-        toast({ title: "Report sent", description: "Thank you for helping keep Prom Connect safe." });
+        toast({ title: "Report sent", description: "Thank you for helping keep Starlit by the Brick safe." });
         setReportText("");
         onOpenChange(false);
       } else {

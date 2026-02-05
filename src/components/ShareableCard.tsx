@@ -16,7 +16,7 @@ export function ReferralShareCard() {
           <Sparkles className="h-8 w-8 text-primary" />
         </div>
         <h2 className="font-display text-2xl font-bold text-foreground">
-          Prom Connect
+          Starlit by the Brick
         </h2>
         <p className="mt-2 text-base text-muted-foreground">
           IIMA&apos;s anonymous matchmaking for Prom 2026
@@ -71,7 +71,7 @@ export function PartnerInviteShareCard({
           {fromName}
         </h2>
         <p className="mt-4 text-sm text-muted-foreground">
-          Join Prom Connect and accept their invite – your dance floor awaits! 💃🕺
+          Join Starlit by the Brick and accept their invite – your dance floor awaits! 💃🕺
         </p>
         <p className="mt-6 font-playfair text-xl text-primary">
           Save the date – 15th Feb, 8 PM ✨
