@@ -26,8 +26,7 @@ export const auth = defineAuth({
         'http://localhost:8080/',
         'http://localhost:8080/auth',
         'https://starlitbythebricks.in/auth',
-        'https://starlitbythebricks.in/',
-        // 'https://main.d1emd9gkgd3wf8.amplifyapp.com'
+        'https://starlitbythebricks.in/'
       ],
     },
   },

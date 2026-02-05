@@ -456,9 +456,24 @@ export default function Profile() {
         <div className="relative z-10 w-full max-w-md">
           <div className="glass rounded-2xl p-6 text-center">
             <p className="text-muted-foreground mb-4">Profile not found.</p>
-            <Button variant="outline" onClick={() => navigate("/onboarding")}>
-              Complete Onboarding
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button variant="outline" onClick={() => navigate("/onboarding")}>
+                Complete Onboarding
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4" />
+                )}
+                Log out
+              </Button>
+            </div>
           </div>
         </div>
       </div>
