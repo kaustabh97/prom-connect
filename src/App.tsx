@@ -13,7 +13,9 @@ import Matches from "./pages/Matches";
 import TestChat from "./pages/TestChat";
 import Profile from "./pages/Profile";
 import PromDate from "./pages/PromDate";
+import MatchmakingComingSoon from "./pages/MatchmakingComingSoon";
 import NotFound from "./pages/NotFound";
+import { MATCHMAKING_ENABLED } from "@/config";
 
 import { useEffect } from "react";
 import { Amplify } from "aws-amplify";
@@ -61,10 +63,11 @@ const App = () => (
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/couple-complete" element={<CoupleCompleteRedirect />} />
           <Route element={<AppLayout />}>
-            <Route path="/discover" element={<Navigate to="/discover/profile" replace />} />
-            <Route path="/discover/profile" element={<Discover />} />
-            <Route path="/discover/profile/:profileId" element={<FullProfileView />} />
-            <Route path="/matches" element={<Matches />} />
+            <Route path="/discover" element={<Navigate to={MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon"} replace />} />
+            <Route path="/discover/profile" element={MATCHMAKING_ENABLED ? <Discover /> : <Navigate to="/matchmaking-soon" replace />} />
+            <Route path="/discover/profile/:profileId" element={MATCHMAKING_ENABLED ? <FullProfileView /> : <Navigate to="/matchmaking-soon" replace />} />
+            <Route path="/matches" element={MATCHMAKING_ENABLED ? <Matches /> : <Navigate to="/matchmaking-soon" replace />} />
+            <Route path="/matchmaking-soon" element={<MatchmakingComingSoon />} />
             <Route path="/prom-date" element={<PromDate />} />
             <Route path="/profile" element={<Profile />} />
           </Route>

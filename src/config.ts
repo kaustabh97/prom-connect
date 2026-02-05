@@ -53,3 +53,15 @@ export const ENABLE_BACKEND_PROFILE_FETCH = true;
  * - User profiles are saved to backend database
  */
 export const GOOGLE_LOGIN_CHECK = false;
+
+/**
+ * Enable/disable matchmaking (Discover, Matches, Chat)
+ *
+ * When false:
+ * - After onboarding, show "Matchmaking will start soon" page
+ * - Only Profile page is accessible (no Discover, Matches)
+ *
+ * When true:
+ * - Normal flow: Discover, Matches, Chat, Profile
+ */
+export const MATCHMAKING_ENABLED = false;

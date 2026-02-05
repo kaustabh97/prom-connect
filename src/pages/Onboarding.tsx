@@ -22,7 +22,7 @@ import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
 import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
@@ -224,7 +224,7 @@ const Onboarding = () => {
           // Check if user has already completed onboarding
           const completed = await hasCompletedOnboarding();
           if (completed) {
-            navigate("/discover/profile?openFilters=1");
+            navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
             return;
           }
 
@@ -806,15 +806,15 @@ const Onboarding = () => {
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
           const hasPending = (requestsToMe ?? []).some((r) => r.status === "pending");
-          if (hasPending) {
+          if (hasPending && MATCHMAKING_ENABLED) {
             navigate("/matches");
             setIsSaving(false);
             return;
           }
         } catch (_) {}
-        console.log("[Onboarding] Navigating to discover page...");
+        console.log("[Onboarding] Navigating to post-onboarding page...");
         console.log("[Onboarding] ========================================");
-        navigate("/discover/profile?openFilters=1");
+        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
         console.error("[Onboarding] ❌ Failed to save user profile:", {
           error,
@@ -964,8 +964,8 @@ const Onboarding = () => {
         console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
       }
 
-      // Sender always goes to discover; show "request pending with partner" there
-      navigate("/discover/profile?openFilters=1");
+      // Sender goes to discover (or matchmaking-soon if disabled)
+      navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
@@ -2069,7 +2069,7 @@ const Onboarding = () => {
 
       <div className="relative z-10 flex-1 flex flex-col w-full max-w-[500px] mx-auto">
         {/* Onboarding header: back, step counter, logout on same line; progress bar below */}
-        <header className="shrink-0 border-b border-primary/20 bg-background/70 backdrop-blur-md">
+        <header className="shrink-0 border-b border-border/50 bg-transparent">
           <div className="px-4 pt-4 pb-4">
             {/* Single row: Back | Step counter | Log out */}
             <div className="flex items-center justify-between gap-3 mb-3">

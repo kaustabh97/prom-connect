@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { signOut } from "aws-amplify/auth";
@@ -7,10 +7,11 @@ import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile, clearTestUser } from "@/utils/auth";
 import { usePromDate } from "@/hooks/usePromDate";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
-import { getUrl } from "aws-amplify/storage";
+import { getUrl, uploadData } from "aws-amplify/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sheet,
@@ -26,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote, LogOut } from "lucide-react";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote, LogOut, Camera } from "lucide-react";
 import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import SparkleBackground from "@/components/SparkleBackground";
 
@@ -129,6 +130,12 @@ export default function Profile() {
   const [preferencesEditValues, setPreferencesEditValues] = useState<Record<string, string>>({});
   const [savingPreferences, setSavingPreferences] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
+  const [showBioEditSheet, setShowBioEditSheet] = useState(false);
+  const [bioEditValue, setBioEditValue] = useState("");
+  const [savingBio, setSavingBio] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
   const { promDate } = usePromDate({ currentUserId: profile?.id ?? "" });
@@ -189,6 +196,73 @@ export default function Profile() {
     });
     setPreferencesEditValues(vals);
     setShowPreferencesEditSheet(true);
+  };
+
+  const openBioEdit = () => {
+    setBioEditValue(profile?.bio || "");
+    setShowBioEditSheet(true);
+  };
+
+  const saveBio = async () => {
+    if (!profile?.id) return;
+    setSavingBio(true);
+    try {
+      // @ts-ignore - authMode
+      const { errors } = await client.models.UserProfile.update(
+        { id: profile.id, email: profile.email, bio: bioEditValue.trim() || undefined },
+        authMode ? { authMode } : undefined
+      );
+      if (errors) throw new Error(errors[0]?.message);
+      setProfile((prev) => prev ? { ...prev, bio: bioEditValue.trim() || undefined } : null);
+      setShowBioEditSheet(false);
+    } catch (err) {
+      console.error("Failed to save bio:", err);
+    } finally {
+      setSavingBio(false);
+    }
+  };
+
+  const handleProfilePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile?.id) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoUploadError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPhotoUploadError("Image must be under 5MB");
+      return;
+    }
+    setPhotoUploadError(null);
+    setUploadingPhoto(true);
+    try {
+      const timestamp = Date.now();
+      const ext = file.name.split(".").pop() || "jpg";
+      const fileName = `profile-${timestamp}.${ext}`;
+      const pathFn = ({ identityId }: { identityId: string }) =>
+        `profile-pics/${identityId}/${fileName}`;
+      const result = await uploadData({
+        path: pathFn,
+        data: file,
+        options: { contentType: file.type, bucket: "userPhotos" },
+      }).result;
+      const s3Path = (result as { path?: string }).path ?? `profile-pics/${fileName}`;
+      // @ts-ignore - authMode
+      const { errors } = await client.models.UserProfile.update(
+        { id: profile.id, email: profile.email, profilePicKey: s3Path },
+        authMode ? { authMode } : undefined
+      );
+      if (errors) throw new Error(errors[0]?.message);
+      setProfile((prev) => prev ? { ...prev, profilePicKey: s3Path } : null);
+      const { url } = await getUrl({ path: s3Path, options: { bucket: "userPhotos" } });
+      setProfilePicUrl(url.toString());
+    } catch (err) {
+      console.error("Failed to upload photo:", err);
+      setPhotoUploadError(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const savePreferences = async () => {
@@ -511,7 +585,14 @@ export default function Profile() {
               className="rounded-2xl overflow-hidden bg-background border border-border/50 shadow-float flex flex-col"
             >
               {/* Hero photo area (like SwipeCard) */}
-              <div className="relative aspect-[4/5] w-full bg-muted shrink-0 min-h-[280px]">
+              <div className="relative aspect-[4/5] w-full bg-muted shrink-0 min-h-[280px] group">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfilePhotoSelect}
+                  className="hidden"
+                />
                 {profilePicUrl || authProfile?.picture ? (
                   <img
                     src={profilePicUrl || authProfile?.picture || ""}
@@ -527,6 +608,24 @@ export default function Profile() {
                       </AvatarFallback>
                     </Avatar>
                   </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="absolute bottom-14 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-black/50 hover:bg-black/70 text-white text-sm font-medium disabled:cursor-wait"
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
+                  {uploadingPhoto ? "Uploading..." : "Change photo"}
+                </button>
+                {photoUploadError && (
+                  <p className="absolute bottom-2 left-2 right-2 text-xs text-destructive bg-black/60 px-2 py-1 rounded">
+                    {photoUploadError}
+                  </p>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent pointer-events-none" />
                 <div className="absolute bottom-4 left-4 right-4 text-white">
@@ -566,20 +665,60 @@ export default function Profile() {
             </motion.div>
 
             {/* Bio tile */}
-            {profile.bio && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
-              >
-                <h3 className="font-display font-semibold text-lg mb-3 flex items-center gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="rounded-2xl p-6 border border-border/50 bg-background/60 backdrop-blur-sm shadow-float"
+            >
+              <h3 className="font-display font-semibold text-lg mb-3 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
                   <User className="w-5 h-5 text-primary" />
                   About Me
-                </h3>
+                </span>
+                <Button variant="ghost" size="sm" onClick={openBioEdit}>
+                  {profile.bio ? "Edit" : "Add"}
+                </Button>
+              </h3>
+              {profile.bio ? (
                 <p className="text-muted-foreground leading-relaxed">{profile.bio}</p>
-              </motion.div>
-            )}
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Tell others a bit about yourself. What makes you you?
+                  </p>
+                  <Button variant="outline" onClick={openBioEdit}>
+                    Add bio
+                  </Button>
+                </>
+              )}
+            </motion.div>
+
+            {/* Bio Edit Sheet */}
+            <Sheet open={showBioEditSheet} onOpenChange={setShowBioEditSheet}>
+              <SheetContent side="right" className="overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>About Me</SheetTitle>
+                </SheetHeader>
+                <p className="text-sm text-muted-foreground mt-2 mb-6">
+                  Write a short bio to help others get to know you.
+                </p>
+                <Textarea
+                  value={bioEditValue}
+                  onChange={(e) => setBioEditValue(e.target.value)}
+                  placeholder="Tell others about yourself..."
+                  className="min-h-[140px] resize-none"
+                />
+                <div className="flex gap-2 mt-8">
+                  <Button variant="outline" onClick={() => setShowBioEditSheet(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button onClick={saveBio} disabled={savingBio} className="flex-1">
+                    {savingBio ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
 
             {/* Tags/Interests tile */}
             {profile.tags && profile.tags.length > 0 && (

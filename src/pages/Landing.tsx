@@ -18,22 +18,22 @@ const Landing = () => {
     {
       icon: Users,
       title: "Campus Only",
-      description: "Exclusively for the IIMA community. Sign in with your @iima.ac.in email to access real profiles of your peers.",
+      description: "Exclusively for IIMA. Sign in with your @iima.ac.in email and you're in. Real people from your campus, no strangers.",
     },
     {
       icon: Filter,
       title: "Set Your Preferences",
-      description: "Use filters and non-negotiables to discover people who align with what matters to you. You're in control.",
+      description: "Pick your filters and non-negotiables. Only see people who match what you're looking for.",
     },
     {
       icon: Heart,
-      title: "Swipe to Connect",
-      description: "Browse profiles and swipe to express interest. When interest is mutual, you match and can start chatting.",
+      title: "Swipe and Match",
+      description: "Browse profiles and swipe right if you're interested. When it's mutual, you match and can start chatting.",
     },
     {
       icon: MessageSquare,
-      title: "Chat & Decide",
-      description: "Get to know your matches through conversation. Decide together whether prom feels right for both of you.",
+      title: "Chat Before Prom",
+      description: "Get to know your matches. When it feels right, ask them to prom. No pressure, take your time.",
     },
   ];
 
@@ -46,7 +46,7 @@ const Landing = () => {
           aria-label="Website is in beta testing"
         >
           <FlaskConical className="w-6 h-6 shrink-0" />
-          <span>This site is in beta testing. Thank you for helping us improve.</span>
+          <span>We're still testing. Thanks for being early and helping us improve.</span>
         </div>
       )}
       <Suspense fallback={null}>
@@ -78,7 +78,7 @@ const Landing = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-12"
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">IIM Ahmedabad Exclusive</span>
+            <span className="text-sm font-medium text-muted-foreground">IIMA Prom 2026</span>
           </motion.div>
 
           {/* Headline – single h1, no nesting */}
@@ -114,7 +114,7 @@ const Landing = () => {
           </motion.div>
 
           <motion.p {...HERO_FADE} transition={{ delay: 0.5, duration: 0.8 }} className="text-xl md:text-2xl text-muted-foreground mt-14 mb-2 font-light">
-            Real profiles. Real connections.
+            Prom 2026 just got easier.
           </motion.p>
 
           <motion.p
@@ -123,7 +123,7 @@ const Landing = () => {
             transition={{ delay: 0.6, duration: 0.8 }}
             className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto"
           >
-            Find your prom match on campus. Set your preferences, discover compatible peers, and chat when it’s mutual. Real people. Real connections.
+            Find your date from campus. Set your preferences, swipe through real profiles, and chat when you both match. No strangers, just IIMA.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -191,10 +191,10 @@ const Landing = () => {
             className="text-center mb-16"
           >
             <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-              How <span className="text-gradient-gold">Matchmaking</span> Works
+              How it <span className="text-gradient-gold">works</span>
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              A straightforward process designed to help you find compatible connections
+              Four simple steps to find your prom date.
             </p>
           </motion.div>
 
@@ -225,19 +225,18 @@ const Landing = () => {
               </div>
               
               <h3 className="font-display text-3xl md:text-4xl font-bold mb-4">
-                Why This Works for <span className="text-gradient-gold">IIMA</span>
+                Why this works for <span className="text-gradient-gold">IIMA</span>
               </h3>
               
               <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                Built around shared context, campus life, and the reality of prom. 
-                Designed to make finding a date straightforward and fun—no guessing games.
+                You share the same campus and the same moment. Prom is the next big night. We built this so finding a date is easy and fun.
               </p>
 
               <div className="grid sm:grid-cols-3 gap-6 text-left">
                 {[
-                  { title: "Real Profiles", desc: "See authentic profiles of your peers. No masks, no mystery—just real people." },
-                  { title: "IIMA Verified", desc: "Every user is authenticated through their @iima.ac.in email address." },
-                  { title: "Intentional Discovery", desc: "Set preferences and non-negotiables to find people who align with you." },
+                  { title: "Real People", desc: "Every profile is someone from campus. No strangers, just people you might know." },
+                  { title: "IIMA Verified", desc: "Sign in with your IIMA email. Everyone here is from campus." },
+                  { title: "You're in Control", desc: "Set your filters and preferences. Only see people who match what you want." },
                 ].map((item) => (
                   <div key={item.title} className="p-4 rounded-xl bg-card/50">
                     <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
@@ -259,10 +258,10 @@ const Landing = () => {
           transition={{ duration: 0.6 }}
         >
           <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            Ready to discover your <span className="text-gradient-rose">prom connection</span>?
+            Ready to find your <span className="text-gradient-rose">prom date</span>?
           </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-            Join your IIMA peers in a thoughtful matchmaking experience designed to make prom genuinely fun and intentional.
+            Your peers are already here. Set up your profile, swipe, chat when it matches, and maybe you'll walk in together on the big night.
           </p>
           <Button variant="gold" size="xl" onClick={() => navigate("/auth")}>
             Get Started

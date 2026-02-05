@@ -40,11 +40,15 @@ export default function BottomNav() {
   // Prom Date is a dead-end page – hide nav when on it or when matched (prevents nav after chat)
   if (hasPromDate || isOnPromDatePage) return null;
 
-  const navItems = [...discoverNavItems, { path: "/profile", label: "Profile", icon: User }];
+  const navItems = MATCHMAKING_ENABLED
+    ? [...discoverNavItems, { path: "/profile", label: "Profile", icon: User }]
+    : [...matchmakingSoonNavItems, { path: "/profile", label: "Profile", icon: User }];
 
   const isActive = (path: string) => {
     if (path === "/discover/profile")
       return location.pathname === "/discover/profile" || location.pathname.startsWith("/discover/profile/");
+    if (path === "/matchmaking-soon")
+      return location.pathname === "/matchmaking-soon";
     if (path === "/prom-date")
       return location.pathname === "/prom-date";
     if (path === "/profile")

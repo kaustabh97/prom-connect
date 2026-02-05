@@ -8,7 +8,7 @@ import { Heart, Mail, FlaskConical } from "lucide-react";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
-import { BETA_MODE, GOOGLE_LOGIN_CHECK } from "@/config";
+import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -39,8 +39,7 @@ const Auth = () => {
         setIsLoading(false);
         
         if (completed) {
-          // Redirect to discover page if onboarding is completed
-          navigate("/discover/profile");
+          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
         } else {
           // Redirect to onboarding if not completed
           navigate("/onboarding");
@@ -117,7 +116,7 @@ const Auth = () => {
       if (profiles && profiles.length > 0) {
         const backendProfile = profiles[0];
         if (backendProfile.onboardingCompleted) {
-          navigate("/discover/profile");
+          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
           return;
         }
       }
