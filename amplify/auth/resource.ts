@@ -20,7 +20,8 @@ export const auth = defineAuth({
         'http://localhost:8080/auth',
         'https://starlitbythebricks.in/auth',
         'https://starlitbythebricks.in/onboarding',
-        'https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse'
+        'https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse',
+        'https://d0aa65b8303f8747775b.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse'
       ],
       logoutUrls: [
         'http://localhost:8080/',

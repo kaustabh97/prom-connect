@@ -53,18 +53,24 @@ When deploying via AWS Amplify Console (pipeline deployments), secrets must be s
 
 ## Google OAuth "invalid request" fix
 
-If you see "You can't sign in because this app sent an invalid request" when signing in with Google:
+If you see "You can't sign in because this app sent an invalid request" or "doesn't comply with Google's OAuth 2.0 policy" when signing in with Google:
 
 1. Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**.
 2. Click your **OAuth 2.0 Client ID** (Web application).
-3. Under **Authorized redirect URIs**, add this **exact** URI (use the Cognito domain from your `amplify_outputs.json` → `auth.oauth.domain`):
-   - `https://<YOUR_COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
-   - Example: `https://f9338aec6e5fd2048b1c.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+3. Under **Authorized redirect URIs**, add **ALL** of these URIs:
+   - **Development/Sandbox**: `https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+   - **Production**: `https://d0aa65b8303f8747775b.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+   - **For any new environments**: `https://<YOUR_COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+     - Find your Cognito domain in AWS Amplify Console → your app → Backend environments → your branch → View details → Auth → Domain
 4. Under **Authorized JavaScript origins**, add:
    - `http://localhost:8080`
    - `http://localhost:8081`
-   - `https://<YOUR_COGNITO_DOMAIN>.auth.ap-south-1.amazoncognito.com`
+   - `https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com` (development)
+   - `https://d0aa65b8303f8747775b.auth.ap-south-1.amazoncognito.com` (production)
+   - `https://starlitbythebricks.in` (production domain)
 5. Save. Changes can take a few minutes to apply.
+
+**Note**: Each Amplify environment (sandbox, main branch, etc.) gets its own Cognito domain. You must add the redirect URI for each domain you use.
 
 PRODUCTION URL FOR NOW: https://main.d1emd9gkgd3wf8.amplifyapp.com/
 
