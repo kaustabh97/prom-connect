@@ -63,30 +63,32 @@ type UserProfileData = {
   lateNightRitual?: string | null;
   perfectSaturdayAtIIMA?: string | null;
   goToBollywoodSong?: string | null;
-  pollTniteOrStayIn?: string | null;
   poll145Surprises?: string | null;
-  pollTeaPostOrNestle?: string | null;
   pollMaggiOrChai?: string | null;
-  pollDormOrLibrary?: string | null;
   pollSectionOrBatch?: string | null;
-  pollLKPOrHeritage?: string | null;
-  pollMorningOrAfternoon?: string | null;
-  pollCROrLKP?: string | null;
+  pollDormOrLibrary?: string | null;
+  pollNetflixOrGoingOut?: string | null;
+  pollTextingOrCalling?: string | null;
+  pollSurpriseOrPlanned?: string | null;
+  pollDeepOrSilly?: string | null;
+  pollBoredInRoom?: string | null;
+  pollCasualOrDressed?: string | null;
   onboardingCompleted?: boolean | null;
   profilePicKey?: string | null;
 };
 
-// This or That polls - IIMA specific
+// This or That polls: 5 IIMA + 5 general (interleaved)
 const POLLS: { key: keyof UserProfileData; optionA: string; optionB: string; label: string }[] = [
-  { key: "pollTniteOrStayIn", optionA: "Tnite", optionB: "Stay in", label: "Tuesday night?" },
-  { key: "poll145Surprises", optionA: "Love them", optionB: "Avoid them", label: "1:45 surprises?" },
-  { key: "pollTeaPostOrNestle", optionA: "Tea Post", optionB: "Nestlé", label: "Chai spot?" },
-  { key: "pollMaggiOrChai", optionA: "Maggi", optionB: "Chai", label: "2am craving?" },
-  { key: "pollDormOrLibrary", optionA: "Dorm", optionB: "Library", label: "Late-night grind?" },
+  { key: "pollTextingOrCalling", optionA: "Texting", optionB: "Calling", label: "How do you reach out?" },
+  { key: "poll145Surprises", optionA: "Love them", optionB: "Hate them", label: "1:45 surprises?" },
+  { key: "pollSurpriseOrPlanned", optionA: "Surprise plans", optionB: "Plan ahead", label: "Planning style?" },
+  { key: "pollMaggiOrChai", optionA: "Maggi", optionB: "Chai / Coffee", label: "2am craving?" },
+  { key: "pollDeepOrSilly", optionA: "Deep talks", optionB: "Silly banter", label: "Conversation vibe?" },
   { key: "pollSectionOrBatch", optionA: "Section party", optionB: "Batch party", label: "Party vibe?" },
-  { key: "pollLKPOrHeritage", optionA: "LKP", optionB: "Heritage walk", label: "Evening stroll?" },
-  { key: "pollMorningOrAfternoon", optionA: "Morning class", optionB: "Afternoon class", label: "Preferred slot?" },
-  { key: "pollCROrLKP", optionA: "CR", optionB: "LKP", label: "Weekend hangout?" },
+  { key: "pollDormOrLibrary", optionA: "Dorm", optionB: "Library", label: "Late-night grind?" },
+  { key: "pollBoredInRoom", optionA: "Walk & Talk", optionB: "Sit and vibe", label: "Bored in your room?" },
+  { key: "pollNetflixOrGoingOut", optionA: "Stay in", optionB: "Going out", label: "Perfect evening?" },
+  { key: "pollCasualOrDressed", optionA: "Casual outfit", optionB: "Dressed up", label: "Going-out look?" },
 ];
 
 // Preference options (matches onboarding)
@@ -97,20 +99,15 @@ const favouritePlaceOptions = ["Tea Post", "Nestlé", "Bhavesh Bhai", "CR Lawns"
 const teaOrCoffeeOptions = ["Tea", "Coffee", "Both", "None"];
 const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
 
+// Fun answers: 7 total, 3 IIMA + 4 normal (free-text, interleaved)
 const FUN_QUESTIONS: { key: keyof UserProfileData; label: string; placeholder: string }[] = [
-  // IIMA-specific
-  { key: "favouriteChaiSpot", label: "Favourite chai adda on campus?", placeholder: "e.g. Tea Post, Nestlé, Room chai" },
-  { key: "messOrOutside", label: "Mess loyalist or outside foodie?", placeholder: "e.g. Mess loyalist, Depends on the day" },
+  { key: "perfectSaturdayAtIIMA", label: "Perfect weekend at IIMA looks like?", placeholder: "e.g. Sleep in, section hangout, movie night" },
+  { key: "secretTalent", label: "Secret talent nobody knows?", placeholder: "e.g. I can quote SRK dialogues" },
   { key: "bestDateSpotOnCampus", label: "Best spot for a date on campus?", placeholder: "e.g. Heritage walk, Tea Post" },
+  { key: "favouriteMovieGenre", label: "Favourite movie genre?", placeholder: "e.g. Rom-com, Thriller, Sci-fi" },
   { key: "lateNightRitual", label: "Late-night ritual at IIMA?", placeholder: "e.g. Maggi run, 2am chai at Tea Post" },
-  { key: "perfectSaturdayAtIIMA", label: "Perfect Saturday at IIMA looks like?", placeholder: "e.g. Sleep in, chai, then section party" },
-  // Indian prom themed
-  { key: "idealPromOutfit", label: "Ideal prom outfit?", placeholder: "e.g. Saree, Kurta, Western, Fusion" },
-  { key: "bollywoodOrEnglishAtProm", label: "Bollywood or English at prom?", placeholder: "e.g. Bollywood, Both" },
-  { key: "goToBollywoodSong", label: "Go-to Bollywood song for the dance floor?", placeholder: "e.g. Pehla Nasha" },
-  // General fun
-  { key: "morningOrNightPerson", label: "Morning person or night owl?", placeholder: "e.g. Night owl" },
-  { key: "secretTalent", label: "Secret talent nobody knows", placeholder: "e.g. I can quote SRK dialogues" },
+  { key: "goToKaraokeSong", label: "Go-to karaoke song?", placeholder: "e.g. Pehla Nasha, Aashiqui" },
+  { key: "superpowerChoice", label: "Pick a superpower?", placeholder: "e.g. Invisibility, Time travel" },
 ];
 
 export default function Profile() {
@@ -318,25 +315,12 @@ export default function Profile() {
     setSavingFun(true);
     try {
       // @ts-ignore - authMode
+      const updateData: Record<string, string | undefined> = { id: profile.id, email: profile.email };
+      FUN_QUESTIONS.forEach(({ key }) => {
+        updateData[key] = funEditValues[key] || undefined;
+      });
       const { errors } = await client.models.UserProfile.update(
-        {
-          id: profile.id,
-          email: profile.email,
-          morningOrNightPerson: funEditValues.morningOrNightPerson || undefined,
-          idealWeekend: funEditValues.idealWeekend || undefined,
-          goToKaraokeSong: funEditValues.goToKaraokeSong || undefined,
-          superpowerChoice: funEditValues.superpowerChoice || undefined,
-          favouriteMovieGenre: funEditValues.favouriteMovieGenre || undefined,
-          secretTalent: funEditValues.secretTalent || undefined,
-          favouriteChaiSpot: funEditValues.favouriteChaiSpot || undefined,
-          idealPromOutfit: funEditValues.idealPromOutfit || undefined,
-          messOrOutside: funEditValues.messOrOutside || undefined,
-          bestDateSpotOnCampus: funEditValues.bestDateSpotOnCampus || undefined,
-          bollywoodOrEnglishAtProm: funEditValues.bollywoodOrEnglishAtProm || undefined,
-          lateNightRitual: funEditValues.lateNightRitual || undefined,
-          perfectSaturdayAtIIMA: funEditValues.perfectSaturdayAtIIMA || undefined,
-          goToBollywoodSong: funEditValues.goToBollywoodSong || undefined,
-        },
+        updateData,
         authMode ? { authMode } : undefined
       );
       if (errors) throw new Error(errors[0]?.message);
@@ -761,11 +745,8 @@ export default function Profile() {
             )}
 
             {/* Fun Answers */}
-            {(profile.morningOrNightPerson || profile.idealWeekend || profile.goToKaraokeSong ||
-              profile.superpowerChoice || profile.favouriteMovieGenre || profile.secretTalent ||
-              profile.favouriteChaiSpot || profile.idealPromOutfit || profile.messOrOutside ||
-              profile.bestDateSpotOnCampus || profile.bollywoodOrEnglishAtProm || profile.lateNightRitual ||
-              profile.perfectSaturdayAtIIMA || profile.goToBollywoodSong) && (
+            {(profile.perfectSaturdayAtIIMA || profile.secretTalent || profile.bestDateSpotOnCampus ||
+              profile.favouriteMovieGenre || profile.lateNightRitual || profile.goToKaraokeSong || profile.superpowerChoice) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -782,58 +763,10 @@ export default function Profile() {
                   </Button>
                 </h3>
                 <div className="space-y-3">
-                  {profile.favouriteChaiSpot && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Favourite chai adda</span>
-                      <p className="text-sm font-medium">{profile.favouriteChaiSpot}</p>
-                    </div>
-                  )}
-                  {profile.messOrOutside && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Mess or outside?</span>
-                      <p className="text-sm font-medium">{profile.messOrOutside}</p>
-                    </div>
-                  )}
-                  {profile.bestDateSpotOnCampus && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Best date spot on campus</span>
-                      <p className="text-sm font-medium">{profile.bestDateSpotOnCampus}</p>
-                    </div>
-                  )}
-                  {profile.lateNightRitual && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Late-night ritual</span>
-                      <p className="text-sm font-medium">{profile.lateNightRitual}</p>
-                    </div>
-                  )}
                   {profile.perfectSaturdayAtIIMA && (
                     <div>
-                      <span className="text-xs text-muted-foreground">Perfect Saturday at IIMA</span>
+                      <span className="text-xs text-muted-foreground">Perfect weekend</span>
                       <p className="text-sm font-medium">{profile.perfectSaturdayAtIIMA}</p>
-                    </div>
-                  )}
-                  {profile.idealPromOutfit && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Ideal prom outfit</span>
-                      <p className="text-sm font-medium">{profile.idealPromOutfit}</p>
-                    </div>
-                  )}
-                  {profile.bollywoodOrEnglishAtProm && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Bollywood or English at prom?</span>
-                      <p className="text-sm font-medium">{profile.bollywoodOrEnglishAtProm}</p>
-                    </div>
-                  )}
-                  {profile.goToBollywoodSong && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Go-to Bollywood song</span>
-                      <p className="text-sm font-medium">{profile.goToBollywoodSong}</p>
-                    </div>
-                  )}
-                  {profile.morningOrNightPerson && (
-                    <div>
-                      <span className="text-xs text-muted-foreground">Morning or night person?</span>
-                      <p className="text-sm font-medium">{profile.morningOrNightPerson}</p>
                     </div>
                   )}
                   {profile.secretTalent && (
@@ -842,17 +775,44 @@ export default function Profile() {
                       <p className="text-sm font-medium">{profile.secretTalent}</p>
                     </div>
                   )}
+                  {profile.bestDateSpotOnCampus && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Best date spot on campus</span>
+                      <p className="text-sm font-medium">{profile.bestDateSpotOnCampus}</p>
+                    </div>
+                  )}
+                  {profile.favouriteMovieGenre && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Favourite movie genre</span>
+                      <p className="text-sm font-medium">{profile.favouriteMovieGenre}</p>
+                    </div>
+                  )}
+                  {profile.lateNightRitual && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Late-night ritual</span>
+                      <p className="text-sm font-medium">{profile.lateNightRitual}</p>
+                    </div>
+                  )}
+                  {profile.goToKaraokeSong && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Go-to karaoke song</span>
+                      <p className="text-sm font-medium">{profile.goToKaraokeSong}</p>
+                    </div>
+                  )}
+                  {profile.superpowerChoice && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Superpower</span>
+                      <p className="text-sm font-medium">{profile.superpowerChoice}</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
 
             {/* Add Fun Answers CTA - when none added yet */}
             {!(
-              profile.morningOrNightPerson || profile.idealWeekend || profile.goToKaraokeSong ||
-              profile.superpowerChoice || profile.favouriteMovieGenre || profile.secretTalent ||
-              profile.favouriteChaiSpot || profile.idealPromOutfit || profile.messOrOutside ||
-              profile.bestDateSpotOnCampus || profile.bollywoodOrEnglishAtProm || profile.lateNightRitual ||
-              profile.perfectSaturdayAtIIMA || profile.goToBollywoodSong
+              profile.perfectSaturdayAtIIMA || profile.secretTalent || profile.bestDateSpotOnCampus ||
+              profile.favouriteMovieGenre || profile.lateNightRitual || profile.goToKaraokeSong || profile.superpowerChoice
             ) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -874,9 +834,9 @@ export default function Profile() {
             )}
 
             {/* This or That Polls */}
-            {(profile.pollTniteOrStayIn || profile.poll145Surprises || profile.pollTeaPostOrNestle ||
-              profile.pollMaggiOrChai || profile.pollDormOrLibrary || profile.pollSectionOrBatch ||
-              profile.pollLKPOrHeritage || profile.pollMorningOrAfternoon || profile.pollCROrLKP) && (
+            {(profile.poll145Surprises || profile.pollMaggiOrChai || profile.pollSectionOrBatch ||
+              profile.pollDormOrLibrary || profile.pollNetflixOrGoingOut || profile.pollTextingOrCalling ||
+              profile.pollSurpriseOrPlanned || profile.pollDeepOrSilly || profile.pollBoredInRoom || profile.pollCasualOrDressed) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -908,9 +868,9 @@ export default function Profile() {
             )}
 
             {/* Add Polls CTA - when none added yet */}
-            {!(profile.pollTniteOrStayIn || profile.poll145Surprises || profile.pollTeaPostOrNestle ||
-              profile.pollMaggiOrChai || profile.pollDormOrLibrary || profile.pollSectionOrBatch ||
-              profile.pollLKPOrHeritage || profile.pollMorningOrAfternoon || profile.pollCROrLKP) && (
+            {!(profile.poll145Surprises || profile.pollMaggiOrChai || profile.pollSectionOrBatch ||
+              profile.pollDormOrLibrary || profile.pollNetflixOrGoingOut || profile.pollTextingOrCalling ||
+              profile.pollSurpriseOrPlanned || profile.pollDeepOrSilly || profile.pollBoredInRoom || profile.pollCasualOrDressed) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

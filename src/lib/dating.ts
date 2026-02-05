@@ -42,16 +42,17 @@ export interface DiscoveryProfileFull {
   lateNightRitual?: string;
   perfectSaturdayAtIIMA?: string;
   goToBollywoodSong?: string;
-  // This or That polls
-  pollTniteOrStayIn?: string;
+  // This or That polls (5 IIMA + 5 general)
   poll145Surprises?: string;
-  pollTeaPostOrNestle?: string;
   pollMaggiOrChai?: string;
-  pollDormOrLibrary?: string;
   pollSectionOrBatch?: string;
-  pollLKPOrHeritage?: string;
-  pollMorningOrAfternoon?: string;
-  pollCROrLKP?: string;
+  pollDormOrLibrary?: string;
+  pollNetflixOrGoingOut?: string;
+  pollTextingOrCalling?: string;
+  pollSurpriseOrPlanned?: string;
+  pollDeepOrSilly?: string;
+  pollBoredInRoom?: string;
+  pollCasualOrDressed?: string;
   // Non-negotiables (for filtering and display)
   nonNegotiables: string[];
 }

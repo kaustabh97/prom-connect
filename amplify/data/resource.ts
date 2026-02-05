@@ -59,16 +59,17 @@ const schema = a.schema({
       perfectSaturdayAtIIMA: a.string(),   // Free text
       goToBollywoodSong: a.string(),       // For karaoke / prom dance
       
-      // Optional This or That polls (IIMA-specific)
-      pollTniteOrStayIn: a.string(),       // Tnite | Stay in
-      poll145Surprises: a.string(),        // Love them | Avoid them
-      pollTeaPostOrNestle: a.string(),     // Tea Post | Nestlé
-      pollMaggiOrChai: a.string(),         // Maggi | Chai
-      pollDormOrLibrary: a.string(),       // Dorm | Library
-      pollSectionOrBatch: a.string(),      // Section party | Batch party
-      pollLKPOrHeritage: a.string(),       // LKP | Heritage walk
-      pollMorningOrAfternoon: a.string(),  // Morning class | Afternoon class
-      pollCROrLKP: a.string(),             // CR | LKP (weekend)
+      // This or That polls: 5 IIMA + 5 general
+      poll145Surprises: a.string(),        // IIMA: Love them | Hate them
+      pollMaggiOrChai: a.string(),         // IIMA: Maggi | Chai / Coffee
+      pollSectionOrBatch: a.string(),      // IIMA: Section party | Batch party
+      pollDormOrLibrary: a.string(),       // IIMA: Dorm | Library
+      pollNetflixOrGoingOut: a.string(),   // Stay in | Going out
+      pollTextingOrCalling: a.string(),    // Texting | Calling
+      pollSurpriseOrPlanned: a.string(),   // Surprise plans | Planned ahead
+      pollDeepOrSilly: a.string(),         // Deep talks | Silly banter
+      pollBoredInRoom: a.string(),         // Walk & Talk | Sit and vibe
+      pollCasualOrDressed: a.string(),     // Casual outfit | Dressed up
       
       // Profile completion status
       onboardingCompleted: a.boolean(),

@@ -266,87 +266,78 @@ export default function FullProfileView() {
           )}
 
           {/* Fun answers */}
-          {(profile.morningOrNightPerson || profile.idealWeekend || profile.goToKaraokeSong ||
-            profile.superpowerChoice || profile.favouriteMovieGenre || profile.secretTalent ||
-            profile.favouriteChaiSpot || profile.idealPromOutfit || profile.messOrOutside ||
-            profile.bestDateSpotOnCampus || profile.bollywoodOrEnglishAtProm || profile.lateNightRitual ||
-            profile.perfectSaturdayAtIIMA || profile.goToBollywoodSong) && (
+          {(profile.perfectSaturdayAtIIMA || profile.secretTalent || profile.bestDateSpotOnCampus ||
+            profile.favouriteMovieGenre || profile.lateNightRitual || profile.goToKaraokeSong || profile.superpowerChoice) && (
             <section>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4" />
                 Fun answers
               </h2>
               <ul className="space-y-2 text-sm">
-                {profile.favouriteChaiSpot && (
-                  <li><span className="text-muted-foreground">Chai adda:</span> {profile.favouriteChaiSpot}</li>
+                {profile.perfectSaturdayAtIIMA && (
+                  <li><span className="text-muted-foreground">Perfect weekend:</span> {profile.perfectSaturdayAtIIMA}</li>
                 )}
-                {profile.messOrOutside && (
-                  <li><span className="text-muted-foreground">Mess or outside:</span> {profile.messOrOutside}</li>
+                {profile.secretTalent && (
+                  <li><span className="text-muted-foreground">Secret talent:</span> {profile.secretTalent}</li>
                 )}
                 {profile.bestDateSpotOnCampus && (
                   <li><span className="text-muted-foreground">Date spot:</span> {profile.bestDateSpotOnCampus}</li>
                 )}
+                {profile.favouriteMovieGenre && (
+                  <li><span className="text-muted-foreground">Favourite movie genre:</span> {profile.favouriteMovieGenre}</li>
+                )}
                 {profile.lateNightRitual && (
                   <li><span className="text-muted-foreground">Late-night ritual:</span> {profile.lateNightRitual}</li>
                 )}
-                {profile.perfectSaturdayAtIIMA && (
-                  <li><span className="text-muted-foreground">Perfect Saturday:</span> {profile.perfectSaturdayAtIIMA}</li>
+                {profile.goToKaraokeSong && (
+                  <li><span className="text-muted-foreground">Karaoke song:</span> {profile.goToKaraokeSong}</li>
                 )}
-                {profile.idealPromOutfit && (
-                  <li><span className="text-muted-foreground">Prom outfit:</span> {profile.idealPromOutfit}</li>
-                )}
-                {profile.bollywoodOrEnglishAtProm && (
-                  <li><span className="text-muted-foreground">Bollywood or English:</span> {profile.bollywoodOrEnglishAtProm}</li>
-                )}
-                {profile.goToBollywoodSong && (
-                  <li><span className="text-muted-foreground">Bollywood song:</span> {profile.goToBollywoodSong}</li>
-                )}
-                {profile.morningOrNightPerson && (
-                  <li><span className="text-muted-foreground">Morning or night:</span> {profile.morningOrNightPerson}</li>
-                )}
-                {profile.secretTalent && (
-                  <li><span className="text-muted-foreground">Secret talent:</span> {profile.secretTalent}</li>
+                {profile.superpowerChoice && (
+                  <li><span className="text-muted-foreground">Superpower:</span> {profile.superpowerChoice}</li>
                 )}
               </ul>
             </section>
           )}
 
           {/* This or That polls */}
-          {(profile.pollTniteOrStayIn || profile.poll145Surprises || profile.pollTeaPostOrNestle ||
-            profile.pollMaggiOrChai || profile.pollDormOrLibrary || profile.pollSectionOrBatch ||
-            profile.pollLKPOrHeritage || profile.pollMorningOrAfternoon || profile.pollCROrLKP) && (
+          {(profile.poll145Surprises || profile.pollMaggiOrChai || profile.pollSectionOrBatch ||
+            profile.pollDormOrLibrary || profile.pollNetflixOrGoingOut || profile.pollTextingOrCalling ||
+            profile.pollSurpriseOrPlanned || profile.pollDeepOrSilly || profile.pollBoredInRoom || profile.pollCasualOrDressed) && (
             <section>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Vote className="w-4 h-4" />
                 This or That
               </h2>
               <ul className="space-y-1.5 text-sm">
-                {profile.pollTniteOrStayIn && (
-                  <li><span className="text-muted-foreground">Tuesday night:</span> {profile.pollTniteOrStayIn}</li>
+                {profile.pollTextingOrCalling && (
+                  <li><span className="text-muted-foreground">Reach out:</span> {profile.pollTextingOrCalling}</li>
                 )}
                 {profile.poll145Surprises && (
                   <li><span className="text-muted-foreground">1:45 surprises:</span> {profile.poll145Surprises}</li>
                 )}
-                {profile.pollTeaPostOrNestle && (
-                  <li><span className="text-muted-foreground">Chai spot:</span> {profile.pollTeaPostOrNestle}</li>
+                {profile.pollSurpriseOrPlanned && (
+                  <li><span className="text-muted-foreground">Planning style:</span> {profile.pollSurpriseOrPlanned}</li>
                 )}
                 {profile.pollMaggiOrChai && (
                   <li><span className="text-muted-foreground">2am craving:</span> {profile.pollMaggiOrChai}</li>
                 )}
-                {profile.pollDormOrLibrary && (
-                  <li><span className="text-muted-foreground">Late-night grind:</span> {profile.pollDormOrLibrary}</li>
+                {profile.pollDeepOrSilly && (
+                  <li><span className="text-muted-foreground">Conversation vibe:</span> {profile.pollDeepOrSilly}</li>
                 )}
                 {profile.pollSectionOrBatch && (
                   <li><span className="text-muted-foreground">Party vibe:</span> {profile.pollSectionOrBatch}</li>
                 )}
-                {profile.pollLKPOrHeritage && (
-                  <li><span className="text-muted-foreground">Evening stroll:</span> {profile.pollLKPOrHeritage}</li>
+                {profile.pollDormOrLibrary && (
+                  <li><span className="text-muted-foreground">Late-night grind:</span> {profile.pollDormOrLibrary}</li>
                 )}
-                {profile.pollMorningOrAfternoon && (
-                  <li><span className="text-muted-foreground">Preferred slot:</span> {profile.pollMorningOrAfternoon}</li>
+                {profile.pollBoredInRoom && (
+                  <li><span className="text-muted-foreground">Bored in your room:</span> {profile.pollBoredInRoom}</li>
                 )}
-                {profile.pollCROrLKP && (
-                  <li><span className="text-muted-foreground">Weekend hangout:</span> {profile.pollCROrLKP}</li>
+                {profile.pollNetflixOrGoingOut && (
+                  <li><span className="text-muted-foreground">Perfect evening:</span> {profile.pollNetflixOrGoingOut}</li>
+                )}
+                {profile.pollCasualOrDressed && (
+                  <li><span className="text-muted-foreground">Going-out look:</span> {profile.pollCasualOrDressed}</li>
                 )}
               </ul>
             </section>
