@@ -614,42 +614,40 @@ export default function Profile() {
                     {photoUploadError}
                   </p>
                 )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="absolute top-4 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 text-midnight-500 hover:from-gold-300 hover:to-gold-400 text-sm font-semibold disabled:cursor-wait shadow-md shrink-0"
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4" />
+                  )}
+                  {uploadingPhoto ? "Uploading..." : "Change photo"}
+                </button>
                 <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2">
                   <span className="px-4 py-2 rounded-full bg-midnight-400/95 text-primary font-playfair text-xl font-bold border border-primary/30 w-fit">
                     {profile.name || "Anonymous"}
                     {profile.age ? `, ${profile.age}` : ""}
                   </span>
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex flex-wrap gap-2">
-                      {profile.gender && (
-                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
-                          {profile.gender}
-                        </span>
-                      )}
-                      {profile.sexualOrientation && (
-                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
-                          {profile.sexualOrientation}
-                        </span>
-                      )}
-                      {profile.height && (
-                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
-                          {profile.height}
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingPhoto}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 text-midnight-500 hover:from-gold-300 hover:to-gold-400 text-sm font-semibold disabled:cursor-wait shadow-md shrink-0 ml-auto"
-                    >
-                      {uploadingPhoto ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Camera className="w-4 h-4" />
-                      )}
-                      {uploadingPhoto ? "Uploading..." : "Change photo"}
-                    </button>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.gender && (
+                      <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                        {profile.gender}
+                      </span>
+                    )}
+                    {profile.sexualOrientation && (
+                      <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                        {profile.sexualOrientation}
+                      </span>
+                    )}
+                    {profile.height && (
+                      <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                        {profile.height}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
