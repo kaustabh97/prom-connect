@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
@@ -9,7 +10,7 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Loader2, LogOut, MessageCircle, Sparkles, User } from "lucide-react";
+import { Loader2, LogOut, MessageCircle, Share2, Sparkles, User } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
 import { clearTestUser } from "@/utils/auth";
@@ -98,6 +99,47 @@ export default function PromDate() {
 
   const showOutsideView = isOutsidePartner && partnerNameFromUrl;
   const showBothView = promDate && !showOutsideView;
+  const shareRef = useRef<HTMLDivElement>(null);
+  const [isSharing, setIsSharing] = useState(false);
+
+  const handleShare = async () => {
+    if (!shareRef.current || isSharing) return;
+    setIsSharing(true);
+    try {
+      const canvas = await html2canvas(shareRef.current, {
+        backgroundColor: "#0f1729",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      canvas.toBlob(
+        async (blob) => {
+          if (!blob) return;
+          const file = new File([blob], "prom-date-invite.png", { type: "image/png" });
+          if (navigator.share && navigator.canShare?.({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: "Prom Date – Save the date!",
+              text: "We're going to Prom together! 15th Feb, 8 PM",
+            });
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "prom-date-invite.png";
+            a.click();
+            URL.revokeObjectURL(url);
+          }
+        },
+        "image/png",
+        0.95
+      );
+    } catch (err) {
+      console.error("Share failed:", err);
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -140,8 +182,22 @@ export default function PromDate() {
   return (
     <div className="h-dvh max-h-dvh overflow-hidden bg-gradient-midnight relative flex flex-col">
       <SparkleBackground />
-      {/* Log out - top right */}
-      <div className="absolute top-4 right-4 z-20">
+      {/* Top bar: Share + Log out */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex justify-between">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleShare}
+          disabled={isSharing}
+          className="gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+        >
+          {isSharing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Share2 className="w-4 h-4" />
+          )}
+          Share
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -152,7 +208,10 @@ export default function PromDate() {
           Log out
         </Button>
       </div>
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32">
+      <div
+        ref={shareRef}
+        className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32 bg-gradient-midnight"
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
