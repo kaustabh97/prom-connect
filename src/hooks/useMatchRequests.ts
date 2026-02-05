@@ -126,8 +126,8 @@ export function useMatchRequests({
               authMode ? { authMode } : undefined
             );
           }
-        } catch (excludeErr) {
-          console.warn("Could not set excludeFromDiscovery:", excludeErr);
+        } catch {
+          // Could not set excludeFromDiscovery
         }
         await loadRequests();
         return true;

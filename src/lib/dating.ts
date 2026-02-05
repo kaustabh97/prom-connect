@@ -140,7 +140,7 @@ export function mapPreferencesToNonNegotiables(
   // Smoking preferences
   if (smokingPreference === "Never") {
     nonNegotiables.push("Non-smoking");
-  } else if (smokingPreference === "Sometimes" || smokingPreference === "Regularly") {
+  } else if (["Passively", "Sometimes", "Regularly"].includes(smokingPreference || "")) {
     nonNegotiables.push("Smoking okay");
   }
 

@@ -30,7 +30,6 @@ export const setTestUser = (email: string, name?: string): void => {
       picture: undefined,
     };
     localStorage.setItem(TEST_USER_STORAGE_KEY, JSON.stringify(testUser));
-    console.log("[Test Mode] Test user set:", testUser);
   }
 };
 
@@ -121,46 +120,6 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
 };
 
 /**
- * Log user profile details to console (useful for debugging)
- * Only logs if user is authenticated
- */
-export const logUserProfile = async () => {
-  try {
-    const session = await fetchAuthSession();
-    if (!session.tokens) {
-      console.log("No active session - user is not authenticated");
-      return null;
-    }
-    
-    const user = await getCurrentUser();
-    
-    console.log("=== Current User Profile ===");
-    console.log("User:", user);
-    console.log("Session:", session);
-    console.log("ID Token Payload:", session.tokens?.idToken?.payload);
-    console.log("Email:", session.tokens?.idToken?.payload.email);
-    console.log("Name:", session.tokens?.idToken?.payload.name);
-    console.log("Picture:", session.tokens?.idToken?.payload.picture);
-    console.log("===========================");
-    
-    return {
-      user,
-      session,
-      email: session.tokens?.idToken?.payload.email,
-      name: session.tokens?.idToken?.payload.name,
-      picture: session.tokens?.idToken?.payload.picture,
-    };
-  } catch (error: any) {
-    if (error?.name === "UserUnAuthenticatedException") {
-      console.log("User is not authenticated");
-    } else {
-      console.error("Error fetching user profile:", error);
-    }
-    return null;
-  }
-};
-
-/**
  * Check if user is currently authenticated (without throwing errors)
  * In test mode, checks if test user exists in localStorage
  */
@@ -191,7 +150,6 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
   const shouldCheckBackend = !GOOGLE_LOGIN_CHECK || ENABLE_BACKEND_PROFILE_FETCH;
   
   if (!shouldCheckBackend) {
-    console.log("[Config] Backend profile fetch is disabled. Skipping onboarding check.");
     return false;
   }
 
@@ -234,9 +192,6 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
 export const getGoogleOAuthRedirectUrl = async (): Promise<string> => {
   try {
     const outputs = await import("../../amplify_outputs.json");
-
-    console.log("agrdipak")
-    console.log(JSON.stringify(outputs, null, 2));
     const cognitoDomain = outputs.default.auth.oauth?.domain;
     if (!cognitoDomain) {
       throw new Error("Cognito domain not found in amplify_outputs.json");
@@ -250,32 +205,3 @@ export const getGoogleOAuthRedirectUrl = async (): Promise<string> => {
   }
 };
 
-/**
- * Log OAuth configuration details for debugging
- */
-export const logOAuthConfig = async () => {
-  try {
-    const outputs = await import("../../amplify_outputs.json");
-    const cognitoDomain = outputs.default.auth.oauth?.domain;
-    const callbackUrls = outputs.default.auth.oauth?.redirect_sign_in_uri;
-    
-    console.log("=== OAuth Configuration ===");
-    console.log("Cognito Hosted UI Domain:", cognitoDomain);
-    console.log("Callback URLs (where Cognito redirects after auth):", callbackUrls);
-    console.log("");
-    
-    const redirectUrl = await getGoogleOAuthRedirectUrl();
-    console.log("🔑 IMPORTANT: Add this URL to Google OAuth Console:");
-    console.log(`   ${redirectUrl}`);
-    console.log("");
-    console.log("The flow is:");
-    console.log("1. User clicks 'Sign in with Google'");
-    console.log("2. Redirects to Cognito Hosted UI");
-    console.log("3. Cognito redirects to Google OAuth");
-    console.log("4. Google redirects back to:", redirectUrl);
-    console.log("5. Cognito processes auth and redirects to:", callbackUrls?.[0]);
-    console.log("===========================");
-  } catch (error) {
-    console.error("Error logging OAuth config:", error);
-  }
-};

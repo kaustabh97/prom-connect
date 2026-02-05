@@ -127,8 +127,8 @@ export default function ReportModal({
         setReportText("");
         onOpenChange(false);
       }
-    } catch (err) {
-      console.warn("[ReportModal] FormSubmit failed, falling back to Gmail:", err);
+    } catch {
+      // FormSubmit failed, fall back to Gmail
       const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
       const reporterNameToUse = reporterName ?? reporterInfo.name;
       openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmailToUse, reporterNameToUse);

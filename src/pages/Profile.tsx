@@ -27,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Loader2, Vote, LogOut, Camera } from "lucide-react";
-import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera } from "lucide-react";
+import { handleReferralShare } from "@/utils/share";
 import SparkleBackground from "@/components/SparkleBackground";
 
 const client = generateClient<Schema>();
@@ -91,10 +91,10 @@ const POLLS: { key: keyof UserProfileData; optionA: string; optionB: string; lab
 
 // Preference options (matches onboarding)
 const alcoholOptions = ["Never", "Sometimes", "Regularly"];
-const smokingOptions = ["Never", "Sometimes", "Regularly"];
-const foodOptions = ["Veg", "Non-Veg", "Eggetarian", "No preference"];
-const favouritePlaceOptions = ["Tea Post", "Library", "LKP", "CR", "Sports Complex", "Nestlé", "Heritage Walk", "Other"];
-const teaOrCoffeeOptions = ["Tea", "Coffee", "Both"];
+const smokingOptions = ["Never", "Passively", "Sometimes", "Regularly"];
+const foodOptions = ["Veg", "Non Veg", "Eggetarian", "Flexible"];
+const favouritePlaceOptions = ["Tea Post", "Nestlé", "Bhavesh Bhai", "CR Lawns", "LKP", "Gym / Sports Complex", "Library", "Mafa Bhai", "Dorm Room", "Other"];
+const teaOrCoffeeOptions = ["Tea", "Coffee", "Both", "None"];
 const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
 
 const FUN_QUESTIONS: { key: keyof UserProfileData; label: string; placeholder: string }[] = [
@@ -370,7 +370,6 @@ export default function Profile() {
 
         // Check if backend profile fetch is enabled
         if (!ENABLE_BACKEND_PROFILE_FETCH) {
-          console.log("[Config] Backend profile fetch is disabled. Showing auth profile only.");
           setError("Profile fetching is currently disabled. Please complete onboarding.");
           return;
         }
@@ -402,8 +401,8 @@ export default function Profile() {
                 options: { bucket: "userPhotos" },
               });
               setProfilePicUrl(url.toString());
-            } catch (err) {
-              console.warn("[Profile] Failed to get profile pic URL:", err);
+            } catch {
+              // Profile pic unavailable
             }
           }
         } else {
@@ -511,7 +510,7 @@ export default function Profile() {
                     <SheetTitle>This or That</SheetTitle>
                   </SheetHeader>
                   <p className="text-sm text-muted-foreground mt-2 mb-6">
-                    IIMA-specific polls. Pick your side for each!
+                    Pick your side on each — the little choices that say a lot about who you are.
                   </p>
                   <div className="space-y-6">
                     {POLLS.map(({ key, label, optionA, optionB }) => (
@@ -561,7 +560,7 @@ export default function Profile() {
                   <SheetTitle>Fun Answers</SheetTitle>
                 </SheetHeader>
                 <p className="text-sm text-muted-foreground mt-2 mb-6">
-                  Add optional fun answers to help others get to know you better.
+                  The fun stuff that makes you, you — optional but great for breaking the ice.
                 </p>
                 <div className="space-y-4">
                   {FUN_QUESTIONS.map(({ key, label, placeholder }) => (
@@ -626,55 +625,53 @@ export default function Profile() {
                     </Avatar>
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  className="absolute bottom-14 right-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-black/50 hover:bg-black/70 text-white text-sm font-medium disabled:cursor-wait"
-                >
-                  {uploadingPhoto ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4" />
-                  )}
-                  {uploadingPhoto ? "Uploading..." : "Change photo"}
-                </button>
                 {photoUploadError && (
                   <p className="absolute bottom-2 left-2 right-2 text-xs text-destructive bg-black/60 px-2 py-1 rounded">
                     {photoUploadError}
                   </p>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent pointer-events-none" />
-                <div className="absolute bottom-4 left-4 right-4 text-white">
-                  <h2 className="font-display text-2xl font-bold drop-shadow-md">
+                <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-2">
+                  <span className="px-4 py-2 rounded-full bg-midnight-400/95 text-primary font-playfair text-xl font-bold border border-primary/30 w-fit">
                     {profile.name || "Anonymous"}
                     {profile.age ? `, ${profile.age}` : ""}
-                    {profile.height ? ` • ${profile.height}` : ""}
-                  </h2>
-                  {(profile.gender || profile.sexualOrientation) && (
-                    <p className="text-sm text-white/90">
-                      {profile.gender && profile.sexualOrientation
-                        ? `${profile.gender} • ${profile.sexualOrientation}`
-                        : (profile.gender || profile.sexualOrientation)}
-                    </p>
-                  )}
+                  </span>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex flex-wrap gap-2">
+                      {profile.gender && (
+                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                          {profile.gender}
+                        </span>
+                      )}
+                      {profile.sexualOrientation && (
+                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                          {profile.sexualOrientation}
+                        </span>
+                      )}
+                      {profile.height && (
+                        <span className="px-3 py-1.5 rounded-full bg-black/50 text-white text-sm backdrop-blur-sm border border-white/20">
+                          {profile.height}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-gold-400 to-gold-500 text-midnight-500 hover:from-gold-300 hover:to-gold-400 text-sm font-semibold disabled:cursor-wait shadow-md shrink-0 ml-auto"
+                    >
+                      {uploadingPhoto ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Camera className="w-4 h-4" />
+                      )}
+                      {uploadingPhoto ? "Uploading..." : "Change photo"}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Content below hero - chips + email */}
+              {/* Content below hero - email */}
               <div className="px-4 pb-4 pt-3 space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {profile.gender && (
-                    <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                      {profile.gender}
-                    </span>
-                  )}
-                  {profile.sexualOrientation && (
-                    <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                      {profile.sexualOrientation}
-                    </span>
-                  )}
-                </div>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground pt-2 border-t border-border/50">
                   <Mail className="w-4 h-4 shrink-0" />
                   <span className="truncate">{profile.email}</span>
@@ -694,7 +691,7 @@ export default function Profile() {
                   <User className="w-5 h-5 text-primary" />
                   About Me
                 </span>
-                <Button variant="ghost" size="sm" onClick={openBioEdit}>
+                <Button variant="ghost" size="sm" onClick={openBioEdit} className="text-sm text-muted-foreground font-normal font-sans">
                   {profile.bio ? "Edit" : "Add"}
                 </Button>
               </h3>
@@ -780,7 +777,7 @@ export default function Profile() {
                     <Sparkles className="w-5 h-5 text-primary" />
                     Fun Answers
                   </span>
-                  <Button variant="ghost" size="sm" onClick={openFunEdit}>
+                  <Button variant="ghost" size="sm" onClick={openFunEdit} className="text-sm text-muted-foreground font-normal font-sans">
                     Edit
                   </Button>
                 </h3>
@@ -867,8 +864,8 @@ export default function Profile() {
                   <Sparkles className="w-5 h-5 text-primary" />
                   Fun Answers
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add optional fun answers to help others get to know you better.
+                  <p className="text-sm text-muted-foreground mb-4">
+                  The fun stuff that makes you, you — optional but great for breaking the ice.
                 </p>
                 <Button variant="outline" onClick={openFunEdit}>
                   Add fun answers
@@ -891,7 +888,7 @@ export default function Profile() {
                     <Vote className="w-5 h-5 text-primary" />
                     This or That
                   </span>
-                  <Button variant="ghost" size="sm" onClick={openPollsEdit}>
+                  <Button variant="ghost" size="sm" onClick={openPollsEdit} className="text-sm text-muted-foreground font-normal font-sans">
                     Edit
                   </Button>
                 </h3>
@@ -925,7 +922,7 @@ export default function Profile() {
                   This or That
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Pick your side on IIMA-specific polls – Tnite vs Stay in, 1:45 surprises, Tea Post vs Nestlé, and more!
+                  Pick your side on each — the little choices that say a lot about who you are.
                 </p>
                 <Button variant="outline" onClick={openPollsEdit}>
                   Add polls
@@ -951,7 +948,7 @@ export default function Profile() {
                     <Heart className="w-5 h-5 text-primary" />
                     Preferences
                   </span>
-                  <Button variant="ghost" size="sm" onClick={openPreferencesEdit}>
+                  <Button variant="ghost" size="sm" onClick={openPreferencesEdit} className="text-sm text-muted-foreground font-normal font-sans">
                     Edit
                   </Button>
                 </h3>
@@ -959,42 +956,42 @@ export default function Profile() {
                   {profile.alcoholPreference && (
                     <div className="flex items-center gap-3">
                       <Wine className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Alcohol:</span>
+                      <span className="text-sm text-muted-foreground">Drink vibe</span>
                       <span className="text-sm font-medium">{profile.alcoholPreference}</span>
                     </div>
                   )}
                   {profile.smokingPreference && (
                     <div className="flex items-center gap-3">
                       <Cigarette className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Smoking:</span>
+                      <span className="text-sm text-muted-foreground">Smoking</span>
                       <span className="text-sm font-medium">{profile.smokingPreference}</span>
                     </div>
                   )}
                   {profile.foodPreference && (
                     <div className="flex items-center gap-3">
                       <Utensils className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Food:</span>
+                      <span className="text-sm text-muted-foreground">Food</span>
                       <span className="text-sm font-medium">{profile.foodPreference}</span>
                     </div>
                   )}
                   {profile.favouritePlace && (
                     <div className="flex items-center gap-3">
                       <MapPin className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Favourite Place:</span>
+                      <span className="text-sm text-muted-foreground">Happy place</span>
                       <span className="text-sm font-medium">{profile.favouritePlace}</span>
                     </div>
                   )}
                   {profile.teaOrCoffee && (
                     <div className="flex items-center gap-3">
                       <Coffee className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Tea or Coffee:</span>
+                      <span className="text-sm text-muted-foreground">Your poison</span>
                       <span className="text-sm font-medium">{profile.teaOrCoffee}</span>
                     </div>
                   )}
                   {profile.mountainOrBeach && (
                     <div className="flex items-center gap-3">
                       <Mountain className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Mountain or Beach:</span>
+                      <span className="text-sm text-muted-foreground">Vacation vibes</span>
                       <span className="text-sm font-medium">{profile.mountainOrBeach}</span>
                     </div>
                   )}
@@ -1039,13 +1036,13 @@ export default function Profile() {
                 </p>
                 <div className="space-y-4">
                   <div>
-                    <Label className="text-sm">Alcohol</Label>
+                    <Label className="text-sm">What&apos;s your drink vibe?</Label>
                     <Select
                       value={preferencesEditValues.alcoholPreference || ""}
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, alcoholPreference: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Cheers?" />
                       </SelectTrigger>
                       <SelectContent>
                         {alcoholOptions.map((o) => (
@@ -1055,13 +1052,13 @@ export default function Profile() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm">Smoking</Label>
+                    <Label className="text-sm">Are you a smoke break person?</Label>
                     <Select
                       value={preferencesEditValues.smokingPreference || ""}
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, smokingPreference: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Mafa?" />
                       </SelectTrigger>
                       <SelectContent>
                         {smokingOptions.map((o) => (
@@ -1077,7 +1074,7 @@ export default function Profile() {
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, foodPreference: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Your food vibe?" />
                       </SelectTrigger>
                       <SelectContent>
                         {foodOptions.map((o) => (
@@ -1087,13 +1084,13 @@ export default function Profile() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm">Tea or Coffee</Label>
+                    <Label className="text-sm">What&apos;s your poison?</Label>
                     <Select
                       value={preferencesEditValues.teaOrCoffee || ""}
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, teaOrCoffee: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Your fix?" />
                       </SelectTrigger>
                       <SelectContent>
                         {teaOrCoffeeOptions.map((o) => (
@@ -1103,13 +1100,13 @@ export default function Profile() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm">Mountain or Beach</Label>
+                    <Label className="text-sm">What&apos;s your vacation vibes?</Label>
                     <Select
                       value={preferencesEditValues.mountainOrBeach || ""}
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, mountainOrBeach: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Where to then?" />
                       </SelectTrigger>
                       <SelectContent>
                         {mountainOrBeachOptions.map((o) => (
@@ -1119,13 +1116,13 @@ export default function Profile() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm">Favourite place on campus</Label>
+                    <Label className="text-sm">Your happy place on campus?</Label>
                     <Select
                       value={preferencesEditValues.favouritePlace || ""}
                       onValueChange={(v) => setPreferencesEditValues((prev) => ({ ...prev, favouritePlace: v }))}
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select" />
+                        <SelectValue placeholder="Where can I find you?" />
                       </SelectTrigger>
                       <SelectContent>
                         {favouritePlaceOptions.map((o) => (
@@ -1146,7 +1143,7 @@ export default function Profile() {
               </SheetContent>
             </Sheet>
 
-            {/* Share via WhatsApp */}
+            {/* Share via WhatsApp — same message and flow as MatchmakingComingSoon */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1158,14 +1155,17 @@ export default function Profile() {
                 Invite friends
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Share Starlit by the Brick with your batchmates – the more, the merrier!
+                Spread the word — more matches for everyone when your friends join.
               </p>
-              <ShareWhatsAppButton
+              <Button
                 variant="outline"
                 size="default"
                 className="w-full gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary"
-                showLabel={true}
-              />
+                onClick={() => handleReferralShare()}
+              >
+                <Share2 className="w-4 h-4" />
+                Refer a friend
+              </Button>
             </motion.div>
 
             {/* Log out at end of profile */}

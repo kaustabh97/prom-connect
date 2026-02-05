@@ -108,7 +108,7 @@ export default function RequestPending() {
             sexualOrientation: data.sexualOrientation,
             intention: data.intention,
             hometown: data.hometown,
-            foodPreference: "No preference",
+            foodPreference: "Flexible",
             onboardingCompleted: true,
           },
           opts

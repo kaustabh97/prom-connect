@@ -60,7 +60,6 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     try {
-      console.log("Initiating Google sign-in from:", window.location.href);
       await signInWithRedirect({ provider: "Google" });
     } catch (error) {
       console.error("Error during Google sign-in:", error);
@@ -111,12 +110,8 @@ const Auth = () => {
           { authMode: "apiKey" }
         );
         profiles = result.data ?? null;
-        if (result.errors) {
-          console.warn("[Auth] Backend profile check returned errors:", result.errors);
-        }
-      } catch (backendError) {
+      } catch {
         // Backend unreachable (wrong URL, network, or API not deployed) – continue to onboarding
-        console.warn("[Auth] Backend profile check failed (network/API). Continuing to onboarding.", backendError);
       }
 
       if (profiles && profiles.length > 0) {

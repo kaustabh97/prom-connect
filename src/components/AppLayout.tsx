@@ -20,7 +20,7 @@ function PromDateGate({
   const isOnPromDatePage = location.pathname === "/prom-date";
   const isMatchesWithChat =
     location.pathname === "/matches" &&
-    new URLSearchParams(location.search).get("matchId");
+    (location.state as { fromPromDate?: boolean } | null)?.fromPromDate;
   const shouldCheck =
     !isOnPromDatePage &&
     !isMatchesWithChat &&
@@ -38,10 +38,15 @@ function PromDateGate({
       return;
     }
     let cancelled = false;
-    getPromDateRedirectPath().then((path) => {
-      if (!cancelled && path) setRedirectPath(path);
-      if (!cancelled) setChecked(true);
-    });
+    getPromDateRedirectPath()
+      .then((path) => {
+        if (!cancelled && path) setRedirectPath(path);
+        if (!cancelled) setChecked(true);
+      })
+      .catch(() => {
+        // On error, don't block - let user through
+        if (!cancelled) setChecked(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -62,7 +67,6 @@ export default function AppLayout() {
   const isRequestPending = location.pathname === "/request-pending";
   const isChatFromPromDate =
     location.pathname === "/matches" &&
-    new URLSearchParams(location.search).get("matchId") &&
     (location.state as { fromPromDate?: boolean } | null)?.fromPromDate;
   const hideNavForPage = isPromDate || isRequestPending || !!isChatFromPromDate;
   const [isCheckingPromDateRedirect, setIsCheckingPromDateRedirect] = useState(false);

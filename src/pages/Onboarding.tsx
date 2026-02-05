@@ -20,9 +20,8 @@ import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
-import { APP_URL } from "@/config";
-import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
-import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X, MessageCircle } from "lucide-react";
+import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
+import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import {
   Dialog,
@@ -114,10 +113,10 @@ function getCoupleFlowSteps(partnerType: "" | "iima" | "outside"): OnboardingSte
 const INVITE_FLOW_STEPS: OnboardingStep[] = ["partnerRequest"];
 
 const alcoholOptions = ["Never", "Sometimes", "Regularly"];
-const smokingOptions = ["Never", "Sometimes", "Regularly"];
-const foodOptions = ["Veg", "Non-Veg", "Eggetarian", "No preference"];
-const favouritePlaceOptions = ["Tea Post", "Library", "LKP", "CR", "Sports Complex", "Nestlé", "Heritage Walk", "Other"];
-const teaOrCoffeeOptions = ["Tea", "Coffee", "Both"];
+const smokingOptions = ["Never", "Passively", "Sometimes", "Regularly"];
+const foodOptions = ["Veg", "Non Veg", "Eggetarian", "Flexible"];
+const favouritePlaceOptions = ["Tea Post", "Nestlé", "Bhavesh Bhai", "CR Lawns", "LKP", "Gym / Sports Complex", "Library", "Mafa Bhai", "Dorm Room", "Other"];
+const teaOrCoffeeOptions = ["Tea", "Coffee", "Both", "None"];
 const mountainOrBeachOptions = ["Mountain", "Beach", "Both"];
 
 const partnerStatusOptions = ["Still looking for my prom date 💫", "Already found my plus-one ✨"] as const;
@@ -127,10 +126,10 @@ const cohorts = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"];
 const genders = ["Man", "Woman", "Non-Binary"];
 const sexualities = ["Straight", "Gay", "Bisexual", "Queer"];
 const intentions = [
-  "Date for Prom",
-  "In a relationship, looking for a prom date",
-  "Long Term",
-  "Not Sure",
+  "Just here for prom night",
+  "Taken, but need a prom buddy",
+  "Looking for something real",
+  "Let's see where this goes",
 ];
 
 const Onboarding = () => {
@@ -233,7 +232,6 @@ const Onboarding = () => {
           setIsValidEmail(isValidIIMAEmail);
           
           if (!isValidIIMAEmail) {
-            console.log("Invalid email domain:", emailDomain);
             setIsCheckingAuth(false);
             return;
           }
@@ -508,14 +506,6 @@ const Onboarding = () => {
       const pathFn = ({ identityId }: { identityId: string }) =>
         `profile-pics/${identityId}/${fileName}`;
 
-      console.log("[Onboarding] Uploading photo to S3:", {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        storageConfigured: !!(outputs as any).storage,
-        outputsKeys: Object.keys(outputs),
-      });
-
       // Check if storage is configured in amplify_outputs.json
       if (!(outputs as any).storage) {
         const errorMsg = "Storage bucket is not configured. Please run 'npx ampx sandbox' in the project root to sync the backend and create the S3 storage bucket.";
@@ -536,8 +526,6 @@ const Onboarding = () => {
 
       // result.path is the resolved S3 path (e.g. profile-pics/{identityId}/profile-xxx.jpg)
       const s3Path = (result as { path?: string }).path ?? `profile-pics/${fileName}`;
-      console.log("[Onboarding] Photo uploaded successfully:", { path: s3Path, result });
-      
       return s3Path;
     } catch (error) {
       console.error("[Onboarding] Error uploading photo:", error);
@@ -608,50 +596,22 @@ const Onboarding = () => {
     // Use override when we just uploaded (React state may not have updated yet)
     const profilePicKeyToSave = profilePicKeyOverride ?? profile.profilePicKey;
 
-    console.log("[Onboarding] ========================================");
-    console.log("[Onboarding] Starting full profile save...");
     setIsSaving(true);
     setSaveError(null);
     
     try {
       const currentUser = await getUserProfile();
-      
-      // Log profile data before saving
-      console.log("[Onboarding] Profile data to save:", {
-        email: profile.email,
-        name: profile.name,
-        dateOfBirth: profile.dateOfBirth,
-        age: profile.age,
-        cohort: profile.cohort,
-        gender: profile.gender,
-        sexualOrientation: profile.sexualOrientation,
-        intention: profile.intention,
-        hometown: profile.hometown,
-        notificationsEnabled: profile.notificationsEnabled,
-        profilePicKey: profilePicKeyToSave,
-        onboardingCompleted: true,
-      });
 
         // Check if profile already exists for this email
-        console.log("[Onboarding] Checking for existing profile with email:", profile.email);
         
         // Check authentication status to determine which auth mode to use
         const { fetchAuthSession } = await import("aws-amplify/auth");
         const session = await fetchAuthSession();
         const isAuthenticated = !!session.tokens;
         
-        console.log("[Onboarding] Auth session:", {
-          isAuthenticated,
-          hasTokens: !!session.tokens,
-          hasAccessToken: !!session.tokens?.accessToken,
-          hasIdToken: !!session.tokens?.idToken,
-        });
-        
         // Use userPool auth if authenticated, otherwise use API key
         const authMode = isAuthenticated ? 'userPool' : 'apiKey';
-        console.log("[Onboarding] Using auth mode:", authMode);
         
-        const listStartTime = Date.now();
         // @ts-ignore - TypeScript types don't match runtime behavior for authMode
         const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
           {
@@ -663,22 +623,8 @@ const Onboarding = () => {
           },
           { authMode: authMode as 'userPool' | 'apiKey' }
         );
-        const listDuration = Date.now() - listStartTime;
-
-        console.log("[Onboarding] Existing profiles check completed:", {
-          duration: `${listDuration}ms`,
-          found: existingProfiles?.length || 0,
-          profiles: existingProfiles,
-          errors: listErrors,
-          errorCount: listErrors?.length || 0,
-        });
 
         if (listErrors) {
-          console.error("[Onboarding] Error checking existing profile:", {
-            errors: listErrors,
-            firstError: listErrors[0],
-            errorMessage: listErrors[0]?.message,
-          });
           throw new Error(listErrors[0]?.message || "Failed to check existing profile");
         }
 
@@ -711,20 +657,9 @@ const Onboarding = () => {
           onboardingCompleted: true,
         };
 
-        console.log("[Onboarding] Prepared profile data for save:", profileData);
-
         if (existingProfiles && existingProfiles.length > 0) {
           // Update existing profile
           const existingProfile = existingProfiles[0];
-          console.log("[Onboarding] Found existing profile, updating:", {
-            existingProfileId: existingProfile.id,
-            existingEmail: existingProfile.email,
-            existingOnboardingCompleted: existingProfile.onboardingCompleted,
-            updateData: profileData,
-            authMode,
-          });
-
-          const updateStartTime = Date.now();
           // @ts-ignore - TypeScript types don't match runtime behavior for update arguments
           const { data: updatedProfile, errors: updateErrors } = await client.models.UserProfile.update(
             {
@@ -752,37 +687,12 @@ const Onboarding = () => {
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
-          const updateDuration = Date.now() - updateStartTime;
-
-          console.log("[Onboarding] Update operation completed:", {
-            duration: `${updateDuration}ms`,
-            success: !updateErrors,
-            updatedProfile,
-            errors: updateErrors,
-            errorCount: updateErrors?.length || 0,
-          });
 
           if (updateErrors) {
-            console.error("[Onboarding] Failed to update profile:", {
-              errors: updateErrors,
-              firstError: updateErrors[0],
-              errorMessage: updateErrors[0]?.message,
-              profileId: existingProfile.id,
-            });
             throw new Error(updateErrors[0]?.message || "Failed to update profile");
           }
-
-          console.log("[Onboarding] ✅ Profile updated successfully:", {
-            id: updatedProfile?.id,
-            email: updatedProfile?.email,
-            onboardingCompleted: updatedProfile?.onboardingCompleted,
-          });
         } else {
           // Create new profile
-          console.log("[Onboarding] No existing profile found, creating new profile");
-          console.log("[Onboarding] Using auth mode:", authMode);
-
-          const createStartTime = Date.now();
           // @ts-ignore - TypeScript types don't match runtime behavior for create arguments
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
@@ -809,34 +719,11 @@ const Onboarding = () => {
             },
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
-          const createDuration = Date.now() - createStartTime;
-
-          console.log("[Onboarding] Create operation completed:", {
-            duration: `${createDuration}ms`,
-            success: !createErrors,
-            createdProfile,
-            errors: createErrors,
-            errorCount: createErrors?.length || 0,
-          });
 
           if (createErrors) {
-            console.error("[Onboarding] Failed to create profile:", {
-              errors: createErrors,
-              firstError: createErrors[0],
-              errorMessage: createErrors[0]?.message,
-              profileData,
-            });
             throw new Error(createErrors[0]?.message || "Failed to create profile");
           }
-
-          console.log("[Onboarding] ✅ Profile created successfully:", {
-            id: createdProfile?.id,
-            email: createdProfile?.email,
-            onboardingCompleted: createdProfile?.onboardingCompleted,
-          });
         }
-        
-        console.log("[Onboarding] ✅ Profile save completed successfully!");
         const currentUserEmailForRequests = profile.email.trim().toLowerCase();
         try {
           const { data: requestsToMe } = await client.models.MatchRequest.listMatchRequestByToEmail(
@@ -850,36 +737,15 @@ const Onboarding = () => {
             return;
           }
         } catch (_) {}
-        console.log("[Onboarding] Navigating to post-onboarding page...");
-        console.log("[Onboarding] ========================================");
         navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
-        console.error("[Onboarding] ❌ Failed to save user profile:", {
-          error,
-          errorType: error?.constructor?.name,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          profileData: {
-            email: profile.email,
-            name: profile.name,
-            dateOfBirth: profile.dateOfBirth,
-            age: profile.age,
-            cohort: profile.cohort,
-            gender: profile.gender,
-            sexualOrientation: profile.sexualOrientation,
-            intention: profile.intention,
-            hometown: profile.hometown,
-            notificationsEnabled: profile.notificationsEnabled,
-          },
-        });
-        console.log("[Onboarding] ========================================");
+        console.error("[Onboarding] Failed to save profile:", error);
         setSaveError(error instanceof Error ? error.message : "Failed to save profile. Please try again.");
         setIsSaving(false);
       }
   };
 
   const saveCoupleOutside = async () => {
-    console.log("[Onboarding] Saving couple flow (outside partner)...");
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -934,7 +800,6 @@ const Onboarding = () => {
   };
 
   const saveCoupleIIMA = async () => {
-    console.log("[Onboarding] Saving couple flow (minimal profile + partner link)...");
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -1025,8 +890,7 @@ const Onboarding = () => {
           // Partner exists - they'll see the request in Matches
           navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
-      } catch (reqErr) {
-        console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
+      } catch {
         // Navigate even if invite creation failed
         navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       }
@@ -1255,7 +1119,7 @@ const Onboarding = () => {
               <h2 className="font-display text-2xl sm:text-3xl font-bold mb-3 px-2 leading-tight">
                 {inviteRequest
                   ? "Someone wants to go to Prom with you!"
-                  : "Are you here for a date or already a couple?"}
+                  : (<>So, what&apos;s the deal?<br />Flying solo or already paired up?</>)}
               </h2>
               <p className="text-muted-foreground">
                 {inviteRequest
@@ -1373,12 +1237,12 @@ const Onboarding = () => {
               Hey {profile.name || "you"} 👋
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              Prom 2026 is calling – and so is your future date.
+              Prom night is almost here and we&apos;re about to make it unforgettable.
               <br />
-              <span className="text-primary">(Saree or suit, we got you)</span>
+              <span className="text-primary">Let&apos;s find you the perfect date ✨</span>
             </p>
             <p className="text-muted-foreground mt-4">
-              Quick deets and you&apos;re in. No long forms, we promise – unlike those 2am case preps.
+              Just a few quick questions – way easier than your last group project, we promise.
             </p>
           </motion.div>
         );
@@ -1392,8 +1256,8 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Name, Birthday & Height</h2>
-              <p className="text-muted-foreground">Tell us your name, when you were born, and your height</p>
+              <h2 className="font-display text-2xl font-bold mb-2">Let&apos;s start with the basics</h2>
+              <p className="text-muted-foreground">Your name, birthday, and height</p>
             </div>
             <div>
               <Label htmlFor="name" className="text-base mb-3 block">
@@ -1409,7 +1273,7 @@ const Onboarding = () => {
             </div>
             <div>
               <Label htmlFor="dateOfBirth" className="text-base mb-3 block">
-                Birthday (DD MM YYYY)
+                Birthday
               </Label>
               <Input
                 id="dateOfBirth"
@@ -1464,7 +1328,7 @@ const Onboarding = () => {
             </div>
             <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
               <p className="text-xs text-muted-foreground text-center">
-                ⚠️ Please use your real name only. Do not use incorrect or pseudo names.
+                ⚠️ Please use your real name, no nicknames or fake ones.<br />It&apos;s how your match will recognize you on prom night.
               </p>
             </div>
           </motion.div>
@@ -1596,8 +1460,8 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Preferences</h2>
-              <p className="text-muted-foreground">Help us understand what you're looking for</p>
+              <h2 className="font-display text-2xl font-bold mb-2">Your preferences</h2>
+              <p className="text-muted-foreground">Quick ones — we use these to show you people you&apos;ll actually connect with</p>
             </div>
 
             {/* Sexuality Dropdown */}
@@ -1625,14 +1489,14 @@ const Onboarding = () => {
             {/* Intention Dropdown */}
             <div>
               <Label htmlFor="intention" className="text-base mb-3 block">
-                What&apos;s the endgame?
+                What are you hoping for?
               </Label>
               <Select
                 value={profile.intention}
                 onValueChange={(value) => setProfile(prev => ({ ...prev, intention: value }))}
               >
                 <SelectTrigger id="intention" className="h-12 text-base">
-                  <SelectValue placeholder="Just prom? Or more?" />
+                  <SelectValue placeholder="Pick your vibe" />
                 </SelectTrigger>
                 <SelectContent>
                   {intentions.map((intention) => (
@@ -1682,15 +1546,15 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Tea Post or Nestlé energy?</h2>
-              <p className="text-muted-foreground">Optional – but helps your matches know the real you</p>
+              <h2 className="font-display text-2xl font-bold mb-2">Let&apos;s vibe check you</h2>
+              <p className="text-muted-foreground">You can skip these if you&apos;re in a rush — but they help break the ice with your matches</p>
             </div>
 
             <div>
               <Label htmlFor="bio" className="text-base mb-3 block">In your own words</Label>
               <Textarea
                 id="bio"
-                placeholder="2am chai at Tea Post type? Or early bird library person? Sell yourself..."
+                placeholder="Case prep or coffee chats? Late nights or early mornings? Sell yourself"
                 value={profile.bio}
                 onChange={(e) => setProfile((prev) => ({ ...prev, bio: e.target.value }))}
                 className="min-h-[80px] resize-none"
@@ -1700,13 +1564,13 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Alcohol</Label>
+              <Label className="text-base mb-3 block">What&apos;s your drink vibe?</Label>
               <Select
                 value={profile.alcoholPreference}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, alcoholPreference: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder="Cheers?" />
                 </SelectTrigger>
                 <SelectContent>
                   {alcoholOptions.map((o) => (
@@ -1717,13 +1581,13 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Smoke break person?</Label>
+              <Label className="text-base mb-3 block">Are you a smoke break person?</Label>
               <Select
                 value={profile.smokingPreference}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, smokingPreference: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Pick one" />
+                  <SelectValue placeholder="Mafa?" />
                 </SelectTrigger>
                 <SelectContent>
                   {smokingOptions.map((o) => (
@@ -1740,7 +1604,7 @@ const Onboarding = () => {
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, foodPreference: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Your food vibe" />
+                  <SelectValue placeholder="Your food vibe?" />
                 </SelectTrigger>
                 <SelectContent>
                   {foodOptions.map((o) => (
@@ -1751,13 +1615,13 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Tea or Coffee</Label>
+              <Label className="text-base mb-3 block">What&apos;s your poison?</Label>
               <Select
                 value={profile.teaOrCoffee}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, teaOrCoffee: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder="Your fix?" />
                 </SelectTrigger>
                 <SelectContent>
                   {teaOrCoffeeOptions.map((o) => (
@@ -1768,13 +1632,13 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Mountain or beach person?</Label>
+              <Label className="text-base mb-3 block">What&apos;s your vacation vibes?</Label>
               <Select
                 value={profile.mountainOrBeach}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, mountainOrBeach: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Weekend getaway vibes" />
+                  <SelectValue placeholder="Where to then?" />
                 </SelectTrigger>
                 <SelectContent>
                   {mountainOrBeachOptions.map((o) => (
@@ -1785,13 +1649,13 @@ const Onboarding = () => {
             </div>
 
             <div>
-              <Label className="text-base mb-3 block">Your spot on campus?</Label>
+              <Label className="text-base mb-3 block">Your happy place on campus?</Label>
               <Select
                 value={profile.favouritePlace}
                 onValueChange={(v) => setProfile((prev) => ({ ...prev, favouritePlace: v }))}
               >
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Tea Post, LKP, Library...?" />
+                  <SelectValue placeholder="Where can I find you?" />
                 </SelectTrigger>
                 <SelectContent>
                   {favouritePlaceOptions.map((o) => (
@@ -1813,7 +1677,7 @@ const Onboarding = () => {
           >
             <div className="text-center mb-6">
               <h2 className="font-display text-2xl font-bold mb-2">Your best shot</h2>
-              <p className="text-muted-foreground">The one that makes people double-tap. Prom-ready vibes only</p>
+              <p className="text-muted-foreground">The one that makes people double-tap.<br />Prom-ready vibes only</p>
             </div>
 
             {/* File input (hidden) */}
@@ -2036,7 +1900,7 @@ const Onboarding = () => {
             <div className="text-center mb-6">
               <Heart className="w-12 h-12 text-primary mx-auto mb-4" />
               <h2 className="font-display text-2xl font-bold mb-2">Your partner</h2>
-              <p className="text-muted-foreground">Partner&apos;s name and IIMA email – we&apos;ll link you two.</p>
+              <p className="text-muted-foreground">Drop their name and campus email – we&apos;ll connect you two.</p>
             </div>
             <div>
               <Label htmlFor="partnerName" className="text-base mb-3 block">Partner&apos;s name</Label>
@@ -2053,7 +1917,7 @@ const Onboarding = () => {
             </div>
             <div>
               <Label htmlFor="partnerEmail" className="text-base mb-3 block">Partner&apos;s IIMA email</Label>
-              <p className="text-xs text-muted-foreground mb-2">Double-check that email – we wouldn&apos;t want you to miss your date! ✨</p>
+              <p className="text-xs text-muted-foreground mb-2">Double-check that spelling – don&apos;t wanna end up inviting the wrong person to prom 😅✨</p>
               <Input
                 id="partnerEmail"
                 type="email"
@@ -2096,7 +1960,7 @@ const Onboarding = () => {
               )}
               {partnerCheckStatus === "not_registered" && (
                 <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                  No profile yet – we&apos;ll send them an invite to join.
+                  No profile yet – you can send them an invite to join.
                 </p>
               )}
             </div>
@@ -2330,58 +2194,17 @@ const Onboarding = () => {
       </AnimatePresence>
 
       {/* WhatsApp Invite Popup */}
-      <Dialog open={showWhatsAppInvitePopup} onOpenChange={setShowWhatsAppInvitePopup}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] rounded-2xl glass-strong border-primary/30 shadow-glow p-0 gap-0 flex flex-col overflow-hidden">
-          {/* Decorative gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none rounded-2xl" />
-          
-          <DialogHeader className="relative px-6 pt-6 pb-4 flex-shrink-0">
-            <div className="flex items-center justify-center mb-4">
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 border-2 border-primary/50">
-                <MessageCircle className="w-8 h-8 text-primary" />
-              </div>
-            </div>
-            <DialogTitle className="text-2xl font-display font-bold text-center text-foreground">
-              Invite Your Partner
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground pt-2 space-y-3 overflow-y-auto max-h-[40vh]">
-              <p>
-                You can invite your partner to join Starlit by the Brick and accept your invitation via WhatsApp.
-              </p>
-              <p className="text-sm">
-                When you click &quot;Open WhatsApp&quot;, a message will be prepared with all the details your partner needs to join and accept your request.
-              </p>
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter className="flex-col sm:flex-row gap-2 px-6 pb-6 pt-4 relative flex-shrink-0 border-t border-border/50">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowWhatsAppInvitePopup(false);
-                navigate("/request-pending");
-              }}
-              className="w-full sm:w-auto"
-            >
-              Skip for Now
-            </Button>
-            <Button
-              variant="gold"
-              onClick={() => {
-                if (pendingWhatsAppInvite) {
-                  sharePartnerInviteViaWhatsApp(pendingWhatsAppInvite.name, pendingWhatsAppInvite.email);
-                }
-                setShowWhatsAppInvitePopup(false);
-                navigate("/request-pending");
-              }}
-              className="w-full sm:w-auto"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Open WhatsApp
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {pendingWhatsAppInvite && (
+        <WhatsAppInviteDialog
+          open={showWhatsAppInvitePopup}
+          onOpenChange={setShowWhatsAppInvitePopup}
+          fromName={pendingWhatsAppInvite.name}
+          fromEmail={pendingWhatsAppInvite.email}
+          skipLabel="Skip for Now"
+          onSkip={() => navigate("/request-pending")}
+          onOpenWhatsApp={() => navigate("/request-pending")}
+        />
+      )}
     </div>
   );
 };

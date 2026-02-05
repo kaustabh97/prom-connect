@@ -50,7 +50,6 @@ export function useMatch() {
         likes.forEach((like) => {
           if (like.toUserId) likedIds.add(like.toUserId);
         });
-        console.log("[useMatch] Loaded likes from backend:", likes.length, Array.from(likedIds));
       }
     } catch (err) {
       console.error("[useMatch] Failed to load likes from backend:", err);
@@ -67,9 +66,7 @@ export function useMatch() {
 
         try {
           const authProfile = await getUserProfile();
-          if (!authProfile?.email) {
-            console.warn("[useMatch] No authenticated user, skipping backend Like create");
-          } else {
+          if (authProfile?.email) {
             const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
             const opts = authMode ? { authMode } : undefined;
 
@@ -93,7 +90,6 @@ export function useMatch() {
               // Create Like
               // @ts-ignore - authMode type
               await client.models.Like.create({ fromUserId, toUserId: profileId }, opts);
-              console.log("[useMatch] Like saved to backend:", { fromUserId, toUserId: profileId });
 
               // Check if the other person has already liked us (mutual like → match)
               // Query: likes FROM profileId (people they liked), filter for toUserId = us
@@ -125,7 +121,6 @@ export function useMatch() {
                 if (matchData?.id) {
                   result.matchId = matchData.id;
                 }
-                console.log("[useMatch] Mutual like! Match created:", { user1Id: u1, user2Id: u2, matchId: matchData?.id });
               }
             }
           }

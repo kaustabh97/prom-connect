@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import html2canvas from "html2canvas";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
@@ -10,7 +9,7 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Loader2, LogOut, MessageCircle, Share2, Sparkles, User } from "lucide-react";
+import { Loader2, LogOut, MessageCircle, Sparkles, User } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
 import { clearTestUser } from "@/utils/auth";
@@ -99,61 +98,6 @@ export default function PromDate() {
 
   const showOutsideView = isOutsidePartner && partnerNameFromUrl;
   const showBothView = promDate && !showOutsideView;
-  const shareRef = useRef<HTMLDivElement>(null);
-  const [isSharing, setIsSharing] = useState(false);
-
-  const handleShare = async () => {
-    if (!shareRef.current || isSharing) return;
-    setIsSharing(true);
-    try {
-      const canvas = await html2canvas(shareRef.current, {
-        backgroundColor: "#0f1729",
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-      canvas.toBlob(
-        async (blob) => {
-          if (!blob) return;
-          const file = new File([blob], "prom-date-invite.png", { type: "image/png" });
-          
-          // Debug: check what's available
-          const hasShare = !!navigator.share;
-          const hasCanShare = !!navigator.canShare;
-          const canShareFiles = hasCanShare ? navigator.canShare({ files: [file] }) : "no canShare";
-          console.log("Share debug:", { hasShare, hasCanShare, canShareFiles });
-          
-          // Try to share if navigator.share exists (skip canShare check - it's unreliable)
-          if (navigator.share) {
-            try {
-              await navigator.share({ files: [file] });
-              return; // Success - exit
-            } catch (e) {
-              console.log("Share error:", (e as Error).name, (e as Error).message);
-              if ((e as Error).name === "AbortError") {
-                return; // User cancelled - don't download
-              }
-              // Fall through to download
-            }
-          }
-          
-          // Fallback: download
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "prom-date-invite.png";
-          a.click();
-          URL.revokeObjectURL(url);
-        },
-        "image/png",
-        0.95
-      );
-    } catch (err) {
-      console.error("Share failed:", err);
-    } finally {
-      setIsSharing(false);
-    }
-  };
 
   const handleLogout = async () => {
     try {
@@ -196,22 +140,8 @@ export default function PromDate() {
   return (
     <div className="min-h-dvh bg-gradient-midnight relative flex flex-col">
       <SparkleBackground />
-      {/* Top bar: Share + Log out */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex justify-between">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleShare}
-          disabled={isSharing}
-          className="gap-1.5 rounded-full px-3 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-        >
-          {isSharing ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Share2 className="w-4 h-4" />
-          )}
-          Share
-        </Button>
+      {/* Top bar: Log out */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex justify-end">
         <Button
           variant="ghost"
           size="sm"
@@ -223,8 +153,7 @@ export default function PromDate() {
         </Button>
       </div>
       <div
-        ref={shareRef}
-        className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32 pb-8 bg-gradient-midnight min-h-dvh"
+        className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32 pb-8 min-h-dvh"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -342,8 +271,8 @@ export default function PromDate() {
           <CountdownTimer targetDate="2026-02-15T20:00:00" />
         </motion.div>
 
-        {/* Chat button - only when both from IIMA (hidden in share image) */}
-        {showBothView && promDate?.match?.id && (
+        {/* Chat button - always for IIMA couples (hidden in share image) */}
+        {showBothView && (
           <motion.div
             data-share-hide
             initial={{ opacity: 0, y: 10 }}
@@ -354,7 +283,7 @@ export default function PromDate() {
             <Button
               variant="outline"
               className="w-full gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary"
-              onClick={() => navigate(`/matches?matchId=${promDate.match.id}`, { state: { fromPromDate: true } })}
+              onClick={() => navigate("/matches", { state: { fromPromDate: true, openMatchId: promDate?.match?.id } })}
             >
               <MessageCircle className="w-5 h-5" />
               Chat with {theirName}

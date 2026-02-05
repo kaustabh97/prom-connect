@@ -9,9 +9,11 @@ interface TimeLeft {
 
 interface CountdownTimerProps {
   targetDate: string;
+  /** Label above the timer. Default: "Prom Night Countdown" */
+  label?: string;
 }
 
-const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
+const CountdownTimer = ({ targetDate, label = "Prom Night Countdown" }: CountdownTimerProps) => {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -42,7 +44,7 @@ const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
   return (
     <div className="text-center">
       <p className="text-sm text-muted-foreground mb-4 uppercase tracking-widest">
-        Prom Night Countdown
+        {label}
       </p>
       <div className="flex justify-center gap-3 md:gap-6">
         {timeUnits.map((unit) => (

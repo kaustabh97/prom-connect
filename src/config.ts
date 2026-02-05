@@ -29,7 +29,7 @@ const IS_BETA_DOMAIN = HOSTNAME === BETA_DOMAIN;
  * When false:
  * - No beta messaging is shown.
  */
-const RAW_BETA_MODE = true;
+const RAW_BETA_MODE = false;
 export const BETA_MODE = RAW_BETA_MODE && !IS_PROD_DOMAIN;
 
 /** Base URL for Starlit by the Brick (used in partner invite emails) */
@@ -77,4 +77,4 @@ export const GOOGLE_LOGIN_CHECK = IS_PROD_DOMAIN || RAW_GOOGLE_LOGIN_CHECK;
  * When true:
  * - Normal flow: Discover, Matches, Chat, Profile
  */
-export const MATCHMAKING_ENABLED = true;
+export const MATCHMAKING_ENABLED = false;

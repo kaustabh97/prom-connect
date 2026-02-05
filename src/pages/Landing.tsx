@@ -18,22 +18,22 @@ const Landing = () => {
     {
       icon: Users,
       title: "Campus Only",
-      description: "Exclusively for IIMA. Sign in with your @iima.ac.in email and you're in. Real people from your campus, no strangers.",
+      description: "Sign in with your IIMA email and you're in. Everyone here is from campus — real people, no strangers.",
     },
     {
       icon: Filter,
       title: "Set Your Preferences",
-      description: "Pick your filters and non-negotiables. Only see people who match what you're looking for.",
+      description: "Pick what matters to you. We'll only show profiles that match your vibe.",
     },
     {
       icon: Heart,
       title: "Swipe and Match",
-      description: "Browse profiles and swipe right if you're interested. When it's mutual, you match and can start chatting.",
+      description: "Found someone interesting? Swipe right. If they like you back, it's a match and you can start talking.",
     },
     {
       icon: MessageSquare,
       title: "Chat Before Prom",
-      description: "Get to know your matches. When it feels right, ask them to prom. No pressure, take your time.",
+      description: "Get to know your matches at your own pace. When it feels right, ask them to prom.",
     },
   ];
 
@@ -78,7 +78,7 @@ const Landing = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-12"
           >
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-muted-foreground">IIMA Prom 2026</span>
+            <span className="text-sm font-medium text-muted-foreground">IIMA Exclusive Prom 2026</span>
           </motion.div>
 
           {/* Headline – single h1, no nesting */}
@@ -113,17 +113,17 @@ const Landing = () => {
             </h1>
           </motion.div>
 
-          <motion.p {...HERO_FADE} transition={{ delay: 0.5, duration: 0.8 }} className="text-xl md:text-2xl text-muted-foreground mt-14 mb-2 font-light">
-            Prom 2026 just got easier.
+          <motion.p {...HERO_FADE} transition={{ delay: 0.5, duration: 0.8 }} className="text-xl md:text-2xl text-muted-foreground mt-14 mb-1 font-light">
+            Your prom story starts here.
           </motion.p>
 
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.8 }}
-            className="text-lg text-muted-foreground/80 mb-12 max-w-2xl mx-auto"
+            className="text-lg text-muted-foreground/80 mb-10 max-w-2xl mx-auto"
           >
-            Find your date from campus. Set your preferences, swipe through real profiles, and chat when you both match. No strangers, just IIMA.
+            Set your vibe, swipe through real profiles from campus, and chat when it's mutual. No strangers — just people you'll actually see at prom.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -137,7 +137,7 @@ const Landing = () => {
               variant="gold"
               size="xl"
               onClick={() => navigate("/auth")}
-              className="group"
+              className="group w-full sm:w-64"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -163,6 +163,7 @@ const Landing = () => {
               variant="gold-outline"
               size="xl"
               onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+              className="w-full sm:w-64"
             >
               How it works
             </Button>
@@ -220,23 +221,23 @@ const Landing = () => {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
             
             <div className="relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-8 h-8 text-primary" />
+              <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-7 h-7 text-primary" />
               </div>
               
-              <h3 className="font-display text-3xl md:text-4xl font-bold mb-4">
+              <h3 className="font-display text-3xl md:text-4xl font-bold mb-2">
                 Why this works for <span className="text-gradient-gold">IIMA</span>
               </h3>
               
-              <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-                You share the same campus and the same moment. Prom is the next big night. We built this so finding a date is easy and fun.
+              <p className="text-muted-foreground text-lg mb-5 max-w-2xl mx-auto">
+                You already know the campus. Now find out who you'll be walking in with.
               </p>
 
-              <div className="grid sm:grid-cols-3 gap-6 text-left">
+              <div className="grid sm:grid-cols-3 gap-4 text-left">
                 {[
-                  { title: "Real People", desc: "Every profile is someone from campus. No strangers, just people you might know." },
-                  { title: "IIMA Verified", desc: "Sign in with your IIMA email. Everyone here is from campus." },
-                  { title: "You're in Control", desc: "Set your filters and preferences. Only see people who match what you want." },
+                  { title: "Real People", desc: "Every profile is someone you could bump into on campus. No fake accounts, no strangers." },
+                  { title: "IIMA Verified", desc: "Your IIMA email is your ticket in. If they're here, they're one of us." },
+                  { title: "You're in Control", desc: "Set your preferences and see only the people who match your vibe." },
                 ].map((item) => (
                   <div key={item.title} className="p-4 rounded-xl bg-card/50">
                     <h4 className="font-semibold text-foreground mb-1">{item.title}</h4>
@@ -250,7 +251,7 @@ const Landing = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="relative py-20 px-4 text-center">
+      <section className="relative py-10 px-4 text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -258,10 +259,10 @@ const Landing = () => {
           transition={{ duration: 0.6 }}
         >
           <h2 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            Ready to find your <span className="text-gradient-rose">prom date</span>?
+            Ready to find your <span className="text-gradient-rose whitespace-nowrap">prom date</span>?
           </h2>
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-            Your peers are already here. Set up your profile, swipe, chat when it matches, and maybe you'll walk in together on the big night.
+            People from campus are already signing up. Set up your profile in under two minutes, start swiping, and who knows — you might just find the one you'll walk in with.
           </p>
           <Button variant="gold" size="xl" onClick={() => navigate("/auth")}>
             Get Started
@@ -272,16 +273,12 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="py-5 px-4 border-t border-border/50">
-        <div className="max-w-6xl mx-auto flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p>© 2026 Starlit by the Brick. Built with  💛  for the campus.</p>
-          </div>
-          <div className="text-center text-xs text-muted-foreground/60 pt-2">
-            Created by{" "}
-            <span className="text-muted-foreground/70">Dipak Agrawal</span>
-            {" & "}
-            <span className="text-muted-foreground/70">Kaustabh Chatterjee</span>
-          </div>
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-sm text-muted-foreground font-semibold leading-tight">Starlit by the Bricks, 2026 ©</p>
+          <p className="text-sm text-muted-foreground leading-tight">Crafted on Campus, for Campus 💛</p>
+          <p className="text-xs text-muted-foreground/60 mt-3">
+            brought to you by Dipak & Kaustabh
+          </p>
         </div>
       </footer>
     </div>

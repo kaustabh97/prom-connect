@@ -285,8 +285,8 @@ const Matches = () => {
                 options: { bucket: "userPhotos" },
               });
               urls[match.id] = url.toString();
-            } catch (err) {
-              console.warn("[Matches] Failed to get profile pic URL for match", match.id, err);
+            } catch {
+              // Profile pic unavailable
             }
           }
         })
@@ -318,8 +318,8 @@ const Matches = () => {
               if (conversation?.lastMessageAt) {
                 times[match.id] = formatLastMessageTime(conversation.lastMessageAt);
               }
-            } catch (err) {
-              console.warn("[Matches] Failed to get conversation for match", match.id, err);
+            } catch {
+              // Conversation unavailable
             }
           }
         })
@@ -343,16 +343,16 @@ const Matches = () => {
     lastMessageTime: lastMessageTimes[m.id] || "",
   }));
 
-  // Open chat from URL param (matchId) – set immediately so chat opens when matches load
+  // Open chat when coming from Prom Date (state.openMatchId) or URL matchId – set immediately so chat opens when matches load
   useEffect(() => {
-    const matchIdFromUrl = searchParams.get("matchId");
-    if (matchIdFromUrl) {
-      setActiveChat(matchIdFromUrl);
-      markMatchViewed(matchIdFromUrl);
-      clearUnread(matchIdFromUrl);
-      // Don't clear URL – keeps redirect from firing when fromPromDate
+    const fromPromDateState = location.state as { fromPromDate?: boolean; openMatchId?: string } | null;
+    const matchIdToOpen = fromPromDateState?.openMatchId ?? searchParams.get("matchId");
+    if (matchIdToOpen) {
+      setActiveChat(matchIdToOpen);
+      markMatchViewed(matchIdToOpen);
+      clearUnread(matchIdToOpen);
     }
-  }, [searchParams, markMatchViewed, clearUnread]);
+  }, [location.state, searchParams, markMatchViewed, clearUnread]);
   
   const activeMatch = rawMatches.find(m => m.id === activeChat);
   const activeConversationId = activeMatch?.conversationId || undefined;
@@ -369,15 +369,14 @@ const Matches = () => {
   };
 
 
-  // Redirect to Prom Date if user has one (unless they explicitly came to chat via ?matchId= or fromPromDate)
+  // Redirect to Prom Date if user has one (unless they came from Prom Date to chat – stay on Matches)
   useEffect(() => {
-    const matchIdFromUrl = searchParams.get("matchId");
-    if (matchIdFromUrl) return; // User came to open chat with prom date
-    if (location.state?.fromPromDate) return; // User came from Prom Date to chat – stay on Matches
+    const fromPromDateState = location.state as { fromPromDate?: boolean } | null;
+    if (fromPromDateState?.fromPromDate) return; // User came from Prom Date to chat – stay on Matches
     if (!isAuthLoading && currentUserId && promDate) {
       navigate("/prom-date", { replace: true });
     }
-  }, [isAuthLoading, currentUserId, promDate, navigate, searchParams, location.state?.fromPromDate]);
+  }, [isAuthLoading, currentUserId, promDate, navigate, location.state]);
 
   // Show loading while checking auth
   if (isAuthLoading) {
@@ -418,7 +417,7 @@ const Matches = () => {
             sexualOrientation: data.sexualOrientation,
             intention: data.intention,
             hometown: data.hometown,
-            foodPreference: "No preference",
+            foodPreference: "Flexible",
             onboardingCompleted: true,
           },
           opts
@@ -739,8 +738,8 @@ const ChatView = ({
             options: { bucket: "userPhotos" },
           });
           setProfilePicUrl(url.toString());
-        } catch (err) {
-          console.warn("[ChatView] Failed to get profile pic URL:", err);
+        } catch {
+          // Profile pic unavailable
         }
       }
     };

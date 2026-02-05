@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, X, Loader2 } from "lucide-react";
 import { getUserProfile } from "@/utils/auth";
-import ShareSheet from "@/components/ShareSheet";
+import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 
 export interface PendingPartnerRequest {
   id: string;
@@ -15,22 +15,21 @@ interface PendingPartnerRequestViewProps {
   onWithdraw: () => Promise<void>;
   onShare?: () => void;
   isWithdrawing: boolean;
-  /** Optional profile photo URL for the share image */
+  /** Optional profile photo URL – unused now (no share-as-image) */
   fromPhotoUrl?: string | null;
 }
 
 /**
  * Shown when user has sent a partner invite (Already a couple flow) and is waiting for acceptance.
- * No access to Discover or Chat – only withdraw or share.
+ * No access to Discover or Chat – only withdraw or share via WhatsApp (with personal message).
  */
 export default function PendingPartnerRequestView({
   partnerDisplayName,
   onWithdraw,
   onShare,
   isWithdrawing,
-  fromPhotoUrl,
 }: PendingPartnerRequestViewProps) {
-  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [shareData, setShareData] = useState<{
     fromName: string;
     fromEmail: string;
@@ -42,7 +41,7 @@ export default function PendingPartnerRequestView({
       fromName: p?.name || "Someone",
       fromEmail: p?.email || "",
     });
-    setShowShareSheet(true);
+    setShowInviteDialog(true);
     onShare?.();
   };
 
@@ -55,13 +54,15 @@ export default function PendingPartnerRequestView({
         <h2 className="font-display text-2xl font-bold mb-3">
           Your prom invite is in the air! ✨
         </h2>
-        <p className="text-muted-foreground text-lg mb-2">
+        <p className="text-muted-foreground text-lg mb-0 leading-tight">
           You&apos;re waiting on{" "}
           <span className="text-primary font-semibold">{partnerDisplayName}</span>
-          — fingers crossed they say yes!
+        </p>
+        <p className="text-muted-foreground text-lg mb-2 leading-tight">
+          Fingers crossed they say yes!
         </p>
         <p className="text-sm text-muted-foreground mb-8">
-          No swiping or chatting until they accept. Use the buttons below to nudge them or change your mind.
+          The ball&apos;s in their court ✨ Resend your invite below if they need a nudge, or follow your heart elsewhere.
         </p>
       </div>
 
@@ -97,13 +98,12 @@ export default function PendingPartnerRequestView({
         </Button>
       </div>
       {shareData && (
-        <ShareSheet
-          variant="partnerInvite"
-          open={showShareSheet}
-          onOpenChange={setShowShareSheet}
+        <WhatsAppInviteDialog
+          open={showInviteDialog}
+          onOpenChange={setShowInviteDialog}
           fromName={shareData.fromName}
           fromEmail={shareData.fromEmail}
-          fromPhotoUrl={fromPhotoUrl}
+          skipLabel="Cancel"
         />
       )}
     </div>

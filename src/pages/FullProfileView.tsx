@@ -21,7 +21,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
   const photoUrls: string[] = [];
   const nonNegotiables: string[] = [];
   if (backendProfile.smokingPreference === "Never") nonNegotiables.push("Non-smoking");
-  else if (backendProfile.smokingPreference === "Sometimes" || backendProfile.smokingPreference === "Regularly") nonNegotiables.push("Smoking okay");
+  else if (["Passively", "Sometimes", "Regularly"].includes(backendProfile.smokingPreference || "")) nonNegotiables.push("Smoking okay");
   if (backendProfile.alcoholPreference === "Never") nonNegotiables.push("No alcohol");
   else if (backendProfile.alcoholPreference === "Sometimes" || backendProfile.alcoholPreference === "Regularly") nonNegotiables.push("Alcohol okay");
   if (backendProfile.intention === "Date for Prom" || backendProfile.intention === "In a relationship, looking for a prom date") nonNegotiables.push("Serious intent");
@@ -359,13 +359,13 @@ export default function FullProfileView() {
             </h2>
             <ul className="space-y-1 text-sm">
               {profile.favouritePlace && (
-                <li>Favourite place: {profile.favouritePlace}</li>
+                <li>Happy place: {profile.favouritePlace}</li>
               )}
               {profile.teaOrCoffee && (
-                <li>Tea or Coffee: {profile.teaOrCoffee}</li>
+                <li>Your poison: {profile.teaOrCoffee}</li>
               )}
               {profile.mountainOrBeach && (
-                <li>Mountain or Beach: {profile.mountainOrBeach}</li>
+                <li>Vacation vibes: {profile.mountainOrBeach}</li>
               )}
               {profile.foodPreference && (
                 <li>Food: {profile.foodPreference}</li>

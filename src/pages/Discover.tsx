@@ -41,7 +41,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
   const nonNegotiables: string[] = [];
   if (backendProfile.smokingPreference === "Never") {
     nonNegotiables.push("Non-smoking");
-  } else if (backendProfile.smokingPreference === "Sometimes" || backendProfile.smokingPreference === "Regularly") {
+  } else if (["Passively", "Sometimes", "Regularly"].includes(backendProfile.smokingPreference || "")) {
     nonNegotiables.push("Smoking okay");
   }
   
@@ -268,8 +268,6 @@ export default function Discover() {
         // Load already-liked profile ids so we exclude them from the feed
         await loadLikesFromBackend();
         
-        console.log("[Discover] Fetching profiles from backend...");
-        
         // Get current user to exclude their profile
         const currentUser = await getUserProfile();
         const currentUserEmail = currentUser?.email;
@@ -335,15 +333,9 @@ export default function Discover() {
         }
 
         if (!backendProfiles || backendProfiles.length === 0) {
-          console.log("[Discover] No profiles found in backend");
           setProfiles([]);
           return;
         }
-
-        console.log("[Discover] Fetched profiles from backend:", {
-          count: backendProfiles.length,
-          currentUserEmail,
-        });
 
         // Filter: exclude current user, only completed onboarding, exclude prom date & request pending
         const filteredBackend = backendProfiles.filter(
@@ -368,20 +360,13 @@ export default function Discover() {
                 options: { bucket: "userPhotos" },
               });
               transformedProfiles[i].photoUrls = [url];
-            } catch (e) {
-              console.warn("[Discover] Failed to get photo URL for profile", filteredBackend[i].id, e);
+            } catch {
+              // Photo URL unavailable
             }
           }
         }
 
         const validProfiles = transformedProfiles.filter((p) => p.id && p.name);
-
-        console.log("[Discover] Transformed profiles:", {
-          total: backendProfiles.length,
-          afterExcludingCurrent: validProfiles.length,
-          profileIds: validProfiles.map((p) => p.id),
-        });
-
         setProfiles(validProfiles);
       } catch (err) {
         console.error("[Discover] Error fetching profiles:", err);
@@ -398,16 +383,7 @@ export default function Discover() {
   // Apply filters to fetched profiles
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return [];
-    console.log("[Discover] Applying filters:", {
-      filters,
-      totalProfiles: profiles.length,
-    });
-    const filtered = applyFilters(profiles, filters);
-    console.log("[Discover] Filtered profiles:", {
-      count: filtered.length,
-      profileIds: filtered.map(p => p.id),
-    });
-    return filtered;
+    return applyFilters(profiles, filters);
   }, [profiles, filters]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
@@ -500,7 +476,7 @@ export default function Discover() {
             sexualOrientation: data.sexualOrientation,
             intention: data.intention,
             hometown: data.hometown,
-            foodPreference: "No preference",
+            foodPreference: "Flexible",
             onboardingCompleted: true,
           },
           opts

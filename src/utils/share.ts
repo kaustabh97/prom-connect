@@ -3,8 +3,43 @@ import { APP_URL } from "@/config";
 const REFERRAL_MESSAGE = `Starlit by the Brick – IIMA's anonymous matchmaking for Prom 2026! 💫 Find your date. Campus-only, privacy-first. Join at ${APP_URL}`;
 
 /**
+ * Gets the referral share data (same message used on MatchmakingComingSoon + Profile).
+ */
+export function getReferralShareData() {
+  const url = APP_URL;
+  const text = `*Starlit by the Bricks* ✨\n\nIIMA exclusive Prom 2026 matching\n\nReal profiles, real people you'll see at prom. Campus-only, verified. No strangers, no awkward first meets.\n\nSet your preferences, swipe through matches, chat when it's mutual. Profile takes 2 mins.\n\n*Everyone's signing up. Don't be the one asking "how did I not know about this?" after prom.*\n\nSign up now: ${url}\n\n_Crafted on Campus, for Campus 💛_`;
+  return { text, url, title: "Starlit by the Bricks - Prom 2026" };
+}
+
+/**
+ * Returns the wa.me URL with the referral message pre-filled.
+ */
+export function getReferralWhatsAppUrl(): string {
+  const { text } = getReferralShareData();
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
+
+/**
+ * Opens share dialog (Web Share API on supported devices) or WhatsApp.
+ * Same flow as MatchmakingComingSoon "Refer a friend".
+ */
+export async function handleReferralShare(): Promise<void> {
+  if (typeof navigator !== "undefined" && navigator.share) {
+    try {
+      const { text, url, title } = getReferralShareData();
+      await navigator.share({ title, text, url });
+      return;
+    } catch {
+      // User cancelled or share failed — fall through to WhatsApp link
+    }
+  }
+  const w = window.open(getReferralWhatsAppUrl(), "_blank", "noopener,noreferrer,width=600,height=400");
+  if (w) setTimeout(() => w.close(), 1500);
+}
+
+/**
  * Opens WhatsApp with a pre-filled referral message.
- * User can then select contacts to send it to.
+ * @deprecated Use handleReferralShare() for the same flow as MatchmakingComingSoon.
  */
 export function shareViaWhatsApp(): void {
   const encoded = encodeURIComponent(REFERRAL_MESSAGE);
@@ -16,10 +51,19 @@ export function shareViaWhatsApp(): void {
  * Opens WhatsApp with a partner invite message (for IIMA partner not on portal).
  * @param fromName - Name of person inviting
  * @param inviterEmail - Inviter's email (used in ?invite= so partner sees the request)
+ * @param personalMessage - Optional personal message, shown after the main invite with an indication
  */
-export function sharePartnerInviteViaWhatsApp(fromName: string, inviterEmail: string): void {
-  const inviteUrl = `${APP_URL}?invite=${encodeURIComponent(inviterEmail)}`;
-  const message = `Hey! ${fromName} wants to go to Prom with you 💫\n\nThey're on Starlit by the Brick – IIMA's anonymous matchmaking for Prom 2026. Join and accept their request:\n${inviteUrl}`;
+export function sharePartnerInviteViaWhatsApp(
+  fromName: string,
+  inviterEmail: string,
+  personalMessage?: string
+): void {
+  const inviteUrl = APP_URL;
+  const baseIntro = `*Someone's got a crush on you 💕*\n\n${fromName} wants to go to Prom with you and they're on Starlit by the Brick – IIMA's matchmaking for Prom 2026. Join with the link below and say yes 🥺`;
+  const personalSection = personalMessage?.trim()
+    ? `\n\n💌 A note from ${fromName}:\n\n_"${personalMessage.trim()}"_`
+    : "";
+  const message = `${baseIntro}${personalSection}\n\n${inviteUrl}\n\n_Crafted on Campus, for Campus 💛_`;
   const encoded = encodeURIComponent(message);
   const url = `https://wa.me/?text=${encoded}`;
   window.open(url, "_blank", "noopener,noreferrer");

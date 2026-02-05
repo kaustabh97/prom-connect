@@ -97,8 +97,8 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
             if (data) {
               profileMap[id] = data;
             }
-          } catch (err) {
-            console.warn("[useMatches] Failed to load profile for match user:", id, err);
+          } catch {
+            // Profile unavailable
           }
         })
       );

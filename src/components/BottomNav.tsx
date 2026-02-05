@@ -107,17 +107,21 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
 
   useEffect(() => {
     const load = async () => {
-      const p = await getUserProfile();
-      if (!p?.email) return;
-      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
-      const opts = authMode ? { authMode } : undefined;
-      const { data } = await client.models.UserProfile.list(
-        { filter: { email: { eq: p.email } } },
-        opts
-      );
-      const profile = data?.[0];
-      setCurrentUserId(profile?.id ?? "");
-      setCurrentUserEmail(profile?.email ?? p.email ?? "");
+      try {
+        const p = await getUserProfile();
+        if (!p?.email) return;
+        const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+        const opts = authMode ? { authMode } : undefined;
+        const { data } = await client.models.UserProfile.list(
+          { filter: { email: { eq: p.email } } },
+          opts
+        );
+        const profile = data?.[0];
+        setCurrentUserId(profile?.id ?? "");
+        setCurrentUserEmail(profile?.email ?? p.email ?? "");
+      } catch {
+        // Silently fail - nav will work without badge counts
+      }
     };
     load();
   }, []);
