@@ -274,7 +274,7 @@ const Landing = () => {
       <footer className="py-5 px-4 border-t border-border/50">
         <div className="max-w-6xl mx-auto flex flex-col gap-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-            <p>© 2026 Starlit by the Brick. Built with 💛 for the campus.</p>
+            <p>© 2026 Starlit by the Brick. Built with  💛  for the campus.</p>
           </div>
           <div className="text-center text-xs text-muted-foreground/60 pt-2">
             Created by{" "}

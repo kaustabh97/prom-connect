@@ -33,6 +33,24 @@ npx amplify sandbox (inside frontend package, amplify code is prom-connect/ampli
 
 (Sets up backend sandbox etc)
 
+## Setting Secrets for AWS Amplify Pipeline Deployments
+
+When deploying via AWS Amplify Console (pipeline deployments), secrets must be set in the **Secrets** section (not Environment Variables):
+
+1. Go to [AWS Amplify Console](https://console.aws.amazon.com/amplify/)
+2. Select your app → **Hosting** → **Secrets**
+3. Click **Manage secrets** button
+4. Add the following secrets:
+   - `GOOGLE_CLIENT_ID` = Your Google OAuth Client ID
+   - `GOOGLE_CLIENT_SECRET` = Your Google OAuth Client Secret
+5. Choose whether to apply to **all branches** or a **specific branch** (e.g., `main`)
+6. Save and redeploy
+
+**Important**: 
+- Secrets are stored in AWS Systems Manager Parameter Store automatically
+- Environment Variables ≠ Secrets - they serve different purposes
+- These secrets are required for Google OAuth authentication. Without them, the deployment will fail with `SecretNotSetError`
+
 ## Google OAuth "invalid request" fix
 
 If you see "You can't sign in because this app sent an invalid request" when signing in with Google:
