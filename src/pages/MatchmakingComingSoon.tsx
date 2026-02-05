@@ -40,7 +40,7 @@ export default function MatchmakingComingSoon() {
             onClick={() => navigate("/profile")}
           >
             <User className="w-5 h-5" />
-            View my profile
+            Polish my profile
           </Button>
           <Button
             variant="outline"

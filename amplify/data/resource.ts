@@ -160,6 +160,8 @@ const schema = a.schema({
     .model({
       user1Id: a.string().required(),           // First participant's user ID
       user2Id: a.string().required(),           // Second participant's user ID
+      user1Email: a.string(),                   // First participant's email (for identification)
+      user2Email: a.string(),                   // Second participant's email (for identification)
       user1Revealed: a.boolean().default(false), // Has user1 revealed their identity?
       user2Revealed: a.boolean().default(false), // Has user2 revealed their identity?
       lastMessageAt: a.datetime(),              // For sorting conversations by recent activity
@@ -206,6 +208,7 @@ const schema = a.schema({
     .model({
       conversationId: a.string().required(),    // Links to Conversation
       senderId: a.string().required(),          // User ID of the sender
+      senderEmail: a.string(),                  // Sender's email (for identification)
       content: a.string().required(),           // Message text content
       sentAt: a.datetime().required(),          // Timestamp when message was sent
     })

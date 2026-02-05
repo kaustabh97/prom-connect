@@ -20,13 +20,15 @@ function openGmailReportFallback(
   context: string,
   personName?: string,
   personId?: string,
+  personEmail?: string,
   reporterEmail?: string,
   reporterName?: string
 ) {
   const subject = encodeURIComponent("Starlit by the Brick – Report");
   const bodyParts: string[] = [];
-  if (personName || personId) {
-    bodyParts.push(`Reporting: ${personName || "Unknown"}${personId ? ` (ID: ${personId})` : ""}`);
+  if (personEmail || personName) {
+    const identifier = personEmail || personName || "Unknown";
+    bodyParts.push(`Reporting: ${identifier}`);
   }
   bodyParts.push(`Context: ${context}`);
   if (reporterEmail || reporterName) {
@@ -44,6 +46,7 @@ async function sendReportViaFormSubmit(
   context: string,
   personName?: string,
   personId?: string,
+  personEmail?: string,
   reporterEmail?: string,
   reporterName?: string
 ): Promise<{ ok: boolean }> {
@@ -55,8 +58,7 @@ async function sendReportViaFormSubmit(
       _template: "table",
       _captcha: "false",
       "Report details": text,
-      "Reported person": personName || "Unknown",
-      "Reported person ID": personId || "",
+      "Reported person": personEmail || personName || "Unknown",
       Context: context,
       "Reporter email": reporterEmail || "",
       "Reporter name": reporterName || "",
@@ -71,6 +73,7 @@ interface ReportModalProps {
   onOpenChange: (open: boolean) => void;
   personName?: string;
   personId?: string;
+  personEmail?: string;
   context?: string;
   reporterEmail?: string;
   reporterName?: string;
@@ -81,6 +84,7 @@ export default function ReportModal({
   onOpenChange,
   personName,
   personId,
+  personEmail,
   context = "Starlit by the Brick",
   reporterEmail,
   reporterName,
@@ -114,6 +118,7 @@ export default function ReportModal({
         context,
         personName ?? undefined,
         personId,
+        personEmail ?? undefined,
         reporterEmailToUse,
         reporterNameToUse
       );
@@ -122,7 +127,7 @@ export default function ReportModal({
         setReportText("");
         onOpenChange(false);
       } else {
-        openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmailToUse, reporterNameToUse);
+        openGmailReportFallback(text, context, personName ?? undefined, personId, personEmail ?? undefined, reporterEmailToUse, reporterNameToUse);
         toast({ title: "Opened email app", description: "Please send the report manually." });
         setReportText("");
         onOpenChange(false);
@@ -131,7 +136,7 @@ export default function ReportModal({
       // FormSubmit failed, fall back to Gmail
       const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
       const reporterNameToUse = reporterName ?? reporterInfo.name;
-      openGmailReportFallback(text, context, personName ?? undefined, personId, reporterEmailToUse, reporterNameToUse);
+      openGmailReportFallback(text, context, personName ?? undefined, personId, personEmail ?? undefined, reporterEmailToUse, reporterNameToUse);
       toast({ title: "Opened email app", description: "Please send the report manually." });
       setReportText("");
       onOpenChange(false);

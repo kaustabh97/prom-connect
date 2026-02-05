@@ -635,6 +635,7 @@ const Matches = () => {
             match={activeMatch}
             conversationId={activeConversationId}
             currentUserId={currentUserId}
+            currentUserEmail={currentUserEmail}
             onBack={() => location.state?.fromPromDate ? navigate("/prom-date", { replace: true }) : setActiveChat(null)}
             onConversationCreated={(convId) => handleConversationCreated(activeMatch.id, convId)}
             onAskToProm={() => setShowPromAsk(true)}
@@ -689,6 +690,7 @@ interface ChatViewProps {
   match: MatchWithDetails;
   conversationId?: string;
   currentUserId: string;
+  currentUserEmail?: string;
   onBack: () => void;
   onConversationCreated?: (conversationId: string) => void;
   onAskToProm?: () => void;
@@ -704,6 +706,7 @@ const ChatView = ({
   match, 
   conversationId, 
   currentUserId,
+  currentUserEmail,
   onBack,
   onConversationCreated,
   onAskToProm,
@@ -758,6 +761,8 @@ const ChatView = ({
   } = useChat({
     conversationId,
     currentUserId,
+    currentUserEmail,
+    otherUserEmail: match.otherUserEmail,
   });
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -824,6 +829,7 @@ const ChatView = ({
         onOpenChange={setReportOpen}
         personName={displayName}
         personId={match.otherUserId}
+        personEmail={match.otherUserEmail}
         context="Chat"
       />
       {/* Chat header - same color as background, blends seamlessly */}
