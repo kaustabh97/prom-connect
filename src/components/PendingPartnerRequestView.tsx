@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, X, Loader2 } from "lucide-react";
-import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
 import { getUserProfile } from "@/utils/auth";
+import ShareSheet from "@/components/ShareSheet";
 
 export interface PendingPartnerRequest {
   id: string;
@@ -14,6 +15,8 @@ interface PendingPartnerRequestViewProps {
   onWithdraw: () => Promise<void>;
   onShare?: () => void;
   isWithdrawing: boolean;
+  /** Optional profile photo URL for the share image */
+  fromPhotoUrl?: string | null;
 }
 
 /**
@@ -25,10 +28,21 @@ export default function PendingPartnerRequestView({
   onWithdraw,
   onShare,
   isWithdrawing,
+  fromPhotoUrl,
 }: PendingPartnerRequestViewProps) {
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [shareData, setShareData] = useState<{
+    fromName: string;
+    fromEmail: string;
+  } | null>(null);
+
   const handleShare = async () => {
     const p = await getUserProfile();
-    sharePartnerInviteViaWhatsApp(p?.name || "Someone", p?.email || "");
+    setShareData({
+      fromName: p?.name || "Someone",
+      fromEmail: p?.email || "",
+    });
+    setShowShareSheet(true);
     onShare?.();
   };
 
@@ -82,6 +96,16 @@ export default function PendingPartnerRequestView({
           )}
         </Button>
       </div>
+      {shareData && (
+        <ShareSheet
+          variant="partnerInvite"
+          open={showShareSheet}
+          onOpenChange={setShowShareSheet}
+          fromName={shareData.fromName}
+          fromEmail={shareData.fromEmail}
+          fromPhotoUrl={fromPhotoUrl}
+        />
+      )}
     </div>
   );
 }

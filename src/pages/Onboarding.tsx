@@ -986,15 +986,15 @@ const Onboarding = () => {
           { authMode: authMode as "userPool" | "apiKey" }
         );
         if (!partner) {
-          // Show popup instead of directly opening WhatsApp
+          // Partner not registered - show popup to share via WhatsApp, then go to request-pending
           setPendingWhatsAppInvite({
             name: profile.name || "Someone",
             email: currentUserEmail,
           });
           setShowWhatsAppInvitePopup(true);
-          // Navigation will happen after popup is closed
+          // Navigation to /request-pending will happen after popup is closed
         } else {
-          // Partner exists, navigate directly
+          // Partner exists - they'll see the request in Matches
           navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
       } catch (reqErr) {
@@ -1127,10 +1127,32 @@ const Onboarding = () => {
       const session = await fetchAuthSession();
       const auth = !!session.tokens;
       const authMode = auth ? "userPool" : "apiKey";
+      const opts = { authMode: authMode as "userPool" | "apiKey" };
       await client.models.MatchRequest.update(
         { id: inviteRequest.id, status: "declined" },
-        { authMode: authMode as "userPool" | "apiKey" }
+        opts
       );
+      // Clear sender's bio so they go to discover flow when they next load
+      try {
+        const { data: senderProfiles } = await client.models.UserProfile.list(
+          { filter: { id: { eq: inviteRequest.fromUserId } } },
+          opts
+        );
+        if (senderProfiles?.[0]?.id && senderProfiles[0].bio?.startsWith("Partner:")) {
+          await client.models.UserProfile.update(
+            {
+              id: senderProfiles[0].id,
+              bio: undefined,
+              partnerStatus: "Still looking for my prom date 💫",
+              partnerEmail: "",
+              partnerName: "",
+            },
+            opts
+          );
+        }
+      } catch (_) {
+        // Non-fatal
+      }
       clearInviteFrom();
       setInviteRequest(null);
       setFlowChoice(null);
@@ -1991,6 +2013,7 @@ const Onboarding = () => {
             </div>
             <div>
               <Label htmlFor="partnerEmail" className="text-base mb-3 block">Partner&apos;s IIMA email</Label>
+              <p className="text-xs text-muted-foreground mb-2">Double-check that email – we wouldn&apos;t want you to miss your date! ✨</p>
               <Input
                 id="partnerEmail"
                 type="email"
@@ -2296,8 +2319,7 @@ const Onboarding = () => {
               variant="outline"
               onClick={() => {
                 setShowWhatsAppInvitePopup(false);
-                // Navigate after closing popup
-                navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+                navigate("/request-pending");
               }}
               className="w-full sm:w-auto"
             >
@@ -2310,8 +2332,7 @@ const Onboarding = () => {
                   sharePartnerInviteViaWhatsApp(pendingWhatsAppInvite.name, pendingWhatsAppInvite.email);
                 }
                 setShowWhatsAppInvitePopup(false);
-                // Navigate after opening WhatsApp
-                navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+                navigate("/request-pending");
               }}
               className="w-full sm:w-auto"
             >

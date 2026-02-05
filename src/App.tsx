@@ -13,6 +13,7 @@ import Matches from "./pages/Matches";
 import TestChat from "./pages/TestChat";
 import Profile from "./pages/Profile";
 import PromDate from "./pages/PromDate";
+import RequestPending from "./pages/RequestPending";
 import MatchmakingComingSoon from "./pages/MatchmakingComingSoon";
 import NotFound from "./pages/NotFound";
 import { MATCHMAKING_ENABLED } from "@/config";
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/matches" element={MATCHMAKING_ENABLED ? <Matches /> : <Navigate to="/matchmaking-soon" replace />} />
             <Route path="/matchmaking-soon" element={<MatchmakingComingSoon />} />
             <Route path="/prom-date" element={<PromDate />} />
+            <Route path="/request-pending" element={<RequestPending />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="/test-chat" element={<TestChat />} />

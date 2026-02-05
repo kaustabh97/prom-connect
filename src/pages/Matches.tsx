@@ -16,6 +16,7 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
+import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { 
   Heart, 
   MessageCircle, 
@@ -62,6 +63,7 @@ const Matches = () => {
     partnerDisplayName: string;
   } | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   
   // Scroll to top when navigating to Matches
   useEffect(() => {
@@ -364,6 +366,48 @@ const Matches = () => {
   }
 
   // Pending outgoing partner request – no access to chat or discover
+  const handleWithdrawConfirm = async (data: WithdrawFormData) => {
+    if (!pendingOutgoingRequest?.id) return;
+    setWithdrawing(true);
+    try {
+      const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+      const opts = authMode ? { authMode } : undefined;
+      await client.models.MatchRequest.update(
+        { id: pendingOutgoingRequest.id, status: "withdrawn" },
+        opts
+      );
+      const { data: myProfiles } = await client.models.UserProfile.list(
+        { filter: { email: { eq: currentUserEmail } } },
+        opts
+      );
+      if (myProfiles?.[0]?.id) {
+        await client.models.UserProfile.update(
+          {
+            id: myProfiles[0].id,
+            bio: undefined,
+            partnerStatus: "Still looking for my prom date 💫",
+            partnerEmail: "",
+            partnerName: "",
+            sexualOrientation: data.sexualOrientation,
+            intention: data.intention,
+            hometown: data.hometown,
+            foodPreference: "No preference",
+            onboardingCompleted: true,
+          },
+          opts
+        );
+      }
+      setPendingOutgoingRequest(null);
+      await loadPendingOutgoing();
+      navigate("/discover/profile", { state: { refresh: true } });
+    } catch (e) {
+      console.error("[Matches] Withdraw failed:", e);
+      throw e;
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   if (pendingOutgoingRequest && !authError) {
     return (
       <div className="min-h-dvh bg-gradient-midnight relative flex flex-col w-full">
@@ -375,44 +419,16 @@ const Matches = () => {
           <div className="flex-1 flex flex-col min-h-0">
             <PendingPartnerRequestView
               partnerDisplayName={pendingOutgoingRequest.partnerDisplayName}
-              onWithdraw={async () => {
-                if (!pendingOutgoingRequest?.id) return;
-                setWithdrawing(true);
-                try {
-                  const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
-                  const opts = authMode ? { authMode } : undefined;
-                  await client.models.MatchRequest.update(
-                    { id: pendingOutgoingRequest.id, status: "declined" },
-                    opts
-                  );
-                  const { data: myProfiles } = await client.models.UserProfile.list(
-                    { filter: { email: { eq: currentUserEmail } } },
-                    opts
-                  );
-                  if (myProfiles?.[0]?.id) {
-                    await client.models.UserProfile.update(
-                      {
-                        id: myProfiles[0].id,
-                        partnerStatus: "Still looking for my prom date 💫",
-                        partnerEmail: "",
-                        partnerName: "",
-                      },
-                      opts
-                    );
-                  }
-                  setPendingOutgoingRequest(null);
-                  await loadPendingOutgoing();
-                  navigate("/discover/profile", { state: { refresh: true } });
-                } catch (e) {
-                  console.error("[Matches] Withdraw failed:", e);
-                } finally {
-                  setWithdrawing(false);
-                }
-              }}
+              onWithdraw={() => setShowWithdrawModal(true)}
               isWithdrawing={withdrawing}
             />
           </div>
         </div>
+        <WithdrawModal
+          open={showWithdrawModal}
+          onOpenChange={setShowWithdrawModal}
+          onConfirm={handleWithdrawConfirm}
+        />
       </div>
     );
   }

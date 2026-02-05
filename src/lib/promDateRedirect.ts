@@ -6,8 +6,10 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 const client = generateClient<Schema>();
 
 /**
- * Returns the path to redirect to if the user has a prom date (IIMA match or outside partner).
- * Returns null if they don't have a prom date.
+ * Returns the path to redirect to based on user's partner status.
+ * - "/prom-date" when they have a confirmed prom date (IIMA Match or outside partner)
+ * - "/request-pending" when they've sent a partner invite (IIMA) that's still pending
+ * - null when they should go to discover/matches/profile
  */
 export async function getPromDateRedirectPath(): Promise<string | null> {
   const profile = await getUserProfile();
@@ -23,8 +25,9 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
   if (!profiles?.[0]) return null;
   const userProfile = profiles[0];
   const userId = userProfile.id;
+  const bio = userProfile.bio;
 
-  // Check IIMA match (prom date via Match record)
+  // 1. Check IIMA match (prom date via Match record - both accepted)
   const [as1, as2] = await Promise.all([
     client.models.Match.listMatchByUser1Id({ user1Id: userId }, opts),
     client.models.Match.listMatchByUser2Id({ user2Id: userId }, opts),
@@ -34,8 +37,22 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
     return "/prom-date";
   }
 
-  // Check outside partner (bio starts with "Partner: ")
-  const bio = userProfile.bio;
+  // 2. Check pending partner request (IIMA couple flow - sent invite, waiting for acceptance)
+  const { data: outgoingRequests } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+    { fromUserId: userId },
+    opts
+  );
+  const pendingSent = (outgoingRequests ?? []).filter((r) => r.status === "pending");
+  if (pendingSent.length > 0) {
+    return "/request-pending";
+  }
+
+  // 3. Outside partner (bio "Partner: X" with no MatchRequest - partner from outside campus)
+  // If we had MatchRequests from me (declined/withdrawn), don't treat as outside - go to discover
+  const hasAnyOutgoingRequest = (outgoingRequests ?? []).length > 0;
+  if (hasAnyOutgoingRequest) {
+    return null; // IIMA flow but request was declined/withdrawn
+  }
   const partnerMatch = bio?.match(/^Partner:\s*(.+)/);
   if (partnerMatch) {
     const partnerName = partnerMatch[1].trim();

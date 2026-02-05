@@ -55,14 +55,16 @@ function PromDateGate({
 export default function AppLayout() {
   const location = useLocation();
   const isPromDate = location.pathname === "/prom-date";
+  const isRequestPending = location.pathname === "/request-pending";
+  const hideNavForPage = isPromDate || isRequestPending;
   const [isCheckingPromDateRedirect, setIsCheckingPromDateRedirect] = useState(false);
 
   return (
-    <div className={`min-h-dvh flex flex-col w-full h-dvh max-h-dvh overflow-hidden ${isPromDate ? "" : "content-above-nav"}`}>
-      <main id="app-main" className={`flex-1 min-h-0 w-full min-w-0 overflow-x-hidden ${isPromDate ? "overflow-auto" : "overflow-auto"}`}>
+    <div className={`min-h-dvh flex flex-col w-full h-dvh max-h-dvh overflow-hidden ${hideNavForPage ? "" : "content-above-nav"}`}>
+      <main id="app-main" className={`flex-1 min-h-0 w-full min-w-0 overflow-x-hidden overflow-auto`}>
         <PromDateGate onCheckingChange={setIsCheckingPromDateRedirect} />
       </main>
-      <BottomNav hideNav={isCheckingPromDateRedirect || isPromDate} />
+      <BottomNav hideNav={isCheckingPromDateRedirect || hideNavForPage} />
     </div>
   );
 }
