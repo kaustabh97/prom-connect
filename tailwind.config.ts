@@ -22,6 +22,7 @@ export default {
         "hero-cormorant": ['"Cormorant Garamond"', 'serif'],
         "hero-fraunces": ['"Fraunces"', 'serif'],
         "hero-italiana": ['"Italiana"', 'serif'],
+        playfair: ['"Playfair Display"', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",

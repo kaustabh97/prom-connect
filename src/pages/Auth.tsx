@@ -8,6 +8,7 @@ import { Heart, Mail, FlaskConical } from "lucide-react";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
+import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -39,7 +40,12 @@ const Auth = () => {
         setIsLoading(false);
         
         if (completed) {
-          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+          const promDatePath = await getPromDateRedirectPath();
+          if (promDatePath) {
+            navigate(promDatePath);
+          } else {
+            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+          }
         } else {
           // Redirect to onboarding if not completed
           navigate("/onboarding");

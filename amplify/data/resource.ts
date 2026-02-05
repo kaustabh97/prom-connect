@@ -19,6 +19,7 @@ const schema = a.schema({
       mobileNo: a.string(),
       dateOfBirth: a.string(), // DD MM YYYY format
       age: a.integer(), // Can be calculated from dateOfBirth
+      height: a.string(), // e.g. "5'10\"" or "5 ft 10 in"
       cohort: a.string(), // PGP1, PGP2, PGPX, PhD, AA, Staff, Other
       gender: a.string(),
       sexualOrientation: a.string(),

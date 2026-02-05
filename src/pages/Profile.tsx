@@ -38,6 +38,7 @@ type UserProfileData = {
   email: string;
   name?: string | null;
   age?: number | null;
+  height?: string | null;
   gender?: string | null;
   sexualOrientation?: string | null;
   bio?: string | null;
@@ -189,6 +190,7 @@ export default function Profile() {
   };
 
   const PREF_KEYS = ["alcoholPreference", "smokingPreference", "foodPreference", "favouritePlace", "teaOrCoffee", "mountainOrBeach"] as const;
+  // Height is read-only – never include in any profile update (set at onboarding only)
   const openPreferencesEdit = () => {
     const vals: Record<string, string> = {};
     PREF_KEYS.forEach((key) => {
@@ -632,6 +634,7 @@ export default function Profile() {
                   <h2 className="font-display text-2xl font-bold drop-shadow-md">
                     {profile.name || "Anonymous"}
                     {profile.age ? `, ${profile.age}` : ""}
+                    {profile.height ? ` • ${profile.height}` : ""}
                   </h2>
                   {(profile.gender || profile.sexualOrientation) && (
                     <p className="text-sm text-white/90">

@@ -9,7 +9,8 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Heart, Loader2, LogOut, MessageCircle } from "lucide-react";
+import { Loader2, LogOut, MessageCircle, Sparkles, User } from "lucide-react";
+import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
 import { clearTestUser } from "@/utils/auth";
 
@@ -126,7 +127,7 @@ export default function PromDate() {
     return (
       <div className="h-dvh max-h-dvh overflow-hidden bg-gradient-midnight flex items-center justify-center">
         <SparkleBackground />
-        <p className="text-muted-foreground">No prom date yet.</p>
+        <p className="text-muted-foreground">Your prom date is still out there – keep swiping!</p>
       </div>
     );
   }
@@ -151,14 +152,7 @@ export default function PromDate() {
           Log out
         </Button>
       </div>
-      {/* Decorative floating hearts */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <Heart className="absolute top-16 left-8 w-6 h-6 text-primary/20 animate-pulse" />
-        <Heart className="absolute top-24 right-12 w-5 h-5 text-primary/25 animate-pulse" style={{ animationDelay: "0.5s" }} />
-        <Heart className="absolute bottom-32 left-12 w-5 h-5 text-primary/20 fill-primary/10 animate-pulse" style={{ animationDelay: "1s" }} />
-        <Heart className="absolute bottom-40 right-8 w-6 h-6 text-primary/25 animate-pulse" style={{ animationDelay: "0.3s" }} />
-      </div>
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -171,15 +165,13 @@ export default function PromDate() {
             transition={{ delay: 0.2, type: "spring" }}
             className="flex items-center justify-center gap-2 mx-auto mb-4"
           >
-            <Heart className="w-8 h-8 text-primary fill-primary/30" />
-            <Heart className="w-10 h-10 text-primary fill-primary/40" />
-            <Heart className="w-8 h-8 text-primary fill-primary/30" />
+            <Sparkles className="w-8 h-8 text-primary" />
           </motion.div>
           <h1 className="font-display text-3xl md:text-4xl font-bold mb-2">
-            You have a date
+            It&apos;s official – you&apos;re going to Prom together
           </h1>
           <p className="text-muted-foreground text-lg">
-            You&apos;re going to Prom together – the rest is up to you two.
+            Time to plan the dance moves, coordinate outfits, and make it a night to remember.
           </p>
         </motion.div>
 
@@ -196,27 +188,23 @@ export default function PromDate() {
                 <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Heart className="w-14 h-14 text-primary/60" />
+                  <User className="w-14 h-14 text-primary/60" />
                 </div>
               )}
             </div>
-            <p className="font-semibold text-lg text-foreground">{myName}</p>
-            <p className="text-xs text-muted-foreground">&</p>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <Heart className="w-5 h-5 text-primary fill-primary/50" />
-              <span className="font-semibold text-foreground">{theirName}</span>
-              <Heart className="w-5 h-5 text-primary fill-primary/50" />
-            </div>
+            <p className="font-playfair text-lg font-medium text-foreground">{myName}</p>
+            <p className="text-sm text-muted-foreground mt-2">+</p>
+            <p className="font-playfair text-lg font-medium text-foreground mt-1">{theirName}</p>
           </motion.div>
         )}
 
-        {/* Both IIMA: two cards with photos in V-shape, hearts between */}
+        {/* Both IIMA: two cards with photos in V-shape */}
         {showBothView && (
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="relative w-full max-w-md flex items-end justify-center gap-2 py-8"
+            className="relative w-full max-w-md flex items-end justify-center gap-4 py-8"
           >
             {/* Left card (me) */}
             <motion.div
@@ -230,25 +218,15 @@ export default function PromDate() {
                   <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Heart className="w-12 h-12 text-primary/60" />
+                    <User className="w-12 h-12 text-primary/60" />
                   </div>
                 )}
               </div>
-              <p className="font-semibold text-foreground truncate">{myName}</p>
+              <p className="font-playfair font-medium text-foreground truncate">{myName}</p>
               <p className="text-xs text-muted-foreground">You</p>
             </motion.div>
 
-            {/* Hearts between the two */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.7, type: "spring" }}
-              className="flex flex-col items-center justify-end gap-1 pb-8"
-            >
-              <Heart className="w-6 h-6 text-primary fill-primary/50" />
-              <Heart className="w-5 h-5 text-primary/80 fill-primary/40" />
-              <Heart className="w-6 h-6 text-primary fill-primary/50" />
-            </motion.div>
+            <p className="text-2xl text-primary/60 pb-6 font-light">+</p>
 
             {/* Right card (them) */}
             <motion.div
@@ -262,11 +240,11 @@ export default function PromDate() {
                   <img src={theirPicUrl} alt={theirName} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <Heart className="w-12 h-12 text-primary/60" />
+                    <User className="w-12 h-12 text-primary/60" />
                   </div>
                 )}
               </div>
-              <p className="font-semibold text-foreground truncate">{theirName}</p>
+              <p className="font-playfair font-medium text-foreground truncate">{theirName}</p>
               <p className="text-xs text-muted-foreground">Your date</p>
             </motion.div>
           </motion.div>
@@ -275,11 +253,20 @@ export default function PromDate() {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="text-sm text-muted-foreground text-center mt-4 max-w-sm"
+          transition={{ delay: 0.85 }}
+          className="font-playfair text-xl md:text-2xl font-medium text-primary text-center mt-4 tracking-wide"
         >
-          See you at Prom. Have fun.
+          Save the date – 15th Feb, 8 PM
         </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.9 }}
+          className="mt-8 w-full max-w-md"
+        >
+          <CountdownTimer targetDate="2026-02-15T20:00:00" />
+        </motion.div>
 
         {/* Chat button - only when both from IIMA */}
         {showBothView && promDate?.match?.id && (
@@ -299,6 +286,15 @@ export default function PromDate() {
             </Button>
           </motion.div>
         )}
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="mt-auto pt-20 md:pt-24 pb-6 text-base font-playfair text-primary text-center"
+        >
+          See you on the dance floor.
+        </motion.p>
       </div>
     </div>
   );

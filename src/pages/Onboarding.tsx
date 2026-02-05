@@ -18,6 +18,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
+import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
 import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
@@ -61,6 +62,8 @@ interface ProfileData {
   email: string;
   dateOfBirth: string; // DD MM YYYY format
   age: number | null;
+  heightFeet: number | null;
+  heightInches: number | null;
   cohort: string;
   gender: string;
   sexualOrientation: string;
@@ -82,24 +85,26 @@ interface ProfileData {
   bio: string;
 }
 
-// First step: ask "Looking for a date" vs "Already a couple"
-const CHOICE_STEP: OnboardingStep[] = ["choice"];
-
-// Full profile flow (after "Looking for a date") – photo right after name/DOB
-const FULL_FLOW_STEPS: OnboardingStep[] = [
+// Initial steps for everyone: name, age, photo, gender – then choice
+const INITIAL_STEPS: OnboardingStep[] = [
   "welcome",
   "dateOfBirth",
   "photoUpload",
-  "notifications",
   "ageCohortGender",
+  "choice",
+];
+
+// Full profile flow (after "Still looking for prom date")
+const FULL_FLOW_STEPS: OnboardingStep[] = [
+  "notifications",
   "sexualityIntention",
   "hometown",
   "lifestyle",
 ];
 
-// Couple flow (after "Already a couple"): name → photo → partner type → partner details
+// Couple flow (after "Already a couple"): partner type → partner details (name & photo already collected)
 function getCoupleFlowSteps(partnerType: "" | "iima" | "outside"): OnboardingStep[] {
-  const base: OnboardingStep[] = ["coupleYourName", "couplePhotoUpload", "couplePartnerType"];
+  const base: OnboardingStep[] = ["couplePartnerType"];
   if (partnerType === "outside") return [...base, "couplePartnerOutside"];
   if (partnerType === "iima") return [...base, "couplePartnerIIMA"];
   return base;
@@ -140,7 +145,7 @@ const Onboarding = () => {
   const [isValidEmail, setIsValidEmail] = useState<boolean | null>(null);
 
   // Profile state
-  const [step, setStep] = useState<OnboardingStep>("choice");
+  const [step, setStep] = useState<OnboardingStep>("welcome");
   const [flowChoice, setFlowChoice] = useState<"full" | "couple" | "invite" | null>(null);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
@@ -155,6 +160,8 @@ const Onboarding = () => {
     email: "",
     dateOfBirth: "",
     age: null,
+    heightFeet: null,
+    heightInches: null,
     cohort: "",
     gender: "",
     sexualOrientation: "",
@@ -190,10 +197,10 @@ const Onboarding = () => {
   const [showExpandedImage, setShowExpandedImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Current steps: choice only, or full flow, or couple flow, or invite flow
+  // Current steps: initial (name, age, photo, gender, choice), or full flow, or couple flow, or invite flow
   const effectiveSteps =
     flowChoice === null
-      ? CHOICE_STEP
+      ? INITIAL_STEPS
       : flowChoice === "invite"
         ? INVITE_FLOW_STEPS
         : flowChoice === "full"
@@ -234,7 +241,12 @@ const Onboarding = () => {
           // Check if user has already completed onboarding
           const completed = await hasCompletedOnboarding();
           if (completed) {
-            navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+            const promDatePath = await getPromDateRedirectPath();
+            if (promDatePath) {
+              navigate(promDatePath);
+            } else {
+              navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+            }
             return;
           }
 
@@ -407,7 +419,6 @@ const Onboarding = () => {
   // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
   const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
     if (option === "request") {
-      // User chose to accept the pending partner request
       setFlowChoice("invite");
       setStep("partnerRequest");
       return;
@@ -415,10 +426,10 @@ const Onboarding = () => {
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
       setFlowChoice("full");
-      setStep("welcome");
+      setStep("notifications");
     } else {
       setFlowChoice("couple");
-      setStep("coupleYourName");
+      setStep("couplePartnerType");
     }
   };
 
@@ -544,25 +555,6 @@ const Onboarding = () => {
       return;
     }
 
-    // Couple flow: couplePhotoUpload - upload then next
-    if (step === "couplePhotoUpload") {
-      if (selectedFile && !profile.profilePicKey) {
-        try {
-          setIsUploading(true);
-          setUploadError(null);
-          const s3Key = await uploadPhotoToS3(selectedFile);
-          setProfile(prev => ({ ...prev, profilePicKey: s3Key }));
-        } catch (error) {
-          setUploadError(error instanceof Error ? error.message : "Failed to upload photo");
-          setIsUploading(false);
-          return;
-        }
-      }
-      const nextIndex = effectiveSteps.indexOf(step) + 1;
-      if (nextIndex < effectiveSteps.length) setStep(effectiveSteps[nextIndex]);
-      return;
-    }
-
     // Couple flow: couplePartnerType - user picks IIMA/Outside (no Next button)
     if (step === "couplePartnerType") return;
 
@@ -662,12 +654,18 @@ const Onboarding = () => {
           throw new Error(listErrors[0]?.message || "Failed to check existing profile");
         }
 
+        const heightStr =
+          profile.heightFeet != null && profile.heightInches != null
+            ? `${profile.heightFeet}'${profile.heightInches}"`
+            : undefined;
+
         // Only include fields that exist on the deployed CreateUserProfileInput.
         const profileData = {
           email: profile.email,
           name: profile.name,
           dateOfBirth: profile.dateOfBirth,
           age: profile.age ?? undefined,
+          height: heightStr,
           cohort: profile.cohort,
           gender: profile.gender,
           sexualOrientation: profile.sexualOrientation,
@@ -707,6 +705,7 @@ const Onboarding = () => {
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
+              height: profileData.height,
               cohort: profileData.cohort,
               gender: profileData.gender,
               sexualOrientation: profileData.sexualOrientation,
@@ -763,6 +762,7 @@ const Onboarding = () => {
               name: profileData.name,
               dateOfBirth: profileData.dateOfBirth,
               age: profileData.age,
+              height: profileData.height,
               cohort: profileData.cohort,
               gender: profileData.gender,
               sexualOrientation: profileData.sexualOrientation,
@@ -871,9 +871,18 @@ const Onboarding = () => {
         { authMode: authMode as "userPool" | "apiKey" }
       );
       if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
+      const heightStr =
+        profile.heightFeet != null && profile.heightInches != null
+          ? `${profile.heightFeet}'${profile.heightInches}"`
+          : undefined;
       const minimalData = {
         email: profile.email,
         name: profile.name.trim() || undefined,
+        dateOfBirth: profile.dateOfBirth || undefined,
+        age: profile.age ?? undefined,
+        height: heightStr,
+        cohort: profile.cohort || undefined,
+        gender: profile.gender || undefined,
         profilePicKey: profile.profilePicKey || undefined,
         bio: `Partner: ${partnerNameTrim}`,
         onboardingCompleted: true,
@@ -925,9 +934,18 @@ const Onboarding = () => {
       );
       if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
 
+      const heightStr =
+        profile.heightFeet != null && profile.heightInches != null
+          ? `${profile.heightFeet}'${profile.heightInches}"`
+          : undefined;
       const minimalData = {
         email: profile.email,
         name: profile.name.trim() || undefined,
+        dateOfBirth: profile.dateOfBirth || undefined,
+        age: profile.age ?? undefined,
+        height: heightStr,
+        cohort: profile.cohort || undefined,
+        gender: profile.gender || undefined,
         profilePicKey: profile.profilePicKey || undefined,
         bio: profile.partnerName.trim() ? `Partner: ${profile.partnerName.trim()}` : undefined,
         onboardingCompleted: true,
@@ -992,10 +1010,8 @@ const Onboarding = () => {
   };
 
   const prevStep = () => {
-    if (step === "welcome" || step === "coupleYourName") {
-      setStep("choice");
-      setFlowChoice(null);
-      return;
+    if (step === "welcome") {
+      return; // Can't go back from welcome
     }
     if (step === "partnerRequest") {
       clearInviteFrom();
@@ -1010,7 +1026,8 @@ const Onboarding = () => {
       return;
     }
     if (step === "couplePartnerType") {
-      setStep("couplePhotoUpload");
+      setStep("choice");
+      setFlowChoice(null);
       return;
     }
     const prevIndex = currentStepIndex - 1;
@@ -1116,8 +1133,8 @@ const Onboarding = () => {
       );
       clearInviteFrom();
       setInviteRequest(null);
-      setFlowChoice("full");
-      setStep("welcome");
+      setFlowChoice(null);
+      setStep("choice");
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to decline. Please try again.");
     } finally {
@@ -1134,7 +1151,13 @@ const Onboarding = () => {
       case "welcome":
         return true;
       case "dateOfBirth":
-        return profile.name.trim() !== "" && profile.dateOfBirth.length === 10 && profile.age !== null;
+        return (
+          profile.name.trim() !== "" &&
+          profile.dateOfBirth.length === 10 &&
+          profile.age !== null &&
+          profile.heightFeet !== null &&
+          profile.heightInches !== null
+        );
       case "notifications":
         return true;
       case "ageCohortGender":
@@ -1319,8 +1342,8 @@ const Onboarding = () => {
             className="space-y-6"
           >
             <div className="text-center mb-6">
-              <h2 className="font-display text-2xl font-bold mb-2">Name & Date of Birth</h2>
-              <p className="text-muted-foreground">Tell us your name and when you were born</p>
+              <h2 className="font-display text-2xl font-bold mb-2">Name, Birthday & Height</h2>
+              <p className="text-muted-foreground">Tell us your name, when you were born, and your height</p>
             </div>
             <div>
               <Label htmlFor="name" className="text-base mb-3 block">
@@ -1351,6 +1374,43 @@ const Onboarding = () => {
                   Age: {profile.age} years
                 </p>
               )}
+            </div>
+            <div>
+              <Label className="text-base mb-3 block">Height</Label>
+              <div className="flex gap-3 items-center">
+                <div className="flex-1 flex gap-2 items-center">
+                  <Select
+                    value={profile.heightFeet !== null ? String(profile.heightFeet) : ""}
+                    onValueChange={(v) => setProfile((prev) => ({ ...prev, heightFeet: v ? parseInt(v, 10) : null }))}
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="Ft" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[4, 5, 6, 7].map((ft) => (
+                        <SelectItem key={ft} value={String(ft)}>
+                          {ft} ft
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={profile.heightInches !== null ? String(profile.heightInches) : ""}
+                    onValueChange={(v) => setProfile((prev) => ({ ...prev, heightInches: v ? parseInt(v, 10) : null }))}
+                  >
+                    <SelectTrigger className="h-12">
+                      <SelectValue placeholder="In" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {i} in
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
             <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
               <p className="text-xs text-muted-foreground text-center">
