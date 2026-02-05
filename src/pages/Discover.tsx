@@ -23,6 +23,7 @@ import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
+import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import { usePromDate } from "@/hooks/usePromDate";
 
 const client = generateClient<Schema>();
@@ -126,9 +127,11 @@ export default function Discover() {
 
   const [reportOpen, setReportOpen] = useState(false);
   const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
+    id: string;
     toEmail: string;
-    fromName?: string;
+    partnerDisplayName: string;
   } | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   // When user clicks Discover in nav (or same tab), refetch profiles and clear refresh state
   useEffect(() => {
@@ -139,13 +142,49 @@ export default function Discover() {
   }, [location.state?.refresh, location.pathname, navigate]);
 
   // When arriving from onboarding (or link with ?openFilters=1), open filters first and clean URL
+  // But skip if user is in couple flow (they already have a partner)
   useEffect(() => {
-    if (searchParams.get("openFilters") === "1") {
-      setFiltersOpen(true);
-      searchParams.delete("openFilters");
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, []);
+    const checkAndOpenFilters = async () => {
+      if (searchParams.get("openFilters") === "1") {
+        try {
+          const currentUser = await getUserProfile();
+          if (currentUser?.email) {
+            const listFilters = { filter: { email: { eq: currentUser.email } } };
+            let result;
+            if (!GOOGLE_LOGIN_CHECK) {
+              // @ts-expect-error - authMode option not in generated types yet
+              result = await client.models.UserProfile.list(listFilters, { authMode: 'apiKey' });
+            } else {
+              result = await client.models.UserProfile.list(listFilters);
+            }
+            const userProfiles = result.data;
+            if (userProfiles && userProfiles.length > 0) {
+              const userProfile = userProfiles[0];
+              const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" || 
+                                  (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+              // Only open filters if not in couple flow
+              if (!isCoupleFlow) {
+                setFiltersOpen(true);
+              }
+            } else {
+              // No profile yet, open filters
+              setFiltersOpen(true);
+            }
+          } else {
+            // No user email, open filters
+            setFiltersOpen(true);
+          }
+        } catch (err) {
+          console.error("[Discover] Error checking profile for filters:", err);
+          // On error, still open filters
+          setFiltersOpen(true);
+        }
+        searchParams.delete("openFilters");
+        setSearchParams(searchParams, { replace: true });
+      }
+    };
+    checkAndOpenFilters();
+  }, [searchParams, setSearchParams]);
 
   // Sync filters from current user's profile whenever profile is loaded (after sign-in or refresh)
   useEffect(() => {
@@ -173,6 +212,11 @@ export default function Discover() {
         }
 
         const userProfile = userProfiles[0];
+        
+        // Skip filters auto-open if user is in "couple" flow (already has a partner)
+        const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" || 
+                            (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+        
         const gendersInterestedIn = mapSexualOrientationToGenders(
           userProfile.sexualOrientation,
           userProfile.gender
@@ -185,9 +229,14 @@ export default function Discover() {
 
         const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
         const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
-        if (!hasBeenInitialized) {
+        
+        // Only auto-open filters if user hasn't initialized them AND they're not in couple flow
+        if (!hasBeenInitialized && !isCoupleFlow) {
           localStorage.setItem(filtersInitializedKey, "true");
           setFiltersOpen(true);
+        } else if (!hasBeenInitialized) {
+          // Mark as initialized even if we don't open filters (for couple flow)
+          localStorage.setItem(filtersInitializedKey, "true");
         }
         setFiltersInitialized(true);
       } catch (err) {
@@ -226,6 +275,7 @@ export default function Discover() {
         // Check for pending outgoing partner request (sender has requested, waiting for partner to accept)
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;
+        // @ts-ignore - Amplify list accepts options as second arg
         const { data: myProfiles } = await client.models.UserProfile.list(
           { filter: { email: { eq: currentUserEmail } } },
           opts
@@ -234,15 +284,17 @@ export default function Discover() {
         setCurrentProfileId(myProfileId ?? "");
         if (myProfileId) {
           try {
-            const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
-              { fromUserId: myProfileId },
-              opts
-            );
+            const { data: outgoing } =
+              // @ts-ignore - Amplify list accepts (input, options)
+              await client.models.MatchRequest.listMatchRequestByFromUserId(
+                { fromUserId: myProfileId },
+                opts
+              );
             const pending = (outgoing ?? []).find((r) => r.status === "pending");
             if (pending) {
               const toEmail = pending.toEmail ?? "";
               setPendingOutgoingRequest({
-                id: pending.id,
+                id: pending.id ?? "",
                 toEmail,
                 partnerDisplayName: toEmail.split("@")[0] || "your partner",
               });
@@ -425,16 +477,18 @@ export default function Discover() {
               className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
               label="Refer"
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setFiltersOpen(true)}
-              className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
-              title="Adjust discovery filters"
-            >
-              <Filter className="w-4 h-4" />
-              Filters
-            </Button>
+            {!pendingOutgoingRequest && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setFiltersOpen(true)}
+                className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
+                title="Adjust discovery filters"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+              </Button>
+            )}
           </div>
         </header>
 
@@ -466,6 +520,7 @@ export default function Discover() {
                   try {
                     const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
                     const opts = authMode ? { authMode } : undefined;
+                    // @ts-ignore - Amplify update accepts (input, options)
                     await client.models.MatchRequest.update(
                       { id: pendingOutgoingRequest.id, status: "declined" },
                       opts
@@ -476,6 +531,7 @@ export default function Discover() {
                       opts
                     );
                     if (myProfiles?.[0]?.id) {
+                      // @ts-ignore - Amplify UserProfile.update field types
                       await client.models.UserProfile.update(
                         {
                           id: myProfiles[0].id,

@@ -24,10 +24,11 @@ sendPartnerInviteLambda.addToRolePolicy(
   })
 );
 
-// Report emails use Resend API (no SES). Add RESEND_API_KEY env var:
-// AWS Console → Lambda → send-report-email → Configuration → Environment variables
-// Or: export RESEND_API_KEY=re_xxx before `npx ampx sandbox`
-const sendReportEmailLambda = backend.sendReportEmail.resources.lambda;
+// Report emails use Resend API (no SES). RESEND_API_KEY from env when running sandbox.
+type LambdaWithEnv = {
+  addEnvironment(key: string, value: string): void;
+};
+const sendReportEmailLambda = backend.sendReportEmail.resources.lambda as unknown as LambdaWithEnv;
 sendReportEmailLambda.addEnvironment(
   'RESEND_API_KEY',
   process.env.RESEND_API_KEY ?? ''

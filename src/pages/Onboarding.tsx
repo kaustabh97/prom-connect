@@ -21,8 +21,16 @@ import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/a
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { APP_URL } from "@/config";
 import { sharePartnerInviteViaWhatsApp } from "@/utils/share";
-import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Upload, Image as ImageIcon, UserX, X, MessageCircle } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Amplify } from "aws-amplify";
 import outputs from "../../amplify_outputs.json";
 import "@aws-amplify/ui-react/styles.css";
@@ -171,6 +179,8 @@ const Onboarding = () => {
   const [partnerCheckStatus, setPartnerCheckStatus] = useState<"idle" | "checking" | "registered" | "not_registered">("idle");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showWhatsAppInvitePopup, setShowWhatsAppInvitePopup] = useState(false);
+  const [pendingWhatsAppInvite, setPendingWhatsAppInvite] = useState<{ name: string; email: string } | null>(null);
   
   // Photo upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -958,14 +968,22 @@ const Onboarding = () => {
           { authMode: authMode as "userPool" | "apiKey" }
         );
         if (!partner) {
-          sharePartnerInviteViaWhatsApp(profile.name || "Someone", currentUserEmail);
+          // Show popup instead of directly opening WhatsApp
+          setPendingWhatsAppInvite({
+            name: profile.name || "Someone",
+            email: currentUserEmail,
+          });
+          setShowWhatsAppInvitePopup(true);
+          // Navigation will happen after popup is closed
+        } else {
+          // Partner exists, navigate directly
+          navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
       } catch (reqErr) {
         console.warn("[Onboarding] MatchRequest/invite failed:", reqErr);
+        // Navigate even if invite creation failed
+        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       }
-
-      // Sender goes to discover (or matchmaking-soon if disabled)
-      navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
@@ -1781,7 +1799,7 @@ const Onboarding = () => {
                 id="coupleName"
                 placeholder="Your name"
                 value={profile.name}
-                onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value.trim() }))}
+                onChange={(e) => setProfile((prev) => ({ ...prev, name: e.target.value }))}
                 className="text-base"
               />
             </div>
@@ -2187,6 +2205,62 @@ const Onboarding = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* WhatsApp Invite Popup */}
+      <Dialog open={showWhatsAppInvitePopup} onOpenChange={setShowWhatsAppInvitePopup}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] rounded-2xl glass-strong border-primary/30 shadow-glow p-0 gap-0 flex flex-col overflow-hidden">
+          {/* Decorative gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none rounded-2xl" />
+          
+          <DialogHeader className="relative px-6 pt-6 pb-4 flex-shrink-0">
+            <div className="flex items-center justify-center mb-4">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 border-2 border-primary/50">
+                <MessageCircle className="w-8 h-8 text-primary" />
+              </div>
+            </div>
+            <DialogTitle className="text-2xl font-display font-bold text-center text-foreground">
+              Invite Your Partner
+            </DialogTitle>
+            <DialogDescription className="text-center text-muted-foreground pt-2 space-y-3 overflow-y-auto max-h-[40vh]">
+              <p>
+                You can invite your partner to join Prom Connect and accept your invitation via WhatsApp.
+              </p>
+              <p className="text-sm">
+                When you click &quot;Open WhatsApp&quot;, a message will be prepared with all the details your partner needs to join and accept your request.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter className="flex-col sm:flex-row gap-2 px-6 pb-6 pt-4 relative flex-shrink-0 border-t border-border/50">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowWhatsAppInvitePopup(false);
+                // Navigate after closing popup
+                navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+              }}
+              className="w-full sm:w-auto"
+            >
+              Skip for Now
+            </Button>
+            <Button
+              variant="gold"
+              onClick={() => {
+                if (pendingWhatsAppInvite) {
+                  sharePartnerInviteViaWhatsApp(pendingWhatsAppInvite.name, pendingWhatsAppInvite.email);
+                }
+                setShowWhatsAppInvitePopup(false);
+                // Navigate after opening WhatsApp
+                navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+              }}
+              className="w-full sm:w-auto"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Open WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

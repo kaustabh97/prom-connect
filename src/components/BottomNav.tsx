@@ -5,11 +5,15 @@ import { getUserProfile } from "@/utils/auth";
 import { usePromDate } from "@/hooks/usePromDate";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 
 const discoverNavItems = [
   { path: "/discover/profile", label: "Discover", icon: Compass },
   { path: "/matches", label: "Matches", icon: Users },
+];
+
+const matchmakingSoonNavItems = [
+  { path: "/matchmaking-soon", label: "Coming soon", icon: Compass },
 ];
 
 const client = generateClient<Schema>();
