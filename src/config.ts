@@ -5,16 +5,32 @@
  * that can be easily toggled to control app behavior.
  */
 
+// Detect current hostname (browser-only; falls back to empty string in SSR/build)
+const HOSTNAME =
+  typeof window !== "undefined" ? window.location.hostname : "";
+
+// Primary production domain and beta/staging domains
+const PROD_DOMAIN = "starlitbythebricks.in";
+const BETA_DOMAIN = "beta.starlitbythebricks.in";
+
+const IS_PROD_DOMAIN = HOSTNAME === PROD_DOMAIN;
+const IS_BETA_DOMAIN = HOSTNAME === BETA_DOMAIN;
+
 /**
  * Beta testing mode
  *
- * When true:
- * - Landing page shows a "Beta" banner at the top so visitors know the site is in beta.
+ * RAW_BETA_MODE controls whether the app is considered in beta generally.
+ * We then hide the visual beta banner on the primary production domain to
+ * keep the UX clean, while still showing it on beta / dev domains.
+ *
+ * When BETA_MODE is true:
+ * - Landing page and auth page can show a "Beta" banner at the top.
  *
  * When false:
  * - No beta messaging is shown.
  */
-export const BETA_MODE = true;
+const RAW_BETA_MODE = true;
+export const BETA_MODE = RAW_BETA_MODE && !IS_PROD_DOMAIN;
 
 /** Base URL for the Prom Connect app (used in partner invite emails) */
 export const APP_URL =
@@ -38,21 +54,18 @@ export const ENABLE_BACKEND_PROFILE_FETCH = true;
 
 /**
  * Enable/disable Google login requirement
- * 
- * When set to false:
- * - Google OAuth login is bypassed
- * - Users can enter any email address to sign in
- * - Email-based authentication (no password required)
- * - User profiles are still saved to backend database
- * - Useful for testing and creating multiple profiles
- * 
- * When set to true:
- * - Google OAuth login is required
- * - Users must sign in with their Google account
- * - Full authentication flow with Cognito
- * - User profiles are saved to backend database
+ *
+ * RAW_GOOGLE_LOGIN_CHECK is the default flag used on non-production domains.
+ *
+ * Additionally:
+ * - On the primary production domain (starlitbythebricks.in), we always
+ *   enforce Google OAuth login regardless of RAW_GOOGLE_LOGIN_CHECK so that
+ *   real users go through the full auth flow.
+ * - On the beta domain (beta.starlitbythebricks.in) and local/dev, you can
+ *   still toggle RAW_GOOGLE_LOGIN_CHECK for easier testing.
  */
-export const GOOGLE_LOGIN_CHECK = false;
+const RAW_GOOGLE_LOGIN_CHECK = false;
+export const GOOGLE_LOGIN_CHECK = IS_PROD_DOMAIN || RAW_GOOGLE_LOGIN_CHECK;
 
 /**
  * Enable/disable matchmaking (Discover, Matches, Chat)

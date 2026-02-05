@@ -279,10 +279,8 @@ const Landing = () => {
           <div className="text-center text-xs text-muted-foreground/60 pt-2">
             Created by{" "}
             <span className="text-muted-foreground/70">Dipak Agrawal</span>
-            {", "}
+            {" & "}
             <span className="text-muted-foreground/70">Kaustabh Chatterjee</span>
-            {", "}
-            <span className="text-muted-foreground/70">Sparsh Chadha</span>
           </div>
         </div>
       </footer>
