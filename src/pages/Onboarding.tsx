@@ -416,6 +416,34 @@ const Onboarding = () => {
     }
   };
 
+  // When on couplePartnerType, check for pending partner requests (someone may have sent one)
+  useEffect(() => {
+    if (step !== "couplePartnerType" || !userEmail) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fetchAuthSession } = await import("aws-amplify/auth");
+        const session = await fetchAuthSession();
+        const auth = !!session.tokens;
+        const authMode = auth ? "userPool" : "apiKey";
+        const { data: requests } = await client.models.MatchRequest.listMatchRequestByToEmail(
+          { toEmail: userEmail.toLowerCase() },
+          { authMode: authMode as "userPool" | "apiKey" }
+        );
+        const pending = (requests ?? []).find((r) => r.status === "pending");
+        if (!cancelled && pending) {
+          setInviteRequest({
+            id: pending.id,
+            fromUserId: pending.fromUserId ?? "",
+            fromEmail: pending.fromEmail ?? "",
+            fromName: pending.fromName ?? undefined,
+          });
+        }
+      } catch (_) {}
+    })();
+    return () => { cancelled = true; };
+  }, [step, userEmail]);
+
   // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
   const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
     if (option === "request") {
@@ -1955,6 +1983,18 @@ const Onboarding = () => {
               >
                 My date&apos;s from beyond campus
               </Button>
+              {inviteRequest && (
+                <Button
+                  variant="outline"
+                  className="h-14 w-full border-primary/50"
+                  onClick={() => {
+                    setFlowChoice("invite");
+                    setStep("partnerRequest");
+                  }}
+                >
+                  I have a pending request from {inviteRequest.fromName || inviteRequest.fromEmail?.split("@")[0] || "someone"} ✨
+                </Button>
+              )}
             </div>
           </motion.div>
         );

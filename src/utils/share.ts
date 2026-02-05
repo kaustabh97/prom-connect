@@ -25,4 +25,17 @@ export function sharePartnerInviteViaWhatsApp(fromName: string, inviterEmail: st
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
+const PROM_DATE_MESSAGE = `We're going to Prom together! 💫 Save the date – 15th Feb, 8 PM\n\nStarlit by the Brick | Prom 2026 – IIM Ahmedabad`;
+
+/**
+ * Opens WhatsApp with a pre-filled prom date message.
+ * Same pattern as partner invite – wa.me only supports text, not images.
+ * User can add the saved image from their gallery if they've downloaded it.
+ */
+export function sharePromDateViaWhatsApp(): void {
+  const encoded = encodeURIComponent(PROM_DATE_MESSAGE);
+  const url = `https://wa.me/?text=${encoded}`;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export { REFERRAL_MESSAGE };

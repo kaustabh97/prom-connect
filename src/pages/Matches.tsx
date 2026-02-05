@@ -10,6 +10,7 @@ import { useMatchRequests } from "@/hooks/useMatchRequests";
 import { usePromAsk } from "@/hooks/usePromAsk";
 import { usePromDate } from "@/hooks/usePromDate";
 import { useViewedMatches } from "@/hooks/useViewedMatches";
+import { useUnreadMatches } from "@/hooks/useUnreadMatches";
 import { getUserProfile } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -18,7 +19,7 @@ import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
-import { dispatchBadgeRefresh } from "@/utils/badgeRefresh";
+import { dispatchBadgeRefresh, dispatchViewingMatch } from "@/utils/badgeRefresh";
 import { 
   Heart, 
   MessageCircle, 
@@ -156,6 +157,7 @@ const Matches = () => {
 
   const { promDate, refresh: refreshPromDate } = usePromDate({ currentUserId });
   const { markMatchViewed } = useViewedMatches(currentUserId);
+  const { clearUnread } = useUnreadMatches(currentUserId);
 
   const loadPendingOutgoing = useCallback(async () => {
     if (!currentUserId) return;
@@ -347,12 +349,19 @@ const Matches = () => {
     if (matchIdFromUrl) {
       setActiveChat(matchIdFromUrl);
       markMatchViewed(matchIdFromUrl);
+      clearUnread(matchIdFromUrl);
       // Don't clear URL – keeps redirect from firing when fromPromDate
     }
-  }, [searchParams, markMatchViewed]);
+  }, [searchParams, markMatchViewed, clearUnread]);
   
   const activeMatch = rawMatches.find(m => m.id === activeChat);
   const activeConversationId = activeMatch?.conversationId || undefined;
+
+  // Notify when viewing a chat (so badge doesn't mark it unread while user is in it)
+  useEffect(() => {
+    dispatchViewingMatch(activeChat);
+    return () => dispatchViewingMatch(null);
+  }, [activeChat]);
 
   // Store conversation ID when created (also update the match record)
   const handleConversationCreated = async (matchId: string, conversationId: string) => {
@@ -564,6 +573,7 @@ const Matches = () => {
               onClick={() => {
                 setActiveChat(match.id);
                 markMatchViewed(match.id);
+                clearUnread(match.id);
               }}
               className={`w-full p-4 rounded-xl mb-3 text-left transition-all duration-300 relative overflow-hidden ${
                 activeChat === match.id 

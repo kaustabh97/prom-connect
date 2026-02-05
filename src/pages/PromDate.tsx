@@ -14,7 +14,6 @@ import { Loader2, LogOut, MessageCircle, Share2, Sparkles, User } from "lucide-r
 import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
 import { clearTestUser } from "@/utils/auth";
-import { useToast } from "@/hooks/use-toast";
 
 const client = generateClient<Schema>();
 
@@ -102,136 +101,55 @@ export default function PromDate() {
   const showBothView = promDate && !showOutsideView;
   const shareRef = useRef<HTMLDivElement>(null);
   const [isSharing, setIsSharing] = useState(false);
-  const { toast } = useToast();
 
   const handleShare = async () => {
     if (!shareRef.current || isSharing) return;
     setIsSharing(true);
     try {
-      // Pre-fetch profile images and convert to data URLs (avoids CORS in canvas)
-      const imageDataUrls: Record<string, string> = {};
-      const urls = [myPicUrl, theirPicUrl].filter(Boolean) as string[];
-      await Promise.all(
-        urls.map(async (url) => {
-          try {
-            const res = await fetch(url, { mode: "cors" });
-            if (!res.ok) return;
-            const blob = await res.blob();
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            });
-            imageDataUrls[url] = dataUrl;
-          } catch (_) {
-            // CORS or fetch failed
-          }
-        })
-      );
-
-      // Temporarily replace img srcs with data URLs and hide countdown
-      const imgs = shareRef.current.querySelectorAll("img[src^='http']");
-      const restores: { img: HTMLImageElement; src: string }[] = [];
-      imgs.forEach((img) => {
-        const src = img.getAttribute("src");
-        if (src && imageDataUrls[src]) {
-          restores.push({ img: img as HTMLImageElement, src });
-          img.setAttribute("src", imageDataUrls[src]);
-        }
-      });
-      const elementsToHide = shareRef.current.querySelectorAll("[data-share-hide]");
-      const originalDisplays: string[] = [];
-      elementsToHide.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        originalDisplays.push(htmlEl.style.display ?? "");
-        htmlEl.style.display = "none";
-      });
-
-      // Wait for images to load after src change
-      await Promise.all(
-        restores.map(({ img }) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()))
-      );
-
       const canvas = await html2canvas(shareRef.current, {
         backgroundColor: "#0f1729",
         scale: 2,
         useCORS: true,
         logging: false,
       });
-
-      // Restore original state
-      restores.forEach(({ img, src }) => img.setAttribute("src", src));
-      elementsToHide.forEach((el, i) => {
-        (el as HTMLElement).style.display = originalDisplays[i] ?? "";
-      });
       canvas.toBlob(
         async (blob) => {
-          if (!blob) {
-            toast({ title: "Could not create image", variant: "destructive" });
-            return;
-          }
+          if (!blob) return;
           const file = new File([blob], "prom-date-invite.png", { type: "image/png" });
-          let shared = false;
-
+          
+          // Debug: check what's available
+          const hasShare = !!navigator.share;
+          const hasCanShare = !!navigator.canShare;
+          const canShareFiles = hasCanShare ? navigator.canShare({ files: [file] }) : "no canShare";
+          console.log("Share debug:", { hasShare, hasCanShare, canShareFiles });
+          
+          // Try to share if navigator.share exists (skip canShare check - it's unreliable)
           if (navigator.share) {
             try {
-              const shareData: ShareData = {
-                files: [file],
-                title: "Prom Date",
-                text: "You're coming to Prom with me!",
-              };
-              if (navigator.canShare?.(shareData) !== false) {
-                await navigator.share(shareData);
-                shared = true;
-                toast({ title: "Shared!", description: "Image shared successfully." });
-              }
+              await navigator.share({ files: [file] });
+              return; // Success - exit
             } catch (e) {
-              if ((e as Error).name !== "AbortError") {
-                console.warn("Web Share failed:", e);
+              console.log("Share error:", (e as Error).name, (e as Error).message);
+              if ((e as Error).name === "AbortError") {
+                return; // User cancelled - don't download
               }
+              // Fall through to download
             }
           }
-
-          if (!shared) {
-            try {
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "prom-date-invite.png";
-              a.style.display = "none";
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-              toast({ title: "Image saved", description: "Check your downloads." });
-            } catch (e) {
-              const dataUrl = canvas.toDataURL("image/png");
-              const win = window.open();
-              if (win) {
-                win.document.write(`<img src="${dataUrl}" alt="Prom date" style="max-width:100%" />`);
-                win.document.close();
-                toast({ title: "Image opened", description: "Long-press to save or share." });
-              } else {
-                toast({
-                  title: "Could not share",
-                  description: "Please allow pop-ups or try again.",
-                  variant: "destructive",
-                });
-              }
-            }
-          }
+          
+          // Fallback: download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "prom-date-invite.png";
+          a.click();
+          URL.revokeObjectURL(url);
         },
         "image/png",
         0.95
       );
     } catch (err) {
       console.error("Share failed:", err);
-      toast({
-        title: "Share failed",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setIsSharing(false);
     }
@@ -453,6 +371,7 @@ export default function PromDate() {
           See you on the dance floor.
         </motion.p>
       </div>
+
     </div>
   );
 }

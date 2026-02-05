@@ -79,12 +79,23 @@ export function useShareImage() {
           );
         }).then(async (blob) => {
           const file = new File([blob], filename, { type: "image/png" });
-          if (navigator.share && navigator.canShare?.({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: shareTitle,
-              text: shareText,
-            });
+          if (navigator.share) {
+            try {
+              await navigator.share({
+                files: [file],
+                title: shareTitle,
+                text: shareText,
+              });
+            } catch (e) {
+              if ((e as Error).name !== "AbortError") {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+              }
+            }
           } else {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
