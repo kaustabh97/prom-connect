@@ -106,12 +106,57 @@ export default function PromDate() {
     if (!shareRef.current || isSharing) return;
     setIsSharing(true);
     try {
+      // Pre-fetch profile images and convert to data URLs (avoids CORS in canvas)
+      const imageDataUrls: Record<string, string> = {};
+      const urls = [myPicUrl, theirPicUrl].filter(Boolean) as string[];
+      await Promise.all(
+        urls.map(async (url) => {
+          try {
+            const res = await fetch(url, { mode: "cors" });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            imageDataUrls[url] = dataUrl;
+          } catch (_) {
+            // CORS or fetch failed
+          }
+        })
+      );
+
+      // Temporarily replace img srcs with data URLs and hide countdown
+      const imgs = shareRef.current.querySelectorAll("img[src^='http']");
+      const restores: { img: HTMLImageElement; src: string }[] = [];
+      imgs.forEach((img) => {
+        const src = img.getAttribute("src");
+        if (src && imageDataUrls[src]) {
+          restores.push({ img: img as HTMLImageElement, src });
+          img.setAttribute("src", imageDataUrls[src]);
+        }
+      });
+      const countdownEl = shareRef.current.querySelector("[data-share-hide]") as HTMLElement | null;
+      const originalDisplay = countdownEl?.style.display ?? "";
+      if (countdownEl) countdownEl.style.display = "none";
+
+      // Wait for images to load after src change
+      await Promise.all(
+        restores.map(({ img }) => (img.decode ? img.decode().catch(() => {}) : Promise.resolve()))
+      );
+
       const canvas = await html2canvas(shareRef.current, {
         backgroundColor: "#0f1729",
         scale: 2,
         useCORS: true,
         logging: false,
       });
+
+      // Restore original state
+      restores.forEach(({ img, src }) => img.setAttribute("src", src));
+      if (countdownEl) countdownEl.style.display = originalDisplay;
       canvas.toBlob(
         async (blob) => {
           if (!blob) return;
@@ -180,7 +225,7 @@ export default function PromDate() {
     : (partnerNameFromUrl || "your partner");
 
   return (
-    <div className="h-dvh max-h-dvh overflow-hidden bg-gradient-midnight relative flex flex-col">
+    <div className="min-h-dvh bg-gradient-midnight relative flex flex-col">
       <SparkleBackground />
       {/* Top bar: Share + Log out */}
       <div className="absolute top-4 left-4 right-4 z-20 flex justify-between">
@@ -210,7 +255,7 @@ export default function PromDate() {
       </div>
       <div
         ref={shareRef}
-        className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32 bg-gradient-midnight"
+        className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 pt-24 md:pt-32 pb-8 bg-gradient-midnight min-h-dvh"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -244,7 +289,7 @@ export default function PromDate() {
           >
             <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-primary/20 mb-3 ring-2 ring-primary/40 shadow-inner">
               {myPicUrl ? (
-                <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" />
+                <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" crossOrigin="anonymous" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <User className="w-14 h-14 text-primary/60" />
@@ -274,7 +319,7 @@ export default function PromDate() {
             >
               <div className="w-28 h-28 mx-auto rounded-full overflow-hidden bg-primary/20 mb-3 ring-2 ring-primary/40 shadow-inner">
                 {myPicUrl ? (
-                  <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" />
+                  <img src={myPicUrl} alt={myName} className="w-full h-full object-cover" crossOrigin="anonymous" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <User className="w-12 h-12 text-primary/60" />
@@ -296,7 +341,7 @@ export default function PromDate() {
             >
               <div className="w-28 h-28 mx-auto rounded-full overflow-hidden bg-primary/20 mb-3 ring-2 ring-primary/40 shadow-inner">
                 {theirPicUrl ? (
-                  <img src={theirPicUrl} alt={theirName} className="w-full h-full object-cover" />
+                  <img src={theirPicUrl} alt={theirName} className="w-full h-full object-cover" crossOrigin="anonymous" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <User className="w-12 h-12 text-primary/60" />
@@ -319,6 +364,7 @@ export default function PromDate() {
         </motion.p>
 
         <motion.div
+          data-share-hide
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.9 }}

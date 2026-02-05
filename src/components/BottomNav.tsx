@@ -18,7 +18,11 @@ const matchmakingSoonNavItems = [
 
 const client = generateClient<Schema>();
 
-export default function BottomNav() {
+interface BottomNavProps {
+  hideNav?: boolean; // e.g. while checking if user has prom date (to avoid flash on refresh)
+}
+
+export default function BottomNav({ hideNav = false }: BottomNavProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [currentUserId, setCurrentUserId] = useState<string>("");
@@ -41,8 +45,8 @@ export default function BottomNav() {
 
   const hasPromDate = !!promDate;
   const isOnPromDatePage = location.pathname === "/prom-date";
-  // Prom Date is a dead-end page – hide nav when on it or when matched (prevents nav after chat)
-  if (hasPromDate || isOnPromDatePage) return null;
+  // Prom Date is a dead-end page – hide nav when on it, when matched, or while checking redirect
+  if (hideNav || hasPromDate || isOnPromDatePage) return null;
 
   const navItems = MATCHMAKING_ENABLED
     ? [...discoverNavItems, { path: "/profile", label: "Profile", icon: User }]
