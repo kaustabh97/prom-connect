@@ -493,7 +493,7 @@ const Matches = () => {
         )}
 
         {/* Match List */}
-        <div className="flex-1 overflow-y-auto p-2 min-h-0">
+        <div className="flex-1 overflow-y-auto p-2 min-h-0 flex flex-col">
           {/* Loading state */}
           {matchesLoading && rawMatches.length === 0 && (
             <div className="flex items-center justify-center py-8">
@@ -510,12 +510,14 @@ const Matches = () => {
 
           {/* Empty state */}
           {!matchesLoading && rawMatches.length === 0 && (
-            <div className="text-center py-8">
-              <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <p className="text-muted-foreground mb-2">No matches yet</p>
-              <p className="text-sm text-muted-foreground/70">
-                Complete discovery to get matched.
-              </p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <p className="text-muted-foreground mb-2">No matches yet</p>
+                <p className="text-sm text-muted-foreground/70">
+                  Complete discovery to get matched.
+                </p>
+              </div>
             </div>
           )}
 

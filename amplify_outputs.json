@@ -112,6 +112,13 @@
               "isRequired": false,
               "attributes": []
             },
+            "height": {
+              "name": "height",
+              "isArray": false,
+              "type": "String",
+              "isRequired": false,
+              "attributes": []
+            },
             "cohort": {
               "name": "cohort",
               "isArray": false,
