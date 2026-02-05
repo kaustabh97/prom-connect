@@ -30,11 +30,15 @@
       "redirect_sign_in_uri": [
         "http://localhost:8080/onboarding",
         "http://localhost:8080/auth",
+        "https://starlitbythebricks.in/auth",
+        "https://starlitbythebricks.in/onboarding",
         "https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse"
       ],
       "redirect_sign_out_uri": [
         "http://localhost:8080/",
-        "http://localhost:8080/auth"
+        "http://localhost:8080/auth",
+        "https://starlitbythebricks.in/auth",
+        "https://starlitbythebricks.in/"
       ],
       "response_type": "code",
       "scopes": [

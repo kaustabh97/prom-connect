@@ -7,7 +7,7 @@ export const auth = defineAuth({
       google: {
         clientId: secret('GOOGLE_CLIENT_ID'),
         clientSecret: secret('GOOGLE_CLIENT_SECRET'),
-        scopes: ['email', 'profile', 'openid'],
+        scopes: ['email'],
         attributeMapping: {
           email: 'email' 
         }
@@ -18,12 +18,15 @@ export const auth = defineAuth({
       callbackUrls: [
         'http://localhost:8080/onboarding',
         'http://localhost:8080/auth',
-        // 'https://main.d1emd9gkgd3wf8.amplifyapp.com/onboarding',
+        'https://starlitbythebricks.in/auth',
+        'https://starlitbythebricks.in/onboarding',
         'https://f7c7f16199412ce0f064.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse'
       ],
       logoutUrls: [
         'http://localhost:8080/',
         'http://localhost:8080/auth',
+        'https://starlitbythebricks.in/auth',
+        'https://starlitbythebricks.in/',
         // 'https://main.d1emd9gkgd3wf8.amplifyapp.com'
       ],
     },
