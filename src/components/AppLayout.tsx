@@ -43,8 +43,9 @@ function PromDateGate({
         if (!cancelled && path) setRedirectPath(path);
         if (!cancelled) setChecked(true);
       })
-      .catch(() => {
-        // On error, don't block - let user through
+      .catch(async (err) => {
+        const { logError } = await import("@/utils/logger");
+        logError(err, { component: "AppLayout", operation: "checkRedirect" });
         if (!cancelled) setChecked(true);
       });
     return () => {

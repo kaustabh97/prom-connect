@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
 import { getUserProfile } from "@/utils/auth";
+import { logError } from "@/utils/logger";
 import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
@@ -69,7 +70,9 @@ export default function PromDate() {
             const { url } = await getUrl({ path: me.profilePicKey, options: { bucket: "userPhotos" } });
             setMyPicUrl(url.toString());
           }
-        } catch (_) {}
+        } catch (err) {
+          logError(err, { component: "PromDate", operation: "fetchOutsideProfile", extra: { currentUserId } });
+        }
       };
       fetch();
     }
@@ -91,7 +94,9 @@ export default function PromDate() {
           const { url } = await getUrl({ path: otherKey, options: { bucket: "userPhotos" } });
           setTheirPicUrl(url.toString());
         }
-      } catch (_) {}
+      } catch (err) {
+        logError(err, { component: "PromDate", operation: "fetchBothProfiles", extra: { currentUserId } });
+      }
     };
     fetch();
   }, [currentUserId, promDate]);
@@ -108,7 +113,7 @@ export default function PromDate() {
       }
       navigate("/");
     } catch (err) {
-      console.error("Logout failed:", err);
+      logError(err, { component: "PromDate", operation: "logout" });
       if (!GOOGLE_LOGIN_CHECK) clearTestUser();
       navigate("/");
     }

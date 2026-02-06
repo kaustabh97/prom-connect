@@ -6,6 +6,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { logError } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
@@ -65,7 +66,8 @@ export default function RequestPending() {
           options: { bucket: "userPhotos" },
         });
         setMyPhotoUrl(url.toString());
-      } catch {
+      } catch (err) {
+        logError(err, { component: "RequestPending", operation: "loadProfilePic", extra: { profilePicKey: userProfile.profilePicKey } });
         setMyPhotoUrl(null);
       }
     } else {
@@ -122,7 +124,7 @@ export default function RequestPending() {
         });
       }
     } catch (e) {
-      console.error("[RequestPending] Withdraw failed:", e);
+      logError(e, { component: "RequestPending", operation: "withdraw", extra: { requestId } });
       throw e;
     } finally {
       setWithdrawing(false);
@@ -138,7 +140,7 @@ export default function RequestPending() {
       }
       navigate("/");
     } catch (err) {
-      console.error("Logout failed:", err);
+      logError(err, { component: "RequestPending", operation: "logout" });
       if (!GOOGLE_LOGIN_CHECK) clearTestUser();
       navigate("/");
     }

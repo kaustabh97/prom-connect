@@ -121,8 +121,9 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
         const profile = data?.find((x) => x.id === canonicalId) ?? data?.[0];
         setCurrentUserId(profile?.id ?? "");
         setCurrentUserEmail(profile?.email ?? p.email ?? "");
-      } catch {
-        // Silently fail - nav will work without badge counts
+      } catch (err) {
+        const { logError } = await import("@/utils/logger");
+        logError(err, { component: "BottomNav", operation: "loadBadgeCounts" });
       }
     };
     load();

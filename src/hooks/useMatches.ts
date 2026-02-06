@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -39,7 +40,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
     
     setIsLoading(true);
     setError(null);
-    
+    logInfo("Loading matches", { component: "useMatches", operation: "loadMatches", extra: { currentUserId } });
     try {
       const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
       const opts = authMode ? { authMode } : undefined;
@@ -55,7 +56,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
         await client.models.Match.listMatchByUser2Id({ user2Id: currentUserId }, opts);
 
       if (errors1 || errors2) {
-        console.error("Error loading matches:", errors1 || errors2);
+        logError(errors1?.[0] ?? errors2?.[0], { component: "useMatches", operation: "loadMatches", extra: { errors1, errors2 } });
         setError("Failed to load matches");
         return;
       }
@@ -97,8 +98,8 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
             if (data) {
               profileMap[id] = data;
             }
-          } catch {
-            // Profile unavailable
+          } catch (err) {
+            logError(err, { component: "useMatches", operation: "fetchProfile", extra: { profileId: id } });
           }
         })
       );
@@ -110,8 +111,9 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
       }));
 
       setMatches(enrichedMatches);
+      logInfo("Matches loaded", { component: "useMatches", operation: "loadMatches", extra: { count: enrichedMatches.length } });
     } catch (err) {
-      console.error("Error loading matches:", err);
+      logError(err, { component: "useMatches", operation: "loadMatches" });
       setError(err instanceof Error ? err.message : "Failed to load matches");
     } finally {
       setIsLoading(false);
@@ -148,7 +150,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
         );
 
       if (errors) {
-        console.error("Error creating match:", errors);
+        logError(errors[0], { component: "useMatches", operation: "createMatch", extra: { otherUserId, errors } });
         setError(errors[0]?.message || "Failed to create match");
         return null;
       }
@@ -157,7 +159,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
       await loadMatches();
       return data;
     } catch (err) {
-      console.error("Error creating match:", err);
+      logError(err, { component: "useMatches", operation: "createMatch", extra: { otherUserId } });
       setError(err instanceof Error ? err.message : "Failed to create match");
       return null;
     }
@@ -182,7 +184,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
         m.id === matchId ? { ...m, conversationId } : m
       ));
     } catch (err) {
-      console.error("Error updating match:", err);
+      logError(err, { component: "useMatches", operation: "updateMatch", extra: { matchId } });
     }
   }, []);
 

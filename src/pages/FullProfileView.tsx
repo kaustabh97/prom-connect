@@ -13,6 +13,7 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import SparkleBackground from "@/components/SparkleBackground";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
+import { logError } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -93,12 +94,13 @@ export default function FullProfileView() {
           try {
             const { url } = await getUrl({ path: data.profilePicKey, options: { bucket: "userPhotos" } });
             transformed.photoUrls = [url.toString()];
-          } catch {
-            // ignore photo fetch error
+          } catch (err) {
+            logError(err, { component: "FullProfileView", operation: "fetchProfilePic", extra: { profileId, profilePicKey: data.profilePicKey } });
           }
         }
         setProfile(transformed);
       } catch (err) {
+        logError(err, { component: "FullProfileView", operation: "fetchProfile", extra: { profileId } });
         setError("Failed to load profile.");
         setProfile(null);
       } finally {

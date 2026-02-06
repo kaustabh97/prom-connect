@@ -37,8 +37,9 @@ export function useShareImage() {
                 reader.readAsDataURL(blob);
               });
               imageDataUrls[url] = dataUrl;
-            } catch {
-              // CORS or fetch failed
+            } catch (err) {
+              const { logError } = await import("@/utils/logger");
+              logError(err, { component: "useShareImage", operation: "fetchImageAsDataUrl", extra: { url } });
             }
           })
         );
@@ -88,6 +89,8 @@ export function useShareImage() {
               });
             } catch (e) {
               if ((e as Error).name !== "AbortError") {
+                const { logError } = await import("@/utils/logger");
+                logError(e, { component: "useShareImage", operation: "navigator.share" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;

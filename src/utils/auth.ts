@@ -109,11 +109,12 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     };
     
     return profile;
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Silently return null for unauthenticated users (expected behavior)
-    // Only log unexpected errors
-    if (error?.name !== "UserUnAuthenticatedException") {
-      console.error("Unexpected error fetching user profile:", error);
+    const err = error as { name?: string };
+    if (err?.name !== "UserUnAuthenticatedException") {
+      const { logError } = await import("./logger");
+      logError(error, { component: "auth", operation: "getUserProfile" });
     }
     return null;
   }
@@ -133,7 +134,9 @@ export const isAuthenticated = async (): Promise<boolean> => {
   try {
     const session = await fetchAuthSession();
     return !!session.tokens;
-  } catch {
+  } catch (err) {
+    const { logError } = await import("./logger");
+    logError(err, { component: "auth", operation: "isAuthenticated" });
     return false;
   }
 };
@@ -180,7 +183,8 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
     const userProfile = profiles[0];
     return userProfile.onboardingCompleted === true;
   } catch (error) {
-    console.error("Error checking onboarding status:", error);
+    const { logError } = await import("./logger");
+    logError(error, { component: "auth", operation: "hasCompletedOnboarding" });
     return false;
   }
 };
@@ -200,7 +204,8 @@ export const getGoogleOAuthRedirectUrl = async (): Promise<string> => {
     const redirectUrl = `https://${cognitoDomain}/oauth2/idpresponse`;
     return redirectUrl;
   } catch (error) {
-    console.error("Error getting OAuth redirect URL:", error);
+    const { logError } = await import("./logger");
+    logError(error, { component: "auth", operation: "getOAuthRedirectUrl" });
     return "";
   }
 };

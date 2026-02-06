@@ -21,6 +21,7 @@ import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { dispatchBadgeRefresh, dispatchViewingMatch } from "@/utils/badgeRefresh";
 import { getIdFromEmail } from "@/utils/userId";
+import { logError } from "@/utils/logger";
 import { 
   Heart, 
   MessageCircle, 
@@ -115,7 +116,7 @@ const Matches = () => {
         setCurrentUserEmail(backendProfile.email || profile.email || "");
         setAuthError(null);
       } catch (err) {
-        console.error("[Matches] Failed to load user profile:", err);
+        logError(err, { component: "Matches", operation: "loadUserProfile" });
         setAuthError("Unable to load your profile. Please try again.");
         setCurrentUserId("");
         setCurrentUserEmail("");
@@ -179,7 +180,8 @@ const Matches = () => {
       } else {
         setPendingOutgoingRequest(null);
       }
-    } catch (_) {
+    } catch (err) {
+      logError(err, { component: "Matches", operation: "loadPendingOutgoingRequest", extra: { currentUserId } });
       setPendingOutgoingRequest(null);
     }
   }, [currentUserId]);
@@ -212,7 +214,7 @@ const Matches = () => {
         navigate("/prom-date", { replace: true });
       }
     } catch (err) {
-      console.error("[Matches] Accept Prom Ask failed:", err);
+      logError(err, { component: "Matches", operation: "acceptPromAsk", extra: { promAskId } });
     } finally {
       setAcceptingPromAskId(null);
     }
@@ -285,8 +287,8 @@ const Matches = () => {
                 options: { bucket: "userPhotos" },
               });
               urls[match.id] = url.toString();
-            } catch {
-              // Profile pic unavailable
+            } catch (err) {
+              logError(err, { component: "Matches", operation: "fetchProfilePic", extra: { profilePicKey, matchId: match.id } });
             }
           }
         })
@@ -318,8 +320,8 @@ const Matches = () => {
               if (conversation?.lastMessageAt) {
                 times[match.id] = formatLastMessageTime(conversation.lastMessageAt);
               }
-            } catch {
-              // Conversation unavailable
+            } catch (err) {
+              logError(err, { component: "Matches", operation: "fetchConversation", extra: { matchId: match.id } });
             }
           }
         })
@@ -427,7 +429,7 @@ const Matches = () => {
       await loadPendingOutgoing();
       navigate("/discover/profile", { state: { refresh: true } });
     } catch (e) {
-      console.error("[Matches] Withdraw failed:", e);
+      logError(e, { component: "Matches", operation: "withdraw" });
       throw e;
     } finally {
       setWithdrawing(false);

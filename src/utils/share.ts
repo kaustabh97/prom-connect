@@ -29,8 +29,9 @@ export async function handleReferralShare(): Promise<void> {
       const { text, url, title } = getReferralShareData();
       await navigator.share({ title, text, url });
       return;
-    } catch {
-      // User cancelled or share failed — fall through to WhatsApp link
+    } catch (err) {
+      const { logError } = await import("./logger");
+      logError(err, { component: "share", operation: "handleReferralShare" });
     }
   }
   const w = window.open(getReferralWhatsAppUrl(), "_blank", "noopener,noreferrer,width=600,height=400");

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { logError } from "@/utils/logger";
 
 const sexualities = ["Straight", "Gay", "Bisexual", "Queer"];
 const intentions = [
@@ -70,7 +71,7 @@ export default function WithdrawModal({
       });
       onOpenChange(false);
     } catch (e) {
-      console.error("[WithdrawModal] Submit failed:", e);
+      logError(e, { component: "WithdrawModal", operation: "handleSubmit" });
     } finally {
       setIsSubmitting(false);
     }

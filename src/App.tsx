@@ -21,14 +21,16 @@ import { MATCHMAKING_ENABLED } from "@/config";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Amplify } from "aws-amplify";
+import { logError, logInfo } from "@/utils/logger";
 import outputs from "../amplify_outputs.json";
 import { captureInviteFromUrl } from "@/utils/invite";
 import "@aws-amplify/ui-react/styles.css";
 
 try {
   Amplify.configure(outputs);
+  logInfo("Amplify configured", { component: "App", operation: "Amplify.configure" });
 } catch (e) {
-  console.error("[App] Amplify configure failed:", e);
+  logError(e, { component: "App", operation: "Amplify.configure" });
 }
 
 /** Captures ?invite=email from URL on load and route changes */

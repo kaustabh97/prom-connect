@@ -132,8 +132,9 @@ export default function ReportModal({
         setReportText("");
         onOpenChange(false);
       }
-    } catch {
-      // FormSubmit failed, fall back to Gmail
+    } catch (err) {
+      const { logError } = await import("@/utils/logger");
+      logError(err, { component: "ReportModal", operation: "sendReportViaFormSubmit" });
       const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
       const reporterNameToUse = reporterName ?? reporterInfo.name;
       openGmailReportFallback(text, context, personName ?? undefined, personId, personEmail ?? undefined, reporterEmailToUse, reporterNameToUse);

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { logError } from "@/utils/logger";
 
 const STORAGE_KEY_PREFIX = "prom-connect:unread-matches:";
 const UNREAD_UPDATED_EVENT = "prom-connect:unread-matches-updated";
@@ -10,7 +11,8 @@ function loadUnreadMatchIds(userId: string): Set<string> {
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as string[];
     return new Set(Array.isArray(parsed) ? parsed : []);
-  } catch {
+  } catch (err) {
+    logError(err, { component: "useUnreadMatches", operation: "loadUnreadMatchIds", extra: { userId } });
     return new Set();
   }
 }
@@ -22,8 +24,8 @@ function saveUnreadMatchIds(userId: string, ids: Set<string>) {
       `${STORAGE_KEY_PREFIX}${userId}`,
       JSON.stringify([...ids])
     );
-  } catch {
-    // ignore
+  } catch (err) {
+    logError(err, { component: "useUnreadMatches", operation: "saveUnreadMatchIds", extra: { userId } });
   }
 }
 

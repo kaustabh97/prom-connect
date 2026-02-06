@@ -6,6 +6,7 @@ import { Heart, User, Share2 } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import CountdownTimer from "@/components/CountdownTimer";
 import { handleReferralShare } from "@/utils/share";
+import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -29,7 +30,9 @@ export default function MatchmakingComingSoon() {
         const count = data?.length ?? 0;
         setRegisteredCount(count);
         setHasMore(!!nextToken);
-      } catch {
+        logInfo("Registered count loaded", { component: "MatchmakingComingSoon", operation: "fetchRegisteredCount", extra: { count, hasMore: !!nextToken } });
+      } catch (err) {
+        logError(err, { component: "MatchmakingComingSoon", operation: "fetchRegisteredCount" });
         setRegisteredCount(null);
       }
     };

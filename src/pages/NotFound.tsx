@@ -4,13 +4,14 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { Heart, Home } from "lucide-react";
+import { logWarn } from "@/utils/logger";
 
 const NotFound = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
+    logWarn("404: User attempted to access non-existent route", { component: "NotFound", extra: { path: location.pathname } });
   }, [location.pathname]);
 
   return (

@@ -63,8 +63,9 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
     }
 
     return null;
-  } catch {
-    // If backend check fails, don't block - let user through
+  } catch (err) {
+    const { logError } = await import("@/utils/logger");
+    logError(err, { component: "promDateRedirect", operation: "getPromDateRedirectPath" });
     return null;
   }
 }

@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { SwipeAction } from "@/lib/dating";
 import { generateClient } from "aws-amplify/data";
+import { logError } from "@/utils/logger";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
@@ -54,7 +55,7 @@ export function useMatch() {
         });
       }
     } catch (err) {
-      console.error("[useMatch] Failed to load likes from backend:", err);
+      logError(err, { component: "useMatch", operation: "loadLikes" });
     }
   }, []);
 
@@ -128,7 +129,7 @@ export function useMatch() {
             }
           }
         } catch (err) {
-          console.error("[useMatch] Failed to save like/match to backend:", err);
+          logError(err, { component: "useMatch", operation: "saveLikeMatch", extra: { profileId } });
         }
 
         matches.push({ user1Id: fromUserId, user2Id: profileId });
