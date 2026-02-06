@@ -72,6 +72,39 @@ If you see "You can't sign in because this app sent an invalid request" or "does
 
 **Note**: Each Amplify environment (sandbox, main branch, etc.) gets its own Cognito domain. You must add the redirect URI for each domain you use.
 
+## Google OAuth "401 invalid_client Unauthorized" Error Fix
+
+If you see `Google Error - 401 invalid_client Unauthorized` when logging in via Google in production:
+
+This error means the Google OAuth Client ID or Client Secret in AWS Amplify doesn't match what's configured in Google Cloud Console. Follow these steps:
+
+1. **Verify secrets are set for production branch**:
+   - Go to AWS Amplify Console → your app → **Hosting** → **Secrets**
+   - Ensure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set for your production branch (e.g., `main`)
+   - If they're only set for "all branches", make sure they're correct values
+
+2. **Verify Google Cloud Console configuration**:
+   - Open [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+   - Find your **OAuth 2.0 Client ID** (Web application)
+   - Copy the **Client ID** and **Client Secret**
+   - Verify these match exactly what you set in AWS Amplify Secrets
+
+3. **Check redirect URI is configured**:
+   - In Google Cloud Console, under **Authorized redirect URIs**, ensure you have:
+     - `https://d0aa65b8303f8747775b.auth.ap-south-1.amazoncognito.com/oauth2/idpresponse`
+   - Under **Authorized JavaScript origins**, ensure you have:
+     - `https://d0aa65b8303f8747775b.auth.ap-south-1.amazoncognito.com`
+     - `https://starlitbythebricks.in`
+
+4. **Common issues**:
+   - **Wrong Client ID/Secret**: The values in Amplify Secrets must match exactly what's in Google Cloud Console
+   - **Secrets not set for production**: Make sure secrets are set for the specific branch, not just sandbox
+   - **Mismatched OAuth client**: Ensure you're using the same OAuth 2.0 Client ID in both places
+
+5. **After fixing secrets**:
+   - Redeploy your Amplify app to pick up the new secret values
+   - Wait a few minutes for changes to propagate
+
 PRODUCTION URL FOR NOW: https://main.d1emd9gkgd3wf8.amplifyapp.com/
 
 ## "An error was encountered with the requested page" (Google OAuth)
