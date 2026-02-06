@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -5,9 +6,35 @@ import { Heart, User, Share2 } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import CountdownTimer from "@/components/CountdownTimer";
 import { handleReferralShare } from "@/utils/share";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
+
+const client = generateClient<Schema>();
 
 export default function MatchmakingComingSoon() {
   const navigate = useNavigate();
+  const [registeredCount, setRegisteredCount] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const { data, nextToken } = await client.models.UserProfile.list(
+          {
+            filter: { onboardingCompleted: { eq: true } },
+            limit: 1000,
+          },
+          { authMode: "apiKey" }
+        );
+        const count = data?.length ?? 0;
+        setRegisteredCount(count);
+        setHasMore(!!nextToken);
+      } catch {
+        setRegisteredCount(null);
+      }
+    };
+    fetchCount();
+  }, []);
 
   return (
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
@@ -30,6 +57,14 @@ export default function MatchmakingComingSoon() {
             We&apos;re getting things ready so you can find your prom date. 
             Until then, polish up that profile — first impressions matter!
           </p>
+          {registeredCount !== null && (
+            <p className="text-sm text-muted-foreground mb-4">
+              <span className="font-medium text-primary">
+                {hasMore ? `${registeredCount}+` : registeredCount}
+              </span>{" "}
+              people are already in the lineup — your perfect prom match could be one of them. Don&apos;t be the one left wondering what if! ✨
+            </p>
+          )}
           <div className="mb-8">
             <CountdownTimer targetDate="2026-02-07T21:00:00" label="Matchmaking begins in" />
           </div>
