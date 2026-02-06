@@ -61,12 +61,14 @@ export default function MatchmakingComingSoon() {
             Until then, polish up that profile — first impressions matter!
           </p>
           {registeredCount !== null && (
-            <p className="text-sm text-muted-foreground mb-4">
+            <div className="text-sm text-muted-foreground mb-4 px-4 py-3 rounded-xl border-2 border-primary/40 bg-primary/5">
               <span className="font-medium text-primary">
                 {hasMore ? `${registeredCount}+` : registeredCount}
               </span>{" "}
-              people are already in the lineup — your perfect prom match could be one of them. Don&apos;t be the one left wondering what if! ✨
-            </p>
+              people are already in the lineup — your perfect prom match could be one of them.
+              <br />
+              Don&apos;t be the one left wondering what if! ✨
+            </div>
           )}
           <div className="mb-8">
             <CountdownTimer targetDate="2026-02-07T21:00:00" label="Matchmaking begins in" />
