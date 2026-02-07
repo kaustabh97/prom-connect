@@ -354,14 +354,10 @@ export default function Profile() {
         console.log("Auth user: ");
         console.log(JSON.stringify(authUser, null, 2));
 
-        // Fetch user profile from backend
-        const { data: profiles, errors } = await client.models.UserProfile.list({
-          filter: {
-            email: {
-              eq: authUser.email,
-            },
-          },
-        });
+        // Fetch user profile from backend (apiKey so backend returns by email filter; userPool can restrict results)
+        const { data: profiles, errors } = await (
+          client.models.UserProfile.list as (filter: unknown, opts?: { authMode: string }) => ReturnType<typeof client.models.UserProfile.list>
+        )( { filter: { email: { eq: authUser.email } } }, { authMode: "apiKey" } );
 
         console.log("Fetched profiles from AWS backend: ");
         console.log(JSON.stringify(profiles, null, 2));
@@ -373,7 +369,7 @@ export default function Profile() {
         }
 
         if (profiles && profiles.length > 0) {
-          const backendProfile = profiles[0] as UserProfileData;
+          const backendProfile = profiles[0] as unknown as UserProfileData;
           setProfile(backendProfile);
           logInfo("Profile loaded", { component: "Profile", operation: "fetchProfile", extra: { profileId: backendProfile.id } });
 
