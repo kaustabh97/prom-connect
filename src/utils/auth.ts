@@ -115,6 +115,8 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       extra: { hasEmail: !!email, hasName: !!name, hasPicture: !!picture },
     });
 
+    console.log(JSON.stringify(payload, null, 2));
+
     const profile: UserProfile = {
       username: user.username,
       userId: user.userId,

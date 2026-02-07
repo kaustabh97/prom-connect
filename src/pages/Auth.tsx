@@ -28,25 +28,20 @@ const Auth = () => {
     const checkUser = async () => {
       setIsLoading(true);
       logInfo("Checking auth state", { component: "Auth", operation: "checkUser" });
-
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const state = urlParams.get('state');
       
       const profile = await getUserProfile();
       setUserInfo(profile);
-      logInfo("Auth check result", { component: "Auth", operation: "checkUser", extra: { hasProfile: !!profile, hasCode: !!code } });
+      logInfo("Auth check result", { component: "Auth", operation: "checkUser", extra: { hasProfile: !!profile } });
+      console.log(JSON.stringify(profile, null, 2));
       
       if (profile) {
-        // After Google OAuth redirect, ensure session/tokens are ready before fetching profile from backend
-        if (code) {
-          try {
-            await fetchAuthSession();
-          } catch (_) {
-            // Session may still be hydrating; continue and let hasCompletedOnboarding handle it
-          }
+        // 1) Ensure session/tokens are ready before any backend call (avoids race with OAuth code exchange)
+        try {
+          await fetchAuthSession();
+        } catch (_) {
+          // Session may still be hydrating; continue and let hasCompletedOnboarding handle it
         }
-        // Fetch user's profile from backend (uses userPool in production) and check onboarding
+        // 2) Only after session is ready: fetch user's profile from backend (uses userPool in production)
         const completed = await hasCompletedOnboarding();
         setIsLoading(false);
         
