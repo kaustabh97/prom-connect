@@ -23,7 +23,10 @@ const frontendLogGroup = new logs.LogGroup(frontendLogsStack, 'FrontendLogGroup'
   logGroupName: '/aws/amplify/prom-connect/frontend-logs',
   retention: logs.RetentionDays.THREE_MONTHS,
 });
-const frontendLoggerLambda = backend.frontendLogger.resources.lambda;
+type LambdaWithEnv = {
+  addEnvironment(key: string, value: string): void;
+};
+const frontendLoggerLambda = backend.frontendLogger.resources.lambda as unknown as LambdaWithEnv;
 frontendLoggerLambda.addEnvironment('FRONTEND_LOG_GROUP', frontendLogGroup.logGroupName);
 frontendLoggerLambda.addToRolePolicy(
   new iam.PolicyStatement({
@@ -44,9 +47,6 @@ sendPartnerInviteLambda.addToRolePolicy(
 );
 
 // Report emails use Resend API (no SES). RESEND_API_KEY from env when running sandbox.
-type LambdaWithEnv = {
-  addEnvironment(key: string, value: string): void;
-};
 const sendReportEmailLambda = backend.sendReportEmail.resources.lambda as unknown as LambdaWithEnv;
 sendReportEmailLambda.addEnvironment(
   'RESEND_API_KEY',
