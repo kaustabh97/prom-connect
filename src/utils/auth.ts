@@ -161,19 +161,19 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
       return false;
     }
 
-    // Use API key auth mode when Google login is disabled
-    const authMode = GOOGLE_LOGIN_CHECK ? undefined : 'apiKey' as const;
-
-    const { data: profiles, errors } = await client.models.UserProfile.list(
-      {
-        filter: {
-          email: {
-            eq: profile.email,
-          },
+    // In production (Google login), use userPool so we fetch the user's profile with their JWT.
+    // When Google login is disabled, use API key.
+    const authMode = GOOGLE_LOGIN_CHECK ? ('userPool' as const) : ('apiKey' as const);
+    const filters = {
+      filter: {
+        email: {
+          eq: profile.email,
         },
       },
-      authMode ? { authMode } : undefined
-    );
+    };
+    const opts = { authMode };
+    // @ts-ignore - authMode option not in generated types yet
+    const { data: profiles, errors } = await client.models.UserProfile.list(filters, opts);
 
     if (errors || !profiles || profiles.length === 0) {
       return false;
