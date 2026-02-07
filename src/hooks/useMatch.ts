@@ -3,7 +3,7 @@ import type { SwipeAction } from "@/lib/dating";
 import { generateClient } from "aws-amplify/data";
 import { logError, logInfo } from "@/utils/logger";
 import type { Schema } from "../../amplify/data/resource";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
@@ -26,7 +26,7 @@ export function useMatch() {
   const loadLikesFromBackend = useCallback(async (): Promise<void> => {
     logInfo("Loading likes from backend", { component: "useMatch", operation: "loadLikesFromBackend" });
     try {
-      const authProfile = await getUserProfile();
+      const authProfile = await getUserProfileFromCognito();
       if (!authProfile?.email) return;
 
       const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
@@ -71,7 +71,7 @@ export function useMatch() {
         let fromUserId = "unknown";
 
         try {
-          const authProfile = await getUserProfile();
+          const authProfile = await getUserProfileFromCognito();
           if (authProfile?.email) {
             const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
             const opts = authMode ? { authMode } : undefined;

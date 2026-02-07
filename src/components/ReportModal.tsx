@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { Flag, Loader2 } from "lucide-react";
 const REPORT_EMAIL = "mosaic@iima.ac.in";
@@ -99,7 +99,7 @@ export default function ReportModal({
   useEffect(() => {
     if (open) {
       logInfo("Report modal opened", { component: "ReportModal", operation: "open", extra: { personName, personId } });
-      getUserProfile().then((p) => {
+      getUserProfileFromCognito().then((p) => {
         setReporterInfo({ email: p?.email, name: p?.name });
       });
     }

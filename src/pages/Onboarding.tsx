@@ -17,7 +17,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
-import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
+import { getUserProfileFromCognito, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
@@ -219,7 +219,7 @@ const Onboarding = () => {
     const checkAuth = async () => {
       setIsCheckingAuth(true);
       try {
-        const authProfile = await getUserProfile();
+        const authProfile = await getUserProfileFromCognito();
         
         if (authProfile && authProfile.email) {
           setIsAuthenticated(true);
@@ -611,7 +611,7 @@ const Onboarding = () => {
     setSaveError(null);
     
     try {
-      const currentUser = await getUserProfile();
+      const currentUser = await getUserProfileFromCognito();
 
         // Check if profile already exists for this email
         
@@ -822,7 +822,7 @@ const Onboarding = () => {
     setIsSaving(true);
     setSaveError(null);
     try {
-      const currentUser = await getUserProfile();
+      const currentUser = await getUserProfileFromCognito();
       const { fetchAuthSession } = await import("aws-amplify/auth");
       const session = await fetchAuthSession();
       const isAuthenticated = !!session.tokens;
@@ -980,7 +980,7 @@ const Onboarding = () => {
             id: getIdFromEmail(profile.email),
             email: profile.email,
             name: profile.name || userName || undefined,
-            userId: (await getUserProfile())?.userId ?? "",
+            userId: (await getUserProfileFromCognito())?.userId ?? "",
             onboardingCompleted: true,
           },
           opts

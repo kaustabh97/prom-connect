@@ -7,7 +7,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import { Heart, Mail, FlaskConical } from "lucide-react";
 import { signInWithRedirect, fetchAuthSession } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
-import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { logError, logInfo } from "@/utils/logger";
@@ -29,7 +29,7 @@ const Auth = () => {
       setIsLoading(true);
       logInfo("Checking auth state", { component: "Auth", operation: "checkUser" });
       
-      const profile = await getUserProfile();
+      const profile = await getUserProfileFromCognito();
       setUserInfo(profile);
       logInfo("Auth check result", { component: "Auth", operation: "checkUser", extra: { hasProfile: !!profile } });
       console.log(JSON.stringify(profile, null, 2));
@@ -100,7 +100,7 @@ const Auth = () => {
       setTestUser(email);
       
       // Get the profile (from localStorage in test mode)
-      const profile = await getUserProfile();
+      const profile = await getUserProfileFromCognito();
       setUserInfo(profile);
 
       if (!profile) {

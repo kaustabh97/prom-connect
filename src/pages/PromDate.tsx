@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
@@ -39,7 +39,7 @@ export default function PromDate() {
   useEffect(() => {
     logInfo("PromDate page loaded", { component: "PromDate", operation: "mount", extra: { partnerNameFromUrl, isOutsidePartner } });
     const load = async () => {
-      const p = await getUserProfile();
+      const p = await getUserProfileFromCognito();
       if (!p?.email) {
         logInfo("No auth, redirecting to auth", { component: "PromDate", operation: "load" });
         navigate("/auth");

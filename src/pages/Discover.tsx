@@ -8,7 +8,7 @@ import { useMatch } from "@/hooks/useMatch";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { logError, logInfo, logWarn } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
@@ -154,7 +154,7 @@ export default function Discover() {
     const checkAndOpenFilters = async () => {
       if (searchParams.get("openFilters") === "1") {
         try {
-          const currentUser = await getUserProfile();
+          const currentUser = await getUserProfileFromCognito();
           if (currentUser?.email) {
             const listFilters = { filter: { email: { eq: currentUser.email } } };
             let result;
@@ -197,7 +197,7 @@ export default function Discover() {
   useEffect(() => {
     const syncFiltersFromProfile = async () => {
       try {
-        const currentUser = await getUserProfile();
+        const currentUser = await getUserProfileFromCognito();
         if (!currentUser?.email) {
           setFiltersInitialized(true);
           return;
@@ -275,7 +275,7 @@ export default function Discover() {
         await loadLikesFromBackend();
         
         // Get current user to exclude their profile
-        const currentUser = await getUserProfile();
+        const currentUser = await getUserProfileFromCognito();
         const currentUserEmail = currentUser?.email;
 
         // Check for pending outgoing partner request (sender has requested, waiting for partner to accept)
@@ -472,7 +472,7 @@ export default function Discover() {
         { id: pendingOutgoingRequest.id, status: "withdrawn" },
         opts
       );
-      const currentUser = await getUserProfile();
+      const currentUser = await getUserProfileFromCognito();
       const { data: myProfiles } = await client.models.UserProfile.list(
         { filter: { email: { eq: currentUser?.email } } },
         opts

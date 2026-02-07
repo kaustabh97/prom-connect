@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Compass, Users, User } from "lucide-react";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { usePromDate } from "@/hooks/usePromDate";
 import { useMatchRequests } from "@/hooks/useMatchRequests";
 import { usePromAsk } from "@/hooks/usePromAsk";
@@ -110,7 +110,7 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
   useEffect(() => {
     const load = async () => {
       try {
-        const p = await getUserProfile();
+        const p = await getUserProfileFromCognito();
         if (!p?.email) return;
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;

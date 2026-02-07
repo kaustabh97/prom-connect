@@ -5,7 +5,7 @@ import { getUrl } from "aws-amplify/storage";
 import SparkleBackground from "@/components/SparkleBackground";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
-import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { getUserProfileFromCognito, clearTestUser } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -33,7 +33,7 @@ export default function RequestPending() {
 
   const loadPendingRequest = useCallback(async () => {
     logInfo("RequestPending: loading pending request", { component: "RequestPending", operation: "loadPendingRequest" });
-    const profile = await getUserProfile();
+    const profile = await getUserProfileFromCognito();
     if (!profile?.email) {
       logInfo("RequestPending: no auth, redirecting to auth", { component: "RequestPending", operation: "loadPendingRequest" });
       navigate("/auth");
@@ -94,7 +94,7 @@ export default function RequestPending() {
     logInfo("RequestPending: withdraw confirmed", { component: "RequestPending", operation: "withdrawConfirm", extra: { requestId } });
     setWithdrawing(true);
     try {
-      const profile = await getUserProfile();
+      const profile = await getUserProfileFromCognito();
       if (!profile?.email) return;
       const { data: profiles } = await client.models.UserProfile.list(
         { filter: { email: { eq: profile.email } } },

@@ -1,6 +1,6 @@
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { logError } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
@@ -15,7 +15,7 @@ const client = generateClient<Schema>();
  */
 export async function getPromDateRedirectPath(): Promise<string | null> {
   try {
-    const profile = await getUserProfile();
+    const profile = await getUserProfileFromCognito();
     if (!profile?.email) return null;
 
     const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
