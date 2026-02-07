@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -35,6 +36,7 @@ export function usePromDate({ currentUserId }: UsePromDateOptions): UsePromDateR
     if (!currentUserId) return;
     setIsLoading(true);
     setError(null);
+    logInfo("Loading prom date", { component: "usePromDate", operation: "load", extra: { currentUserId } });
     try {
       const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
       const opts = authMode ? { authMode } : undefined;
@@ -56,14 +58,18 @@ export function usePromDate({ currentUserId }: UsePromDateOptions): UsePromDateR
       try {
         const { data } = await client.models.UserProfile.get({ id: otherUserId }, opts);
         otherProfile = data;
-      } catch (_) {}
+      } catch (err) {
+        logError(err, { component: "usePromDate", operation: "fetchOtherProfile", extra: { otherUserId } });
+      }
       setPromDate({
         match: prom,
         otherUserId,
         otherUserEmail: otherUserEmail || "",
         otherUserProfile: otherProfile,
       });
+      logInfo("Prom date loaded", { component: "usePromDate", operation: "load", extra: { otherUserId } });
     } catch (err) {
+      logError(err, { component: "usePromDate", operation: "loadPromDate", extra: { currentUserId } });
       setError(err instanceof Error ? err.message : "Failed to load prom date");
       setPromDate(null);
     } finally {

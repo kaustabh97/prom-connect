@@ -5,6 +5,7 @@ import { signOut } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { logError, logInfo } from "@/utils/logger";
 import { usePromDate } from "@/hooks/usePromDate";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl, uploadData } from "aws-amplify/storage";
@@ -160,7 +161,7 @@ export default function Profile() {
       }
       navigate("/");
     } catch (err) {
-      console.error("Error signing out:", err);
+      logError(err, { component: "Profile", operation: "signOut" });
       if (!GOOGLE_LOGIN_CHECK) clearTestUser();
       navigate("/");
     } finally {
@@ -215,7 +216,7 @@ export default function Profile() {
       setProfile((prev) => prev ? { ...prev, bio: bioEditValue.trim() || undefined } : null);
       setShowBioEditSheet(false);
     } catch (err) {
-      console.error("Failed to save bio:", err);
+      logError(err, { component: "Profile", operation: "saveBio" });
     } finally {
       setSavingBio(false);
     }
@@ -256,7 +257,7 @@ export default function Profile() {
       const { url } = await getUrl({ path: s3Path, options: { bucket: "userPhotos" } });
       setProfilePicUrl(url.toString());
     } catch (err) {
-      console.error("Failed to upload photo:", err);
+      logError(err, { component: "Profile", operation: "uploadPhoto" });
       setPhotoUploadError(err instanceof Error ? err.message : "Failed to upload photo");
     } finally {
       setUploadingPhoto(false);
@@ -281,7 +282,7 @@ export default function Profile() {
       setProfile((prev) => prev ? { ...prev, ...preferencesEditValues } : null);
       setShowPreferencesEditSheet(false);
     } catch (err) {
-      console.error("Failed to save preferences:", err);
+      logError(err, { component: "Profile", operation: "savePreferences" });
     } finally {
       setSavingPreferences(false);
     }
@@ -304,7 +305,7 @@ export default function Profile() {
       setProfile((prev) => prev ? { ...prev, ...pollEditValues } : null);
       setShowPollsEditSheet(false);
     } catch (err) {
-      console.error("Failed to save polls:", err);
+      logError(err, { component: "Profile", operation: "savePolls" });
     } finally {
       setSavingPolls(false);
     }
@@ -327,17 +328,22 @@ export default function Profile() {
       setProfile((prev) => prev ? { ...prev, ...funEditValues } : null);
       setShowFunEditSheet(false);
     } catch (err) {
-      console.error("Failed to save fun answers:", err);
+      logError(err, { component: "Profile", operation: "saveFunAnswers" });
     } finally {
       setSavingFun(false);
     }
   };
 
   useEffect(() => {
+    logInfo("Profile page loaded", { component: "Profile", operation: "mount" });
+  }, []);
+
+  useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);
         setError(null);
+        logInfo("Fetching profile", { component: "Profile", operation: "fetchProfile" });
 
         // Get authenticated user info
         const authUser = await getUserProfile();
@@ -368,7 +374,7 @@ export default function Profile() {
         });
 
         if (errors) {
-          console.error("Error fetching profile:", errors);
+          logError(errors[0], { component: "Profile", operation: "fetchProfile", extra: { errors } });
           setError("Failed to load profile. Please try again.");
           return;
         }
@@ -376,7 +382,8 @@ export default function Profile() {
         if (profiles && profiles.length > 0) {
           const backendProfile = profiles[0] as UserProfileData;
           setProfile(backendProfile);
-          
+          logInfo("Profile loaded", { component: "Profile", operation: "fetchProfile", extra: { profileId: backendProfile.id } });
+
           // Fetch profile picture from S3 if available
           if (backendProfile.profilePicKey) {
             try {
@@ -385,15 +392,15 @@ export default function Profile() {
                 options: { bucket: "userPhotos" },
               });
               setProfilePicUrl(url.toString());
-            } catch {
-              // Profile pic unavailable
+            } catch (err) {
+              logError(err, { component: "Profile", operation: "fetchProfilePic", extra: { profilePicKey: backendProfile.profilePicKey } });
             }
           }
         } else {
           setError("Profile not found. Please complete onboarding first.");
         }
       } catch (err) {
-        console.error("Error fetching profile:", err);
+        logError(err, { component: "Profile", operation: "fetchProfile" });
         setError("An error occurred while loading your profile.");
       } finally {
         setLoading(false);

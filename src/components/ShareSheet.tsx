@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { ReferralShareCard, PartnerInviteShareCard } from "./ShareableCard";
 import { useShareImage } from "@/hooks/useShareImage";
+import { logInfo } from "@/utils/logger";
 import { shareViaWhatsApp, sharePartnerInviteViaWhatsApp } from "@/utils/share";
 
 type ShareSheetVariant = "referral" | "partnerInvite";
@@ -59,6 +60,7 @@ export default function ShareSheet(props: ShareSheetProps) {
   };
 
   const handleShareWhatsApp = () => {
+    logInfo("ShareSheet: Share via WhatsApp clicked", { component: "ShareSheet", operation: "shareWhatsApp", extra: { variant: props.variant } });
     if (props.variant === "referral") {
       shareViaWhatsApp();
     } else {

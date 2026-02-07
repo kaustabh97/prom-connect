@@ -3,6 +3,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getIdFromEmail } from "@/utils/userId";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -36,6 +37,7 @@ export function useMatchRequests({
     if (!currentUserEmail && !currentUserId) return;
     setIsLoading(true);
     setError(null);
+    logInfo("Loading match requests", { component: "useMatchRequests", operation: "loadRequests", extra: { currentUserEmail, currentUserId } });
     try {
       const byEmail =
         currentUserEmail
@@ -60,8 +62,9 @@ export function useMatchRequests({
       );
       const pending = unique.filter((r) => r.status === "pending");
       setPendingRequests(pending);
+      logInfo("Match requests loaded", { component: "useMatchRequests", operation: "loadRequests", extra: { count: pending.length } });
     } catch (err) {
-      console.error("Error loading match requests:", err);
+      logError(err, { component: "useMatchRequests", operation: "loadRequests" });
       setError(err instanceof Error ? err.message : "Failed to load requests");
       setPendingRequests([]);
     } finally {
@@ -102,7 +105,7 @@ export function useMatchRequests({
           authMode ? { authMode } : undefined
         );
         if (errors || !newMatch) {
-          console.error("Error creating match:", errors);
+          logError(errors?.[0], { component: "useMatchRequests", operation: "acceptRequest_createMatch", extra: { requestId, fromUserId, errors } });
           return false;
         }
         // Mark both users as excluded from discovery (partner match confirmed)
@@ -131,13 +134,13 @@ export function useMatchRequests({
               authMode ? { authMode } : undefined
             );
           }
-        } catch {
-          // Could not set excludeFromDiscovery
+        } catch (err) {
+          logError(err, { component: "useMatchRequests", operation: "setExcludeFromDiscovery", extra: { myEmail: currentUserEmail, theirEmail: fromEmail } });
         }
         await loadRequests();
         return true;
       } catch (err) {
-        console.error("Error accepting request:", err);
+        logError(err, { component: "useMatchRequests", operation: "acceptRequest", extra: { requestId } });
         return false;
       }
     },
@@ -157,7 +160,7 @@ export function useMatchRequests({
         await loadRequests();
         return true;
       } catch (err) {
-        console.error("Error declining request:", err);
+        logError(err, { component: "useMatchRequests", operation: "declineRequest", extra: { requestId } });
         return false;
       }
     },

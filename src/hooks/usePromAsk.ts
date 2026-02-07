@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -44,10 +45,13 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
           opts
         ),
       ]);
-      setPendingToMe((toMeRes.data ?? []).filter((r) => r.status === "pending"));
-      setPendingFromMe((fromMeRes.data ?? []).filter((r) => r.status === "pending"));
+      const toMe = (toMeRes.data ?? []).filter((r) => r.status === "pending");
+      const fromMe = (fromMeRes.data ?? []).filter((r) => r.status === "pending");
+      setPendingToMe(toMe);
+      setPendingFromMe(fromMe);
+      logInfo("PromAsk requests loaded", { component: "usePromAsk", operation: "load", extra: { pendingToMe: toMe.length, pendingFromMe: fromMe.length } });
     } catch (err) {
-      console.error("[usePromAsk] Failed to load:", err);
+      logError(err, { component: "usePromAsk", operation: "load" });
       setPendingToMe([]);
       setPendingFromMe([]);
     } finally {
@@ -77,7 +81,7 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
         return { ok: true };
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
-        console.error("[usePromAsk] Send failed:", err);
+        logError(err, { component: "usePromAsk", operation: "send" });
         return { ok: false, error: msg };
       }
     },
@@ -103,13 +107,15 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
                 { id: uid, excludeFromDiscovery: true },
                 opts
               );
-            } catch (_) {}
+            } catch (err) {
+              logError(err, { component: "usePromAsk", operation: "setExcludeFromDiscovery", extra: { userId: uid } });
+            }
           }
         }
         await load();
         return true;
       } catch (err) {
-        console.error("[usePromAsk] Accept failed:", err);
+        logError(err, { component: "usePromAsk", operation: "acceptPromAsk", extra: { requestId } });
         return false;
       }
     },
@@ -126,7 +132,7 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
         await load();
         return true;
       } catch (err) {
-        console.error("[usePromAsk] Decline failed:", err);
+        logError(err, { component: "usePromAsk", operation: "declinePromAsk", extra: { requestId } });
         return false;
       }
     },

@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import type { DiscoveryFilters } from "@/lib/dating";
+import { logInfo } from "@/utils/logger";
 import { GENDER_OPTIONS, NON_NEGOTIABLE_OPTIONS } from "@/lib/dating";
 import { Sparkles } from "lucide-react";
 
@@ -52,6 +53,7 @@ export default function FiltersModal({
   };
 
   const handleSave = () => {
+    logInfo("Filters modal: filters saved", { component: "FiltersModal", operation: "handleSave", extra: local });
     onSave(local);
     onOpenChange(false);
   };

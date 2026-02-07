@@ -6,6 +6,7 @@ import SparkleBackground from "@/components/SparkleBackground";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
@@ -31,8 +32,10 @@ export default function RequestPending() {
   const opts = authMode ? { authMode } : undefined;
 
   const loadPendingRequest = useCallback(async () => {
+    logInfo("RequestPending: loading pending request", { component: "RequestPending", operation: "loadPendingRequest" });
     const profile = await getUserProfile();
     if (!profile?.email) {
+      logInfo("RequestPending: no auth, redirecting to auth", { component: "RequestPending", operation: "loadPendingRequest" });
       navigate("/auth");
       return;
     }
@@ -51,9 +54,11 @@ export default function RequestPending() {
     );
     const pending = (outgoing ?? []).find((r) => r.status === "pending");
     if (!pending) {
+      logInfo("RequestPending: no pending request, redirecting", { component: "RequestPending", operation: "loadPendingRequest" });
       navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
       return;
     }
+    logInfo("RequestPending: pending request loaded", { component: "RequestPending", operation: "loadPendingRequest", extra: { requestId: pending.id } });
     const nameFromBio = userProfile.bio?.match(/^Partner:\s*(.+)/)?.[1]?.trim();
     const nameFromEmail = pending.toEmail?.split("@")[0] || "your partner";
     setPartnerDisplayName(nameFromBio || nameFromEmail);
@@ -65,7 +70,8 @@ export default function RequestPending() {
           options: { bucket: "userPhotos" },
         });
         setMyPhotoUrl(url.toString());
-      } catch {
+      } catch (err) {
+        logError(err, { component: "RequestPending", operation: "loadProfilePic", extra: { profilePicKey: userProfile.profilePicKey } });
         setMyPhotoUrl(null);
       }
     } else {
@@ -81,10 +87,11 @@ export default function RequestPending() {
     return () => { cancelled = true; };
   }, [loadPendingRequest]);
 
-  const handleWithdrawClick = () => setShowWithdrawModal(true);
+  const handleWithdrawClick = () => { logInfo("RequestPending: withdraw modal opened", { component: "RequestPending", operation: "withdrawClick" }); setShowWithdrawModal(true); };
 
   const handleWithdrawConfirm = async (data: WithdrawFormData) => {
     if (!requestId) return;
+    logInfo("RequestPending: withdraw confirmed", { component: "RequestPending", operation: "withdrawConfirm", extra: { requestId } });
     setWithdrawing(true);
     try {
       const profile = await getUserProfile();
@@ -113,16 +120,18 @@ export default function RequestPending() {
           },
           opts
         );
+        logInfo("RequestPending: withdraw complete, redirecting", { component: "RequestPending", operation: "withdrawConfirm" });
         navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", {
           state: { refresh: true },
         });
       } else {
+        logInfo("RequestPending: withdraw complete, redirecting", { component: "RequestPending", operation: "withdrawConfirm" });
         navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", {
           state: { refresh: true },
         });
       }
     } catch (e) {
-      console.error("[RequestPending] Withdraw failed:", e);
+      logError(e, { component: "RequestPending", operation: "withdraw", extra: { requestId } });
       throw e;
     } finally {
       setWithdrawing(false);
@@ -130,6 +139,7 @@ export default function RequestPending() {
   };
 
   const handleLogout = async () => {
+    logInfo("RequestPending: logout clicked", { component: "RequestPending", operation: "logout" });
     try {
       if (GOOGLE_LOGIN_CHECK) {
         await signOut();
@@ -138,7 +148,7 @@ export default function RequestPending() {
       }
       navigate("/");
     } catch (err) {
-      console.error("Logout failed:", err);
+      logError(err, { component: "RequestPending", operation: "logout" });
       if (!GOOGLE_LOGIN_CHECK) clearTestUser();
       navigate("/");
     }

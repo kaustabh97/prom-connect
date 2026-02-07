@@ -21,6 +21,7 @@ import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/a
 import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
+import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
@@ -147,6 +148,10 @@ const Onboarding = () => {
   // Profile state
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [flowChoice, setFlowChoice] = useState<"full" | "couple" | "invite" | null>(null);
+
+  useEffect(() => {
+    logInfo("Onboarding step changed", { component: "Onboarding", operation: "stepChange", extra: { step } });
+  }, [step]);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
     fromUserId: string;
@@ -274,14 +279,16 @@ const Onboarding = () => {
               });
               // Stay on choice step; show "You have a request from X" vs "Look for a date"
             }
-          } catch (_) {}
+          } catch (err) {
+            logError(err, { component: "Onboarding", operation: "checkAuth" });
+          }
         } else {
           setIsAuthenticated(false);
           setShowAuthModal(true);
           setIsValidEmail(null);
         }
       } catch (error) {
-        console.error("Auth check failed:", error);
+        logError(error, { component: "Onboarding", operation: "authCheck" });
         setIsAuthenticated(false);
         setShowAuthModal(true);
         setIsValidEmail(null);
@@ -305,7 +312,7 @@ const Onboarding = () => {
       // Redirect to landing page
       navigate("/");
     } catch (error) {
-      console.error("Error signing out:", error);
+      logError(error, { component: "Onboarding", operation: "signOut" });
       // Still clear test user and navigate even if signOut fails
       if (!GOOGLE_LOGIN_CHECK) {
         clearTestUser();
@@ -438,7 +445,9 @@ const Onboarding = () => {
             fromName: pending.fromName ?? undefined,
           });
         }
-      } catch (_) {}
+      } catch (err) {
+        logError(err, { component: "Onboarding", operation: "fetchPromDateRedirect", extra: { step } });
+      }
     })();
     return () => { cancelled = true; };
   }, [step, userEmail]);
@@ -484,7 +493,8 @@ const Onboarding = () => {
       );
       const isRegistered = (partnerProfiles?.length ?? 0) > 0;
       setPartnerCheckStatus(isRegistered ? "registered" : "not_registered");
-    } catch (_) {
+    } catch (err) {
+      logError(err, { component: "Onboarding", operation: "checkPartnerRegistered", extra: { partnerEmail: trimmed } });
       setPartnerCheckStatus("idle");
     }
   };
@@ -510,8 +520,7 @@ const Onboarding = () => {
       // Check if storage is configured in amplify_outputs.json
       if (!(outputs as any).storage) {
         const errorMsg = "Storage bucket is not configured. Please run 'npx ampx sandbox' in the project root to sync the backend and create the S3 storage bucket.";
-        console.error("[Onboarding] Storage not configured in amplify_outputs.json");
-        console.error("[Onboarding] Available outputs:", Object.keys(outputs));
+        logError(new Error(errorMsg), { component: "Onboarding", operation: "uploadPhoto", extra: { availableOutputs: Object.keys(outputs) } });
         throw new Error(errorMsg);
       }
 
@@ -529,7 +538,7 @@ const Onboarding = () => {
       const s3Path = (result as { path?: string }).path ?? `profile-pics/${fileName}`;
       return s3Path;
     } catch (error) {
-      console.error("[Onboarding] Error uploading photo:", error);
+      logError(error, { component: "Onboarding", operation: "uploadPhoto" });
       const errorMessage = error instanceof Error ? error.message : "Failed to upload photo";
       
       // Provide helpful error message for missing bucket
@@ -556,6 +565,7 @@ const Onboarding = () => {
           const s3Key = await uploadPhotoToS3(selectedFile);
           setProfile(prev => ({ ...prev, profilePicKey: s3Key }));
         } catch (error) {
+          logError(error, { component: "Onboarding", operation: "uploadPhotoNextStep" });
           setUploadError(error instanceof Error ? error.message : "Failed to upload photo");
           setIsUploading(false);
           return;
@@ -738,10 +748,13 @@ const Onboarding = () => {
             setIsSaving(false);
             return;
           }
-        } catch (_) {}
+        } catch (err) {
+          logError(err, { component: "Onboarding", operation: "sendPartnerInvite" });
+        }
+        logInfo("Onboarding: profile saved, navigating", { component: "Onboarding", operation: "saveProfile", extra: { flow: "full" } });
         navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
-        console.error("[Onboarding] Failed to save profile:", error);
+        logError(error, { component: "Onboarding", operation: "saveProfile" });
         setSaveError(error instanceof Error ? error.message : "Failed to save profile. Please try again.");
         setIsSaving(false);
       }
@@ -798,6 +811,7 @@ const Onboarding = () => {
       }
       navigate(`/prom-date?partnerName=${encodeURIComponent(partnerNameTrim)}&outside=1`);
     } catch (error) {
+      logError(error, { component: "Onboarding", operation: "saveCoupleOutside" });
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
       setIsSaving(false);
@@ -898,11 +912,12 @@ const Onboarding = () => {
           // Partner exists - they'll see the request in Matches
           navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
-      } catch {
-        // Navigate even if invite creation failed
+      } catch (err) {
+        logError(err, { component: "Onboarding", operation: "createMatchRequest" });
         navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       }
     } catch (error) {
+      logError(error, { component: "Onboarding", operation: "saveCoupleIIMA" });
       setSaveError(error instanceof Error ? error.message : "Failed to save. Please try again.");
     } finally {
       setIsSaving(false);
@@ -1013,6 +1028,7 @@ const Onboarding = () => {
       clearInviteFrom();
       navigate("/prom-date");
     } catch (err) {
+      logError(err, { component: "Onboarding", operation: "acceptInvite", extra: { inviteId: inviteRequest?.id } });
       setSaveError(err instanceof Error ? err.message : "Failed to accept. Please try again.");
     } finally {
       setInviteAccepting(false);
@@ -1051,14 +1067,15 @@ const Onboarding = () => {
             opts
           );
         }
-      } catch (_) {
-        // Non-fatal
+      } catch (err) {
+        logError(err, { component: "Onboarding", operation: "clearSenderBioOnDecline", extra: { fromUserId: inviteRequest.fromUserId } });
       }
       clearInviteFrom();
       setInviteRequest(null);
       setFlowChoice(null);
       setStep("choice");
     } catch (err) {
+      logError(err, { component: "Onboarding", operation: "declineInvite", extra: { inviteId: inviteRequest?.id } });
       setSaveError(err instanceof Error ? err.message : "Failed to decline. Please try again.");
     } finally {
       setInviteDeclining(false);

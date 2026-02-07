@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -26,13 +27,15 @@ const Auth = () => {
   useEffect(() => {
     const checkUser = async () => {
       setIsLoading(true);
-      
+      logInfo("Checking auth state", { component: "Auth", operation: "checkUser" });
+
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
       const state = urlParams.get('state');
       
       const profile = await getUserProfile();
       setUserInfo(profile);
+      logInfo("Auth check result", { component: "Auth", operation: "checkUser", extra: { hasProfile: !!profile, hasCode: !!code } });
       
       if (profile) {
         // Check if user has completed onboarding
@@ -41,13 +44,14 @@ const Auth = () => {
         
         if (completed) {
           const promDatePath = await getPromDateRedirectPath();
+          logInfo("Redirecting authenticated user", { component: "Auth", operation: "checkUser", extra: { promDatePath: promDatePath ?? "discover/matchmaking-soon", completed: true } });
           if (promDatePath) {
             navigate(promDatePath);
           } else {
             navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
           }
         } else {
-          // Redirect to onboarding if not completed
+          logInfo("Redirecting to onboarding", { component: "Auth", operation: "checkUser" });
           navigate("/onboarding");
         }
       } else {
@@ -58,11 +62,12 @@ const Auth = () => {
   }, [navigate]);
 
   const handleGoogleSignIn = async () => {
+    logInfo("Auth: Google sign in clicked", { component: "Auth", operation: "googleSignIn" });
     setIsSigningIn(true);
     try {
       await signInWithRedirect({ provider: "Google" });
     } catch (error) {
-      console.error("Error during Google sign-in:", error);
+      logError(error, { component: "Auth", operation: "googleSignIn" });
       // Show user-friendly error
       alert("Sign-in failed. Please make sure you're using the correct URL. If on mobile, your IP address may need to be added to the allowed callback URLs.");
       setIsSigningIn(false);
@@ -70,6 +75,7 @@ const Auth = () => {
   };
 
   const handleTestModeSignIn = async () => {
+    logInfo("Auth: Test mode sign in clicked", { component: "Auth", operation: "testModeSignIn", extra: { email: testEmail.trim() } });
     if (!testEmail.trim()) {
       alert("Please enter an email address");
       return;
@@ -123,7 +129,7 @@ const Auth = () => {
       }
       navigate("/onboarding");
     } catch (error) {
-      console.error("Error in email sign-in:", error);
+      logError(error, { component: "Auth", operation: "emailSignIn" });
       alert("Failed to sign in. Please try again.");
     } finally {
       setIsSigningIn(false);

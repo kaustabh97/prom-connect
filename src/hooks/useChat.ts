@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -57,14 +58,18 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
   const loadConversation = useCallback(async (id: string) => {
     setIsLoading(true);
     setError(null);
+    logInfo("Loading conversation", { component: "useChat", operation: "loadConversation", extra: { conversationId: id } });
     try {
       const { data, errors } = await client.models.Conversation.get({ id });
       if (errors) {
+        logError(errors[0], { component: "useChat", operation: "loadConversation", extra: { conversationId: id, errors } });
         setError(errors[0]?.message || "Failed to load conversation");
         return;
       }
       setConversation(data);
+      logInfo("Conversation loaded", { component: "useChat", operation: "loadConversation", extra: { conversationId: id } });
     } catch (err) {
+      logError(err, { component: "useChat", operation: "loadConversation", extra: { conversationId: id } });
       setError(err instanceof Error ? err.message : "Failed to load conversation");
     } finally {
       setIsLoading(false);
@@ -74,18 +79,20 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
   // Load messages for the current conversation
   const loadMessages = useCallback(async (convId: string) => {
     setMessagesLoading(true);
+    logInfo("Loading messages", { component: "useChat", operation: "loadMessages", extra: { conversationId: convId } });
     try {
       const { data, errors } = await client.models.Message.listMessageByConversationIdAndSentAt(
         { conversationId: convId },
         { sortDirection: "ASC" }
       );
       if (errors) {
-        console.error("Failed to load messages:", errors);
+        logError(errors[0], { component: "useChat", operation: "loadMessages", extra: { conversationId: convId, errors } });
         return;
       }
       setMessages(data || []);
+      logInfo("Messages loaded", { component: "useChat", operation: "loadMessages", extra: { conversationId: convId, count: (data || []).length } });
     } catch (err) {
-      console.error("Failed to load messages:", err);
+      logError(err, { component: "useChat", operation: "loadMessages", extra: { conversationId: convId } });
     } finally {
       setMessagesLoading(false);
     }
@@ -95,6 +102,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
   const createConversation = useCallback(async (otherUserId: string): Promise<Conversation | null> => {
     setIsLoading(true);
     setError(null);
+    logInfo("Creating conversation", { component: "useChat", operation: "createConversation", extra: { currentUserId, otherUserId } });
     try {
       const { data, errors } = await client.models.Conversation.create({
         user1Id: currentUserId,
@@ -104,12 +112,15 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
         lastMessageAt: new Date().toISOString(),
       });
       if (errors) {
+        logError(errors[0], { component: "useChat", operation: "createConversation", extra: { currentUserId, otherUserId, errors } });
         setError(errors[0]?.message || "Failed to create conversation");
         return null;
       }
       setConversation(data);
+      logInfo("Conversation created", { component: "useChat", operation: "createConversation", extra: { conversationId: data?.id } });
       return data;
     } catch (err) {
+      logError(err, { component: "useChat", operation: "createConversation", extra: { currentUserId, otherUserId } });
       setError(err instanceof Error ? err.message : "Failed to create conversation");
       return null;
     } finally {
@@ -123,6 +134,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
       setError("No conversation selected");
       return;
     }
+    logInfo("Sending message", { component: "useChat", operation: "sendMessage", extra: { conversationId: conversation.id } });
     try {
       const now = new Date().toISOString();
       const { errors } = await client.models.Message.create({
@@ -132,7 +144,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
         sentAt: now,
       });
       if (errors) {
-        console.error("Failed to send message:", errors);
+        logError(errors[0], { component: "useChat", operation: "sendMessage", extra: { conversationId: conversation.id, errors } });
         return;
       }
       // Update lastMessageAt on conversation
@@ -140,9 +152,8 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
         id: conversation.id,
         lastMessageAt: now,
       });
-      // Message will be added via the real-time subscription - no optimistic update needed
     } catch (err) {
-      console.error("Failed to send message:", err);
+      logError(err, { component: "useChat", operation: "sendMessage", extra: { conversationId: conversation.id } });
     }
   }, [conversation?.id, currentUserId]);
 
@@ -152,6 +163,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
       setError("No conversation selected");
       return;
     }
+    logInfo("Revealing identity", { component: "useChat", operation: "revealIdentity", extra: { conversationId: conversation.id } });
     try {
       const updateData = isUser1
         ? { id: conversation.id, user1Revealed: true }
@@ -159,12 +171,13 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
 
       const { data, errors } = await client.models.Conversation.update(updateData);
       if (errors) {
-        console.error("Failed to reveal identity:", errors);
+        logError(errors[0], { component: "useChat", operation: "revealIdentity", extra: { conversationId: conversation.id, errors } });
         return;
       }
       setConversation(data);
+      logInfo("Identity revealed", { component: "useChat", operation: "revealIdentity", extra: { conversationId: conversation.id } });
     } catch (err) {
-      console.error("Failed to reveal identity:", err);
+      logError(err, { component: "useChat", operation: "revealIdentity", extra: { conversationId: conversation.id } });
     }
   }, [conversation?.id, isUser1]);
 
@@ -209,7 +222,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
         });
       },
       error: (err) => {
-        console.error("Message subscription error:", err);
+        logError(err, { component: "useChat", operation: "messageSubscription", extra: { conversationId: conversation.id } });
       },
     });
 
@@ -229,7 +242,7 @@ export function useChat({ conversationId, currentUserId }: UseChatOptions): UseC
         setConversation(updatedConversation);
       },
       error: (err) => {
-        console.error("Conversation subscription error:", err);
+        logError(err, { component: "useChat", operation: "conversationSubscription", extra: { conversationId: conversation.id } });
       },
     });
 
@@ -261,6 +274,7 @@ export function useConversationList(userId: string) {
   const loadConversations = useCallback(async () => {
     if (!userId) return;
     setIsLoading(true);
+    logInfo("Loading conversations", { component: "useConversationList", operation: "loadConversations", extra: { userId } });
     try {
       // Get conversations where user is user1
       const { data: asUser1 } = await client.models.Conversation.listConversationByUser1Id({
@@ -279,8 +293,9 @@ export function useConversationList(userId: string) {
         return timeB - timeA; // Most recent first
       });
       setConversations(all);
+      logInfo("Conversations loaded", { component: "useConversationList", operation: "loadConversations", extra: { userId, count: all.length } });
     } catch (err) {
-      console.error("Failed to load conversations:", err);
+      logError(err, { component: "useConversationList", operation: "loadConversations", extra: { userId } });
     } finally {
       setIsLoading(false);
     }

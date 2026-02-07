@@ -9,6 +9,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
 import { getUserProfile } from "@/utils/auth";
+import { logError, logInfo, logWarn } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 import {
@@ -111,6 +112,9 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
 
 export default function Discover() {
   const navigate = useNavigate();
+  useEffect(() => {
+    logInfo("Discover page loaded", { component: "Discover", operation: "mount" });
+  }, []);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<DiscoveryProfileFull[]>([]);
@@ -178,7 +182,7 @@ export default function Discover() {
             setFiltersOpen(true);
           }
         } catch (err) {
-          console.error("[Discover] Error checking profile for filters:", err);
+          logError(err, { component: "Discover", operation: "checkProfileForFilters" });
           // On error, still open filters
           setFiltersOpen(true);
         }
@@ -243,7 +247,7 @@ export default function Discover() {
         }
         setFiltersInitialized(true);
       } catch (err) {
-        console.error("[Discover] Error syncing filters from profile:", err);
+        logError(err, { component: "Discover", operation: "syncFiltersFromProfile" });
         setFiltersInitialized(true);
       }
     };
@@ -265,6 +269,7 @@ export default function Discover() {
         setLoading(true);
         setError(null);
         setPendingOutgoingRequest(null);
+        logInfo("Fetching discovery profiles", { component: "Discover", operation: "fetchProfiles" });
 
         // Load already-liked profile ids so we exclude them from the feed
         await loadLikesFromBackend();
@@ -300,7 +305,9 @@ export default function Discover() {
                 partnerDisplayName: toEmail.split("@")[0] || "your partner",
               });
             }
-          } catch (_) {}
+          } catch (err) {
+            logError(err, { component: "Discover", operation: "fetchProfilePic", extra: { profileId: filteredBackend[i]?.id } });
+          }
         }
         
         // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
@@ -310,7 +317,9 @@ export default function Discover() {
           (matchRequests ?? [])
             .filter((r) => r.status === "pending" && r.fromUserId)
             .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
-        } catch (_) {}
+        } catch (err) {
+          logError(err, { component: "Discover", operation: "fetchMatchRequests" });
+        }
 
         // Fetch all profiles - we'll filter for completed onboarding client-side
         // Note: Amplify Data client list() doesn't support boolean filters well,
@@ -327,7 +336,7 @@ export default function Discover() {
         const errors = result.errors;
 
         if (errors) {
-          console.error("[Discover] Error fetching profiles:", errors);
+          logError(errors[0], { component: "Discover", operation: "fetchProfiles", extra: { errors } });
           setError("Failed to load profiles. Please try again.");
           setProfiles([]);
           return;
@@ -361,16 +370,17 @@ export default function Discover() {
                 options: { bucket: "userPhotos" },
               });
               transformedProfiles[i].photoUrls = [url];
-            } catch {
-              // Photo URL unavailable
+            } catch (err) {
+              logWarn("Profile photo URL unavailable", { component: "Discover", operation: "fetchProfiles", extra: { profileId: filteredBackend[i]?.id, profilePicKey } });
             }
           }
         }
 
         const validProfiles = transformedProfiles.filter((p) => p.id && p.name);
         setProfiles(validProfiles);
+        logInfo("Discovery profiles loaded", { component: "Discover", operation: "fetchProfiles", extra: { count: validProfiles.length } });
       } catch (err) {
-        console.error("[Discover] Error fetching profiles:", err);
+        logError(err, { component: "Discover", operation: "fetchProfiles" });
         setError(err instanceof Error ? err.message : "Failed to load profiles");
         setProfiles([]);
       } finally {
@@ -396,6 +406,7 @@ export default function Discover() {
   }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
+    logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
     const profile = displayQueue.find((p) => p.id === profileId);
     const result = await recordSwipe(profileId, action);
     if (result.isMatch && profile) {
@@ -419,7 +430,7 @@ export default function Discover() {
     if (displayQueue.length === 0) return;
     const currentProfile = displayQueue[0];
     if (!currentProfile) return;
-    
+    logInfo("Discover: next (skip)", { component: "Discover", operation: "handleNext", extra: { profileId: currentProfile.id } });
     setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
     scrollToTop();
   }, [displayQueue, scrollToTop]);
@@ -486,7 +497,7 @@ export default function Discover() {
       setPendingOutgoingRequest(null);
       setRefreshKey((k) => k + 1);
     } catch (e) {
-      console.error("[Discover] Withdraw failed:", e);
+      logError(e, { component: "Discover", operation: "withdraw" });
       throw e;
     } finally {
       setWithdrawing(false);
@@ -514,7 +525,7 @@ export default function Discover() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setFiltersOpen(true)}
+                onClick={() => { logInfo("Discover: filters opened", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
                 className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
                 title="Adjust discovery filters"
               >
@@ -579,7 +590,7 @@ export default function Discover() {
               profiles={displayQueue}
               onSwipe={handleSwipe}
               onNext={handleNext}
-              onOpenFilters={() => setFiltersOpen(true)}
+              onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}
             />
@@ -596,7 +607,7 @@ export default function Discover() {
 
       {!loading && displayQueue.length > 0 && displayQueue[0] && (
         <>
-          <ReportFloatingButton onClick={() => setReportOpen(true)} />
+          <ReportFloatingButton onClick={() => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: displayQueue[0]?.id } }); setReportOpen(true); }} />
           <ReportModal
             open={reportOpen}
             onOpenChange={setReportOpen}

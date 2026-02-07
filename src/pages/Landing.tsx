@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Heart, Users, Filter, CheckCircle2, MessageSquare, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,11 @@ import { useNavigate } from "react-router-dom";
 import FeatureCard from "@/components/FeatureCard";
 import CountdownTimer from "@/components/CountdownTimer";
 import { BETA_MODE } from "@/config";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
+import { logError, logInfo } from "@/utils/logger";
+
+const client = generateClient<Schema>();
 
 const SparkleBackground = lazy(() => import("@/components/SparkleBackground"));
 
@@ -13,6 +18,28 @@ const HERO_FADE = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [registeredCount, setRegisteredCount] = useState<number | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      logInfo("Fetching registered user count", { component: "Landing", operation: "fetchRegisteredCount" });
+      try {
+        const { data, nextToken } = await client.models.UserProfile.list(
+          { filter: { onboardingCompleted: { eq: true } }, limit: 1000 },
+          { authMode: "apiKey" }
+        );
+        const count = data?.length ?? 0;
+        setRegisteredCount(count);
+        setHasMore(!!nextToken);
+        logInfo("Registered count loaded", { component: "Landing", operation: "fetchRegisteredCount", extra: { count, hasMore: !!nextToken } });
+      } catch (err) {
+        logError(err, { component: "Landing", operation: "fetchRegisteredCount" });
+        setRegisteredCount(null);
+      }
+    };
+    fetchCount();
+  }, []);
 
   const features = [
     {
@@ -126,6 +153,28 @@ const Landing = () => {
             Set your vibe, swipe through real profiles from campus, and chat when it's mutual. No strangers — just people you'll actually see at prom.
           </motion.p>
 
+          {registeredCount !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.65, duration: 0.8 }}
+              className="mb-6 px-5 py-4 rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-primary/5 shadow-[0_0_20px_rgba(251,191,36,0.08)]"
+            >
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-3xl font-bold tabular-nums text-gradient-gold">
+                  {hasMore ? `${registeredCount}+` : registeredCount}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">people</span>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                are already in the lineup — your perfect prom match could be one of them.
+              </p>
+              <p className="text-sm font-medium text-primary/90 text-center mt-1">
+                Don&apos;t be the one left wondering what if! ✨
+              </p>
+            </motion.div>
+          )}
+
           {/* CTA Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -136,7 +185,7 @@ const Landing = () => {
             <Button
               variant="gold"
               size="xl"
-              onClick={() => navigate("/auth")}
+              onClick={() => { logInfo("Landing: Sign in clicked", { component: "Landing", operation: "signInClick" }); navigate("/auth"); }}
               className="group w-full sm:w-64"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -162,7 +211,7 @@ const Landing = () => {
             <Button
               variant="gold-outline"
               size="xl"
-              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => { logInfo("Landing: How it works clicked", { component: "Landing", operation: "howItWorksClick" }); document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' }); }}
               className="w-full sm:w-64"
             >
               How it works
@@ -264,7 +313,7 @@ const Landing = () => {
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
             People from campus are already signing up. Set up your profile in under two minutes, start swiping, and who knows — you might just find the one you'll walk in with.
           </p>
-          <Button variant="gold" size="xl" onClick={() => navigate("/auth")}>
+          <Button variant="gold" size="xl" onClick={() => { logInfo("Landing: Get Started clicked", { component: "Landing", operation: "getStartedClick" }); navigate("/auth"); }}>
             Get Started
             <Sparkles className="w-5 h-5 ml-2" />
           </Button>

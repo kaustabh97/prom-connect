@@ -21,6 +21,7 @@ import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { dispatchBadgeRefresh, dispatchViewingMatch } from "@/utils/badgeRefresh";
 import { getIdFromEmail } from "@/utils/userId";
+import { logError, logInfo } from "@/utils/logger";
 import { 
   Heart, 
   MessageCircle, 
@@ -74,6 +75,10 @@ const Matches = () => {
     if (main) main.scrollTo({ top: 0, behavior: "instant" });
   }, [location.pathname]);
 
+  useEffect(() => {
+    logInfo("Matches page loaded", { component: "Matches", operation: "mount" });
+  }, []);
+
   // Load current user on mount
   useEffect(() => {
     const loadUser = async () => {
@@ -115,7 +120,7 @@ const Matches = () => {
         setCurrentUserEmail(backendProfile.email || profile.email || "");
         setAuthError(null);
       } catch (err) {
-        console.error("[Matches] Failed to load user profile:", err);
+        logError(err, { component: "Matches", operation: "loadUserProfile" });
         setAuthError("Unable to load your profile. Please try again.");
         setCurrentUserId("");
         setCurrentUserEmail("");
@@ -179,7 +184,8 @@ const Matches = () => {
       } else {
         setPendingOutgoingRequest(null);
       }
-    } catch (_) {
+    } catch (err) {
+      logError(err, { component: "Matches", operation: "loadPendingOutgoingRequest", extra: { currentUserId } });
       setPendingOutgoingRequest(null);
     }
   }, [currentUserId]);
@@ -212,7 +218,7 @@ const Matches = () => {
         navigate("/prom-date", { replace: true });
       }
     } catch (err) {
-      console.error("[Matches] Accept Prom Ask failed:", err);
+      logError(err, { component: "Matches", operation: "acceptPromAsk", extra: { promAskId } });
     } finally {
       setAcceptingPromAskId(null);
     }
@@ -285,8 +291,8 @@ const Matches = () => {
                 options: { bucket: "userPhotos" },
               });
               urls[match.id] = url.toString();
-            } catch {
-              // Profile pic unavailable
+            } catch (err) {
+              logError(err, { component: "Matches", operation: "fetchProfilePic", extra: { profilePicKey, matchId: match.id } });
             }
           }
         })
@@ -318,8 +324,8 @@ const Matches = () => {
               if (conversation?.lastMessageAt) {
                 times[match.id] = formatLastMessageTime(conversation.lastMessageAt);
               }
-            } catch {
-              // Conversation unavailable
+            } catch (err) {
+              logError(err, { component: "Matches", operation: "fetchConversation", extra: { matchId: match.id } });
             }
           }
         })
@@ -427,7 +433,7 @@ const Matches = () => {
       await loadPendingOutgoing();
       navigate("/discover/profile", { state: { refresh: true } });
     } catch (e) {
-      console.error("[Matches] Withdraw failed:", e);
+      logError(e, { component: "Matches", operation: "withdraw" });
       throw e;
     } finally {
       setWithdrawing(false);
@@ -570,6 +576,7 @@ const Matches = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
+                logInfo("Matches: chat opened", { component: "Matches", operation: "openChat", extra: { matchId: match.id, otherUserId: match.otherUserId } });
                 setActiveChat(match.id);
                 markMatchViewed(match.id);
                 clearUnread(match.id);
@@ -852,7 +859,7 @@ const ChatView = ({
           <div>
             <button
               type="button"
-              onClick={() => navigate(`/discover/profile/${match.otherUserId}`, { state: { fromChat: true } })}
+              onClick={() => { logInfo("Matches: view full profile from chat", { component: "Matches", operation: "viewFullProfile", extra: { otherUserId: match.otherUserId } }); navigate(`/discover/profile/${match.otherUserId}`, { state: { fromChat: true } }); }}
               className="font-semibold text-foreground hover:text-primary hover:underline text-left"
             >
               {displayName}
@@ -865,7 +872,7 @@ const ChatView = ({
             <Button
               variant="default"
               size="sm"
-              onClick={onAskToProm}
+              onClick={() => { logInfo("Matches: Ask to Prom clicked", { component: "Matches", operation: "askToProm", extra: { otherUserId: match.otherUserId } }); onAskToProm?.(); }}
               className="bg-primary hover:bg-primary/90"
             >
               <Heart className="w-4 h-4 mr-2" />

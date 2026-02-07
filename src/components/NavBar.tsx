@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { signOut } from "aws-amplify/auth";
 import { LogOut, Heart, Menu, X, Home, Compass, Users } from "lucide-react";
+import { logError } from "@/utils/logger";
 
 interface NavBarProps {
   showBackButton?: boolean;
@@ -23,7 +24,7 @@ const NavBar = ({ showBackButton, onBack, title }: NavBarProps) => {
       await signOut();
       navigate("/auth");
     } catch (error) {
-      console.error("Error signing out:", error);
+      logError(error, { component: "NavBar", operation: "handleLogout" });
       setIsLoggingOut(false);
     }
   };

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getUserProfile } from "@/utils/auth";
+import { logError, logInfo } from "@/utils/logger";
 import { Flag, Loader2 } from "lucide-react";
 const REPORT_EMAIL = "mosaic@iima.ac.in";
 
@@ -97,6 +98,7 @@ export default function ReportModal({
   // Fetch current user (reporter) when modal opens
   useEffect(() => {
     if (open) {
+      logInfo("Report modal opened", { component: "ReportModal", operation: "open", extra: { personName, personId } });
       getUserProfile().then((p) => {
         setReporterInfo({ email: p?.email, name: p?.name });
       });
@@ -123,6 +125,7 @@ export default function ReportModal({
         reporterNameToUse
       );
       if (result.ok) {
+        logInfo("Report submitted successfully", { component: "ReportModal", operation: "submit", extra: { personName, personId } });
         toast({ title: "Report sent", description: "Thank you for helping keep Starlit by the Brick safe." });
         setReportText("");
         onOpenChange(false);
@@ -132,8 +135,8 @@ export default function ReportModal({
         setReportText("");
         onOpenChange(false);
       }
-    } catch {
-      // FormSubmit failed, fall back to Gmail
+    } catch (err) {
+      logError(err, { component: "ReportModal", operation: "sendReportViaFormSubmit" });
       const reporterEmailToUse = reporterEmail ?? reporterInfo.email;
       const reporterNameToUse = reporterName ?? reporterInfo.name;
       openGmailReportFallback(text, context, personName ?? undefined, personId, personEmail ?? undefined, reporterEmailToUse, reporterNameToUse);

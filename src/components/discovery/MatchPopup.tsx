@@ -4,6 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { logInfo } from "@/utils/logger";
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle } from "lucide-react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
@@ -67,6 +68,7 @@ export function MatchPopup({
             variant="default"
             className="bg-primary hover:bg-primary/90"
             onClick={() => {
+              logInfo("MatchPopup: Open Chat clicked", { component: "MatchPopup", operation: "openChat", extra: { matchId } });
               onOpenChange(false);
               onOpenChat?.();
             }}
@@ -77,6 +79,7 @@ export function MatchPopup({
           <Button
             variant="outline"
             onClick={() => {
+              logInfo("MatchPopup: Keep Swiping clicked", { component: "MatchPopup", operation: "keepSwiping", extra: { matchId } });
               onOpenChange(false);
               onKeepSwiping?.();
             }}

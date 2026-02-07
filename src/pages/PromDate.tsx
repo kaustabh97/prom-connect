@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
 import { getUserProfile } from "@/utils/auth";
+import { logError, logInfo } from "@/utils/logger";
 import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
@@ -36,9 +37,11 @@ export default function PromDate() {
   }, []);
 
   useEffect(() => {
+    logInfo("PromDate page loaded", { component: "PromDate", operation: "mount", extra: { partnerNameFromUrl, isOutsidePartner } });
     const load = async () => {
       const p = await getUserProfile();
       if (!p?.email) {
+        logInfo("No auth, redirecting to auth", { component: "PromDate", operation: "load" });
         navigate("/auth");
         return;
       }
@@ -47,7 +50,10 @@ export default function PromDate() {
         opts
       );
       const id = data?.[0]?.id;
-      if (id) setCurrentUserId(id);
+      if (id) {
+        setCurrentUserId(id);
+        logInfo("PromDate: current user loaded", { component: "PromDate", operation: "load", extra: { currentUserId: id } });
+      }
     };
     load();
   }, [navigate]);
@@ -69,7 +75,9 @@ export default function PromDate() {
             const { url } = await getUrl({ path: me.profilePicKey, options: { bucket: "userPhotos" } });
             setMyPicUrl(url.toString());
           }
-        } catch (_) {}
+        } catch (err) {
+          logError(err, { component: "PromDate", operation: "fetchOutsideProfile", extra: { currentUserId } });
+        }
       };
       fetch();
     }
@@ -91,7 +99,9 @@ export default function PromDate() {
           const { url } = await getUrl({ path: otherKey, options: { bucket: "userPhotos" } });
           setTheirPicUrl(url.toString());
         }
-      } catch (_) {}
+      } catch (err) {
+        logError(err, { component: "PromDate", operation: "fetchBothProfiles", extra: { currentUserId } });
+      }
     };
     fetch();
   }, [currentUserId, promDate]);
@@ -100,6 +110,7 @@ export default function PromDate() {
   const showBothView = promDate && !showOutsideView;
 
   const handleLogout = async () => {
+    logInfo("PromDate: logout clicked", { component: "PromDate", operation: "logout" });
     try {
       if (GOOGLE_LOGIN_CHECK) {
         await signOut();
@@ -108,7 +119,7 @@ export default function PromDate() {
       }
       navigate("/");
     } catch (err) {
-      console.error("Logout failed:", err);
+      logError(err, { component: "PromDate", operation: "logout" });
       if (!GOOGLE_LOGIN_CHECK) clearTestUser();
       navigate("/");
     }
@@ -283,7 +294,7 @@ export default function PromDate() {
             <Button
               variant="outline"
               className="w-full gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary"
-              onClick={() => navigate("/matches", { state: { fromPromDate: true, openMatchId: promDate?.match?.id } })}
+              onClick={() => { logInfo("PromDate: chat button clicked", { component: "PromDate", operation: "chatButton", extra: { matchId: promDate?.match?.id } }); navigate("/matches", { state: { fromPromDate: true, openMatchId: promDate?.match?.id } }); }}
             >
               <MessageCircle className="w-5 h-5" />
               Chat with {theirName}

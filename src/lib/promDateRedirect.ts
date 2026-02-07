@@ -2,6 +2,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfile } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
+import { logError } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -63,8 +64,8 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
     }
 
     return null;
-  } catch {
-    // If backend check fails, don't block - let user through
+  } catch (err) {
+    logError(err, { component: "promDateRedirect", operation: "getPromDateRedirectPath" });
     return null;
   }
 }
