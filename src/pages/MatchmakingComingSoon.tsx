@@ -1,46 +1,21 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Heart, User, Share2 } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import CountdownTimer from "@/components/CountdownTimer";
+import FomoCounter from "@/components/FomoCounter";
+import { useRegisteredCount } from "@/hooks/useRegisteredCount";
 import { handleReferralShare } from "@/utils/share";
-import { logError, logInfo } from "@/utils/logger";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "../../amplify/data/resource";
-
-const client = generateClient<Schema>();
+import { logInfo } from "@/utils/logger";
 
 export default function MatchmakingComingSoon() {
   const navigate = useNavigate();
-  const [registeredCount, setRegisteredCount] = useState<number | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+  const { count, hasMore } = useRegisteredCount("MatchmakingComingSoon");
 
   useEffect(() => {
     logInfo("MatchmakingComingSoon page loaded", { component: "MatchmakingComingSoon", operation: "mount" });
-  }, []);
-
-  useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const { data, nextToken } = await client.models.UserProfile.list(
-          {
-            filter: { onboardingCompleted: { eq: true } },
-            limit: 1000,
-          },
-          { authMode: "apiKey" }
-        );
-        const count = data?.length ?? 0;
-        setRegisteredCount(count);
-        setHasMore(!!nextToken);
-        logInfo("Registered count loaded", { component: "MatchmakingComingSoon", operation: "fetchRegisteredCount", extra: { count, hasMore: !!nextToken } });
-      } catch (err) {
-        logError(err, { component: "MatchmakingComingSoon", operation: "fetchRegisteredCount" });
-        setRegisteredCount(null);
-      }
-    };
-    fetchCount();
   }, []);
 
   return (
@@ -64,24 +39,9 @@ export default function MatchmakingComingSoon() {
             We&apos;re getting things ready so you can find your prom date. 
             Until then, polish up that profile — first impressions matter!
           </p>
-          {registeredCount !== null && (
-            <div className="mb-6 px-5 py-4 rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-primary/5 shadow-[0_0_20px_rgba(251,191,36,0.08)]">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-3xl font-bold tabular-nums text-gradient-gold">
-                  {hasMore ? `${registeredCount}+` : registeredCount}
-                </span>
-                <span className="text-sm font-medium text-muted-foreground">people</span>
-              </div>
-              <p className="text-sm text-muted-foreground text-center">
-                are already in the lineup — your perfect prom match could be one of them.
-              </p>
-              <p className="text-sm font-medium text-primary/90 text-center mt-1">
-                Don&apos;t be the one left wondering what if! ✨
-              </p>
-            </div>
-          )}
+          {count !== null && <FomoCounter count={count} hasMore={hasMore} animate delay={0} />}
           <div className="mb-8">
-            <CountdownTimer targetDate="2026-02-07T21:00:00" label="Matchmaking begins in" />
+            <CountdownTimer targetDate="2026-02-08T21:00:00" label="Matchmaking begins in" />
           </div>
           <Button
             variant="gold"
