@@ -26,8 +26,8 @@ const frontendLogGroup = new logs.LogGroup(frontendLogsStack, 'FrontendLogGroup'
 type LambdaWithEnv = {
   addEnvironment(key: string, value: string): void;
 };
-const frontendLoggerLambda = backend.frontendLogger.resources.lambda as unknown as LambdaWithEnv;
-frontendLoggerLambda.addEnvironment('FRONTEND_LOG_GROUP', frontendLogGroup.logGroupName);
+const frontendLoggerLambda = backend.frontendLogger.resources.lambda;
+(frontendLoggerLambda as unknown as LambdaWithEnv).addEnvironment('FRONTEND_LOG_GROUP', frontendLogGroup.logGroupName);
 frontendLoggerLambda.addToRolePolicy(
   new iam.PolicyStatement({
     sid: 'AllowCloudWatchLogsPut',
