@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, X, Loader2 } from "lucide-react";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 
 export interface PendingPartnerRequest {
@@ -36,7 +36,7 @@ export default function PendingPartnerRequestView({
   } | null>(null);
 
   const handleShare = async () => {
-    const p = await getUserProfile();
+    const p = await getUserProfileFromCognito();
     setShareData({
       fromName: p?.name || "Someone",
       fromEmail: p?.email || "",

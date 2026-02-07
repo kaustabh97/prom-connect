@@ -4,10 +4,10 @@ import { motion } from "framer-motion";
 import { signOut } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { getUserProfile, clearTestUser } from "@/utils/auth";
+import { getUserProfileFromCognito, clearTestUser } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { usePromDate } from "@/hooks/usePromDate";
-import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { getUrl, uploadData } from "aws-amplify/storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,7 +116,6 @@ export default function Profile() {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfileData | null>(null);
-  const [authProfile, setAuthProfile] = useState<{ email?: string; name?: string; picture?: string } | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFunEditSheet, setShowFunEditSheet] = useState(false);
@@ -346,23 +345,14 @@ export default function Profile() {
         logInfo("Fetching profile", { component: "Profile", operation: "fetchProfile" });
 
         // Get authenticated user info
-        const authUser = await getUserProfile();
+        const authUser = await getUserProfileFromCognito();
         if (!authUser || !authUser.email) {
           setError("Not authenticated. Please sign in.");
           return;
         }
 
-        setAuthProfile({
-          email: authUser.email,
-          name: authUser.name,
-          picture: authUser.picture,
-        });
-
-        // Check if backend profile fetch is enabled
-        if (!ENABLE_BACKEND_PROFILE_FETCH) {
-          setError("Profile fetching is currently disabled. Please complete onboarding.");
-          return;
-        }
+        console.log("Auth user: ");
+        console.log(JSON.stringify(authUser, null, 2));
 
         // Fetch user profile from backend
         const { data: profiles, errors } = await client.models.UserProfile.list({
@@ -372,6 +362,9 @@ export default function Profile() {
             },
           },
         });
+
+        console.log("Fetched profiles from AWS backend: ");
+        console.log(JSON.stringify(profiles, null, 2));
 
         if (errors) {
           logError(errors[0], { component: "Profile", operation: "fetchProfile", extra: { errors } });
@@ -600,9 +593,9 @@ export default function Profile() {
                   onChange={handleProfilePhotoSelect}
                   className="hidden"
                 />
-                {profilePicUrl || authProfile?.picture ? (
+                {profilePicUrl  ? (
                   <img
-                    src={profilePicUrl || authProfile?.picture || ""}
+                    src={profilePicUrl || ""}
                     alt=""
                     className="w-full h-full object-cover"
                   />

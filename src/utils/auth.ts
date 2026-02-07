@@ -2,7 +2,7 @@ import { getCurrentUser, fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { logError, logInfo } from "./logger";
-import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
 
@@ -65,7 +65,7 @@ export const clearTestUser = (): void => {
  * 
  * In test mode (GOOGLE_LOGIN_CHECK = false), returns test user from localStorage
  */
-export const getUserProfile = async (): Promise<UserProfile | null> => {
+export const getUserProfileFromCognito = async (): Promise<UserProfile | null> => {
   const context = { component: "auth", operation: "getUserProfile" };
 
   // If Google login is disabled, use test user from localStorage
@@ -168,15 +168,9 @@ export const isAuthenticated = async (): Promise<boolean> => {
  * When Google login is disabled, always checks backend (ignores ENABLE_BACKEND_PROFILE_FETCH)
  */
 export const hasCompletedOnboarding = async (): Promise<boolean> => {
-  // If Google login is disabled, always check backend (profiles are saved there)
-  const shouldCheckBackend = !GOOGLE_LOGIN_CHECK || ENABLE_BACKEND_PROFILE_FETCH;
-  
-  if (!shouldCheckBackend) {
-    return false;
-  }
 
   try {
-    const profile = await getUserProfile();
+    const profile = await getUserProfileFromCognito();
     if (!profile || !profile.email) {
       return false;
     }

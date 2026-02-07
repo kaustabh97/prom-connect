@@ -39,20 +39,6 @@ export const APP_URL =
     : (import.meta.env?.VITE_APP_URL as string) || "https://starlitbythebricks.in";
 
 /**
- * Enable/disable backend profile fetching
- * 
- * When set to false:
- * - hasCompletedOnboarding() will always return false
- * - Profile page will not fetch from backend
- * - Users will always go through onboarding flow
- * 
- * When set to true:
- * - Backend checks will be performed normally
- * - Existing profiles will be fetched and checked
- */
-export const ENABLE_BACKEND_PROFILE_FETCH = true;
-
-/**
  * Enable/disable Google login requirement
  *
  * RAW_GOOGLE_LOGIN_CHECK is the default flag used on non-production domains.

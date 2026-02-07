@@ -11,7 +11,7 @@ import { usePromAsk } from "@/hooks/usePromAsk";
 import { usePromDate } from "@/hooks/usePromDate";
 import { useViewedMatches } from "@/hooks/useViewedMatches";
 import { useUnreadMatches } from "@/hooks/useUnreadMatches";
-import { getUserProfile } from "@/utils/auth";
+import { getUserProfileFromCognito } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
@@ -84,7 +84,7 @@ const Matches = () => {
     const loadUser = async () => {
       setIsAuthLoading(true);
       try {
-        const profile = await getUserProfile();
+        const profile = await getUserProfileFromCognito();
 
         if (!profile?.email) {
           setAuthError("Please sign in to view your matches.");
