@@ -2,6 +2,7 @@
  * Centralized error logging utility.
  * Use throughout the app for consistent, debuggable error output.
  * Logs are sent to the backend (CloudWatch) in both dev and prod, with separate streams.
+ * Uses a queue to avoid dropping logs when many fire in quick succession.
  */
 
 import type { Schema } from "../../amplify/data/resource";
@@ -28,18 +29,24 @@ function buildPrefix(context: LogContext): string {
 
 const env = import.meta.env.DEV ? "development" : "production";
 
-/** Fire-and-forget: send log to backend. Swallows all errors to avoid recursion. */
-function sendToBackend(level: string, message: string, context: LogContext): void {
-  if (typeof window === "undefined") return;
-  const payload = {
-    level,
-    message,
-    env,
-    component: context.component ?? null,
-    operation: context.operation ?? null,
-    extra: context.extra ?? null,
-  };
-  void import("aws-amplify/data")
+type LogPayload = {
+  level: string;
+  message: string;
+  component: string | null;
+  operation: string | null;
+  extra: Record<string, unknown> | null;
+  env: string;
+};
+
+const logQueue: LogPayload[] = [];
+let isDraining = false;
+const DRAIN_DELAY_MS = 80;
+
+function drainQueue(): void {
+  if (isDraining || logQueue.length === 0) return;
+  isDraining = true;
+  const payload = logQueue.shift()!;
+  import("aws-amplify/data")
     .then(({ generateClient }) => {
       const client = generateClient<Schema>();
       return client.mutations.logFrontendEvent(payload);
@@ -48,7 +55,28 @@ function sendToBackend(level: string, message: string, context: LogContext): voi
       if (import.meta.env.DEV) {
         console.warn("[logger] sendToBackend failed:", e);
       }
+    })
+    .finally(() => {
+      isDraining = false;
+      if (logQueue.length > 0) {
+        setTimeout(drainQueue, DRAIN_DELAY_MS);
+      }
     });
+}
+
+/** Fire-and-forget: send log to backend via queue. Swallows all errors to avoid recursion. */
+function sendToBackend(level: string, message: string, context: LogContext): void {
+  if (typeof window === "undefined") return;
+  const payload: LogPayload = {
+    level,
+    message,
+    env,
+    component: context.component ?? null,
+    operation: context.operation ?? null,
+    extra: context.extra ?? null,
+  };
+  logQueue.push(payload);
+  drainQueue();
 }
 
 /**
