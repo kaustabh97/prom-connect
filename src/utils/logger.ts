@@ -40,28 +40,38 @@ type LogPayload = {
 
 const logQueue: LogPayload[] = [];
 let isDraining = false;
-const DRAIN_DELAY_MS = 80;
+const MAX_RETRIES = 1;
 
 function drainQueue(): void {
   if (isDraining || logQueue.length === 0) return;
   isDraining = true;
   const payload = logQueue.shift()!;
-  import("aws-amplify/data")
-    .then(({ generateClient }) => {
-      const client = generateClient<Schema>();
-      return client.mutations.logFrontendEvent(payload);
-    })
-    .catch((e) => {
-      if (import.meta.env.DEV) {
-        console.warn("[logger] sendToBackend failed:", e);
-      }
-    })
-    .finally(() => {
-      isDraining = false;
-      if (logQueue.length > 0) {
-        setTimeout(drainQueue, DRAIN_DELAY_MS);
-      }
-    });
+  let retries = 0;
+
+  function attempt(): Promise<void> {
+    return import("aws-amplify/data")
+      .then(({ generateClient }) => {
+        const client = generateClient<Schema>();
+        return client.mutations.logFrontendEvent(payload);
+      })
+      .then(() => {})
+      .catch((e) => {
+        if (retries < MAX_RETRIES) {
+          retries++;
+          return attempt();
+        }
+        if (import.meta.env.DEV) {
+          console.warn("[logger] sendToBackend failed after retries:", e);
+        }
+      });
+  }
+
+  attempt().finally(() => {
+    isDraining = false;
+    if (logQueue.length > 0) {
+      queueMicrotask(drainQueue);
+    }
+  });
 }
 
 /** Fire-and-forget: send log to backend via queue. Swallows all errors to avoid recursion. */
