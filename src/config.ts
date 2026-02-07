@@ -63,4 +63,4 @@ export const GOOGLE_LOGIN_CHECK = IS_PROD_DOMAIN || RAW_GOOGLE_LOGIN_CHECK;
  * When true:
  * - Normal flow: Discover, Matches, Chat, Profile
  */
-export const MATCHMAKING_ENABLED = false;
+export const MATCHMAKING_ENABLED = true;

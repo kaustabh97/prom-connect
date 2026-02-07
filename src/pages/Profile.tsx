@@ -1159,30 +1159,12 @@ export default function Profile() {
               </Button>
             </motion.div>
 
-            {/* Delete account */}
+            {/* Log out at end of profile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.33 }}
               className="pt-2"
-            >
-              <Button
-                variant="outline"
-                className="w-full gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
-                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
-                disabled={isDeleting}
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete my account
-              </Button>
-            </motion.div>
-
-            {/* Log out at end of profile */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="pt-2 pb-6"
             >
               <Button
                 variant="outline"
@@ -1196,6 +1178,24 @@ export default function Profile() {
                   <LogOut className="w-4 h-4" />
                 )}
                 Log out
+              </Button>
+            </motion.div>
+
+            {/* Delete account - below Log out, red, tight spacing */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="pt-1.5 pb-6"
+            >
+              <Button
+                variant="outline"
+                className="w-full gap-2 text-destructive border-destructive/60 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
+                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
+                disabled={isDeleting}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete my account
               </Button>
             </motion.div>
           </div>
