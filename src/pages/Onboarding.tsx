@@ -487,11 +487,12 @@ const Onboarding = () => {
       const session = await fetchAuthSession();
       const isAuthenticated = !!session.tokens;
       const authMode = isAuthenticated ? "userPool" : "apiKey";
-      const { data: partnerProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: trimmed } } },
+      const partnerId = getIdFromEmail(trimmed);
+      const { data: partnerProfile } = await client.models.UserProfile.get(
+        { id: partnerId },
         { authMode: authMode as "userPool" | "apiKey" }
       );
-      const isRegistered = (partnerProfiles?.length ?? 0) > 0;
+      const isRegistered = !!partnerProfile;
       setPartnerCheckStatus(isRegistered ? "registered" : "not_registered");
     } catch (err) {
       logError(err, { component: "Onboarding", operation: "checkPartnerRegistered", extra: { partnerEmail: trimmed } });
@@ -622,21 +623,14 @@ const Onboarding = () => {
         
         // Use userPool auth if authenticated, otherwise use API key
         const authMode = isAuthenticated ? 'userPool' : 'apiKey';
-        
-        // @ts-ignore - TypeScript types don't match runtime behavior for authMode
-        const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
-          {
-            filter: {
-              email: {
-                eq: profile.email,
-              },
-            },
-          },
+        const profileId = getIdFromEmail(profile.email.trim());
+        const { data: existingProfile, errors: getErrors } = await client.models.UserProfile.get(
+          { id: profileId },
           { authMode: authMode as 'userPool' | 'apiKey' }
         );
 
-        if (listErrors) {
-          throw new Error(listErrors[0]?.message || "Failed to check existing profile");
+        if (getErrors) {
+          throw new Error(getErrors[0]?.message || "Failed to check existing profile");
         }
 
         const heightStr =
@@ -668,9 +662,8 @@ const Onboarding = () => {
           onboardingCompleted: true,
         };
 
-        if (existingProfiles && existingProfiles.length > 0) {
+        if (existingProfile) {
           // Update existing profile
-          const existingProfile = existingProfiles[0];
           // @ts-ignore - TypeScript types don't match runtime behavior for update arguments
           const { data: updatedProfile, errors: updateErrors } = await client.models.UserProfile.update(
             {
@@ -774,12 +767,12 @@ const Onboarding = () => {
         setIsSaving(false);
         return;
       }
-      // @ts-ignore
-      const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
-        { filter: { email: { eq: profile.email } } },
+      const profileId = getIdFromEmail(profile.email.trim());
+      const { data: existingProfile, errors: getErrors } = await client.models.UserProfile.get(
+        { id: profileId },
         { authMode: authMode as "userPool" | "apiKey" }
       );
-      if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
+      if (getErrors) throw new Error(getErrors[0]?.message || "Failed to check profile");
       const heightStr =
         profile.heightFeet != null && profile.heightInches != null
           ? `${profile.heightFeet}'${profile.heightInches}"`
@@ -796,10 +789,10 @@ const Onboarding = () => {
         bio: `Partner: ${partnerNameTrim}`,
         onboardingCompleted: true,
       };
-      if (existingProfiles?.length) {
+      if (existingProfile) {
         // @ts-ignore
         await client.models.UserProfile.update(
-          { id: existingProfiles[0].id, ...minimalData },
+          { id: existingProfile.id, ...minimalData },
           { authMode: authMode as "userPool" | "apiKey" }
         );
       } else {
@@ -839,12 +832,12 @@ const Onboarding = () => {
         return;
       }
 
-      // @ts-ignore - authMode option
-      const { data: existingProfiles, errors: listErrors } = await client.models.UserProfile.list(
-        { filter: { email: { eq: profile.email } } },
+      const senderProfileIdFromEmail = getIdFromEmail(profile.email.trim());
+      const { data: existingProfile, errors: getErrors } = await client.models.UserProfile.get(
+        { id: senderProfileIdFromEmail },
         { authMode: authMode as "userPool" | "apiKey" }
       );
-      if (listErrors) throw new Error(listErrors[0]?.message || "Failed to check profile");
+      if (getErrors) throw new Error(getErrors[0]?.message || "Failed to check profile");
 
       const heightStr =
         profile.heightFeet != null && profile.heightInches != null
@@ -864,29 +857,28 @@ const Onboarding = () => {
       };
 
       let senderProfileId: string;
-      if (existingProfiles?.length) {
+      if (existingProfile) {
         // @ts-ignore - update args
         await client.models.UserProfile.update(
-          { id: existingProfiles[0].id, ...minimalData },
+          { id: existingProfile.id, ...minimalData },
           { authMode: authMode as "userPool" | "apiKey" }
         );
-        senderProfileId = existingProfiles[0].id;
+        senderProfileId = existingProfile.id;
       } else {
         // @ts-ignore - create args
         const { data: created } = await client.models.UserProfile.create(
-          { id: getIdFromEmail(profile.email), ...minimalData },
+          { id: senderProfileIdFromEmail, ...minimalData },
           { authMode: authMode as "userPool" | "apiKey" }
         );
         senderProfileId = created?.id ?? "";
       }
       const currentUserEmail = profile.email.trim().toLowerCase();
       try {
-        // @ts-ignore - authMode
-        const { data: partnerProfiles } = await client.models.UserProfile.list(
-          { filter: { email: { eq: partnerEmailTrim } } },
+        const partnerId = getIdFromEmail(partnerEmailTrim);
+        const { data: partner } = await client.models.UserProfile.get(
+          { id: partnerId },
           { authMode: authMode as "userPool" | "apiKey" }
         );
-        const partner = partnerProfiles?.[0];
         // @ts-ignore - MatchRequest create (fromUserId = UserProfile id for Match consistency)
         await client.models.MatchRequest.create(
           {
@@ -963,13 +955,14 @@ const Onboarding = () => {
       const opts = { authMode: authMode as "userPool" | "apiKey" };
 
       // Create or get partner's UserProfile (partner might not have one yet)
-      const { data: partnerProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: profile.email } } },
+      const partnerProfileIdFromEmail = getIdFromEmail(profile.email.trim());
+      const { data: existingPartnerProfile } = await client.models.UserProfile.get(
+        { id: partnerProfileIdFromEmail },
         opts
       );
       let partnerProfileId: string;
-      if (partnerProfiles?.[0]?.id) {
-        partnerProfileId = partnerProfiles[0].id;
+      if (existingPartnerProfile?.id) {
+        partnerProfileId = existingPartnerProfile.id;
         await client.models.UserProfile.update(
           { id: partnerProfileId, onboardingCompleted: true },
           opts
@@ -1005,23 +998,19 @@ const Onboarding = () => {
         },
         opts
       );
-      const { data: myProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: profile.email } } },
-        opts
-      );
-      const { data: theirProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: inviteRequest.fromEmail } } },
-        opts
-      );
-      if (myProfiles?.[0]?.id) {
+      const myProfileId = getIdFromEmail(profile.email.trim());
+      const theirProfileId = getIdFromEmail(inviteRequest.fromEmail.trim());
+      const { data: myProfile } = await client.models.UserProfile.get({ id: myProfileId }, opts);
+      const { data: theirProfile } = await client.models.UserProfile.get({ id: theirProfileId }, opts);
+      if (myProfile?.id) {
         await client.models.UserProfile.update(
-          { id: myProfiles[0].id, excludeFromDiscovery: true },
+          { id: myProfile.id, excludeFromDiscovery: true },
           opts
         );
       }
-      if (theirProfiles?.[0]?.id) {
+      if (theirProfile?.id) {
         await client.models.UserProfile.update(
-          { id: theirProfiles[0].id, excludeFromDiscovery: true },
+          { id: theirProfile.id, excludeFromDiscovery: true },
           opts
         );
       }
@@ -1051,14 +1040,14 @@ const Onboarding = () => {
       );
       // Clear sender's bio so they go to discover flow when they next load
       try {
-        const { data: senderProfiles } = await client.models.UserProfile.list(
-          { filter: { id: { eq: inviteRequest.fromUserId } } },
+        const { data: senderProfile } = await client.models.UserProfile.get(
+          { id: inviteRequest.fromUserId },
           opts
         );
-        if (senderProfiles?.[0]?.id && senderProfiles[0].bio?.startsWith("Partner:")) {
+        if (senderProfile?.id && senderProfile.bio?.startsWith("Partner:")) {
           await client.models.UserProfile.update(
             {
-              id: senderProfiles[0].id,
+              id: senderProfile.id,
               bio: undefined,
               partnerStatus: "Still looking for my prom date 💫",
               partnerEmail: "",

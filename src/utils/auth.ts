@@ -2,6 +2,7 @@ import { getCurrentUser, fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { logError, logInfo } from "./logger";
+import { getIdFromEmail } from "./userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -175,25 +176,15 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
       return false;
     }
 
-    // In production (Google login), use userPool so we fetch the user's profile with their JWT.
-    // When Google login is disabled, use API key.
     const authMode = GOOGLE_LOGIN_CHECK ? ('userPool' as const) : ('apiKey' as const);
-    const filters = {
-      filter: {
-        email: {
-          eq: profile.email,
-        },
-      },
-    };
+    const profileId = getIdFromEmail(profile.email.trim());
     const opts = { authMode };
     // @ts-ignore - authMode option not in generated types yet
-    const { data: profiles, errors } = await client.models.UserProfile.list(filters, opts);
+    const { data: userProfile, errors } = await client.models.UserProfile.get({ id: profileId }, opts);
 
-    if (errors || !profiles || profiles.length === 0) {
+    if (errors || !userProfile) {
       return false;
     }
-
-    const userProfile = profiles[0];
     return userProfile.onboardingCompleted === true;
   } catch (error) {
     logError(error, { component: "auth", operation: "hasCompletedOnboarding" });

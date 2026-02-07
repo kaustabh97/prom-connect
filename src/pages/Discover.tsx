@@ -9,6 +9,7 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
 import { getUserProfileFromCognito } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { logError, logInfo, logWarn } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 
@@ -156,34 +157,26 @@ export default function Discover() {
         try {
           const currentUser = await getUserProfileFromCognito();
           if (currentUser?.email) {
-            const listFilters = { filter: { email: { eq: currentUser.email } } };
-            let result;
-            if (!GOOGLE_LOGIN_CHECK) {
-              // @ts-expect-error - authMode option not in generated types yet
-              result = await client.models.UserProfile.list(listFilters, { authMode: 'apiKey' });
-            } else {
-              result = await client.models.UserProfile.list(listFilters);
-            }
-            const userProfiles = result.data;
-            if (userProfiles && userProfiles.length > 0) {
-              const userProfile = userProfiles[0];
-              const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" || 
+            const profileId = getIdFromEmail(currentUser.email.trim());
+            const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+            const { data: userProfile } = await client.models.UserProfile.get(
+              { id: profileId },
+              opts
+            );
+            if (userProfile) {
+              const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
                                   (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
-              // Only open filters if not in couple flow
               if (!isCoupleFlow) {
                 setFiltersOpen(true);
               }
             } else {
-              // No profile yet, open filters
               setFiltersOpen(true);
             }
           } else {
-            // No user email, open filters
             setFiltersOpen(true);
           }
         } catch (err) {
           logError(err, { component: "Discover", operation: "checkProfileForFilters" });
-          // On error, still open filters
           setFiltersOpen(true);
         }
         searchParams.delete("openFilters");
@@ -203,27 +196,21 @@ export default function Discover() {
           return;
         }
 
-        const listFilters = { filter: { email: { eq: currentUser.email } } };
-        let result;
-        if (!GOOGLE_LOGIN_CHECK) {
-          // @ts-expect-error - authMode option not in generated types yet
-          result = await client.models.UserProfile.list(listFilters, { authMode: 'apiKey' });
-        } else {
-          result = await client.models.UserProfile.list(listFilters);
-        }
+        const profileId = getIdFromEmail(currentUser.email.trim());
+        const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+        const { data: userProfile } = await client.models.UserProfile.get(
+          { id: profileId },
+          opts
+        );
 
-        const userProfiles = result.data;
-        if (!userProfiles || userProfiles.length === 0) {
+        if (!userProfile) {
           setFiltersInitialized(true);
           return;
         }
 
-        const userProfile = userProfiles[0];
-        
-        // Skip filters auto-open if user is in "couple" flow (already has a partner)
-        const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" || 
+        const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
                             (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
-        
+
         const gendersInterestedIn = mapSexualOrientationToGenders(
           userProfile.sexualOrientation,
           userProfile.gender
@@ -236,13 +223,11 @@ export default function Discover() {
 
         const filtersInitializedKey = `${FILTER_STORAGE_KEY}-initialized`;
         const hasBeenInitialized = localStorage.getItem(filtersInitializedKey) === "true";
-        
-        // Only auto-open filters if user hasn't initialized them AND they're not in couple flow
+
         if (!hasBeenInitialized && !isCoupleFlow) {
           localStorage.setItem(filtersInitializedKey, "true");
           setFiltersOpen(true);
         } else if (!hasBeenInitialized) {
-          // Mark as initialized even if we don't open filters (for couple flow)
           localStorage.setItem(filtersInitializedKey, "true");
         }
         setFiltersInitialized(true);
@@ -281,19 +266,18 @@ export default function Discover() {
         // Check for pending outgoing partner request (sender has requested, waiting for partner to accept)
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;
-        // @ts-ignore - Amplify list accepts options as second arg
-        const { data: myProfiles } = await client.models.UserProfile.list(
-          { filter: { email: { eq: currentUserEmail } } },
-          opts
-        );
-        const myProfileId = myProfiles?.[0]?.id;
-        setCurrentProfileId(myProfileId ?? "");
-        if (myProfileId) {
+        const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
+        const { data: myProfile } = myProfileId
+          ? await client.models.UserProfile.get({ id: myProfileId }, opts)
+          : { data: null };
+        const resolvedMyProfileId = myProfile?.id ?? "";
+        setCurrentProfileId(resolvedMyProfileId);
+        if (resolvedMyProfileId) {
           try {
             const { data: outgoing } =
               // @ts-ignore - Amplify list accepts (input, options)
               await client.models.MatchRequest.listMatchRequestByFromUserId(
-                { fromUserId: myProfileId },
+                { fromUserId: resolvedMyProfileId },
                 opts
               );
             const pending = (outgoing ?? []).find((r) => r.status === "pending");
@@ -306,14 +290,15 @@ export default function Discover() {
               });
             }
           } catch (err) {
-            logError(err, { component: "Discover", operation: "fetchProfilePic", extra: { profileId: filteredBackend[i]?.id } });
+            logError(err, { component: "Discover", operation: "fetchPendingRequest", extra: { profileId: resolvedMyProfileId } });
           }
         }
-        
+
         // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
         let requestPendingUserIds = new Set<string>();
         try {
-          const { data: matchRequests } = await client.models.MatchRequest.list({}, opts);
+          // @ts-ignore - list(options) second arg for authMode
+        const { data: matchRequests } = await client.models.MatchRequest.list({}, opts);
           (matchRequests ?? [])
             .filter((r) => r.status === "pending" && r.fromUserId)
             .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
@@ -321,28 +306,26 @@ export default function Discover() {
           logError(err, { component: "Discover", operation: "fetchMatchRequests" });
         }
 
-        // Fetch all profiles - we'll filter for completed onboarding client-side
-        // Note: Amplify Data client list() doesn't support boolean filters well,
-        // so we fetch all and filter client-side
-        // Use API key auth mode when User login is disabled
-        let result;
-        if (!GOOGLE_LOGIN_CHECK) {
-          // @ts-ignore - TypeScript types don't match runtime behavior for authMode
-          result = await client.models.UserProfile.list({}, { authMode: 'apiKey' });
-        } else {
-          result = await client.models.UserProfile.list({});
-        }
-        const backendProfiles = result.data;
-        const errors = result.errors;
+        // Fetch all profiles with pagination; filter for completed onboarding client-side
+        const listOpts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+        const allProfiles: NonNullable<Awaited<ReturnType<typeof client.models.UserProfile.list>>["data"]> = [];
+        let nextToken: string | undefined;
+        do {
+          // @ts-ignore - list(options) second arg for authMode
+          const res = await client.models.UserProfile.list({ nextToken }, listOpts);
+          if (res.errors?.length) {
+            logError(res.errors[0], { component: "Discover", operation: "fetchProfiles", extra: { errors: res.errors } });
+            setError("Failed to load profiles. Please try again.");
+            setProfiles([]);
+            return;
+          }
+          allProfiles.push(...(res.data ?? []));
+          nextToken = res.nextToken ?? undefined;
+        } while (nextToken);
 
-        if (errors) {
-          logError(errors[0], { component: "Discover", operation: "fetchProfiles", extra: { errors } });
-          setError("Failed to load profiles. Please try again.");
-          setProfiles([]);
-          return;
-        }
+        const backendProfiles = allProfiles;
 
-        if (!backendProfiles || backendProfiles.length === 0) {
+        if (backendProfiles.length === 0) {
           setProfiles([]);
           return;
         }
@@ -473,14 +456,13 @@ export default function Discover() {
         opts
       );
       const currentUser = await getUserProfileFromCognito();
-      const { data: myProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: currentUser?.email } } },
-        opts
-      );
-      if (myProfiles?.[0]?.id) {
-        await client.models.UserProfile.update(
-          {
-            id: myProfiles[0].id,
+      const myProfileId = currentUser?.email ? getIdFromEmail(currentUser.email.trim()) : null;
+      if (myProfileId) {
+        const { data: myProfile } = await client.models.UserProfile.get({ id: myProfileId }, opts);
+        if (myProfile?.id) {
+          await client.models.UserProfile.update(
+            {
+              id: myProfile.id,
             bio: undefined,
             partnerStatus: "Still looking for my prom date 💫",
             partnerEmail: "",
@@ -493,6 +475,7 @@ export default function Discover() {
           },
           opts
         );
+        }
       }
       setPendingOutgoingRequest(null);
       setRefreshKey((k) => k + 1);

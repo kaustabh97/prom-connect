@@ -21,13 +21,9 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
     const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
     const opts = authMode ? { authMode } : undefined;
 
-    const { data: profiles } = await client.models.UserProfile.list(
-      { filter: { email: { eq: profile.email } } },
-      opts
-    );
-    if (!profiles?.[0]) return null;
-    const canonicalId = profile.email ? getIdFromEmail(profile.email) : null;
-    const userProfile = profiles.find((p) => p.id === canonicalId) ?? profiles[0];
+    const profileId = getIdFromEmail(profile.email.trim());
+    const { data: userProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
+    if (!userProfile) return null;
     const userId = userProfile.id;
     const bio = userProfile.bio;
 

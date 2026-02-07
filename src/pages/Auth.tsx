@@ -9,6 +9,7 @@ import { signInWithRedirect, fetchAuthSession } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfileFromCognito, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
+import { getIdFromEmail } from "@/utils/userId";
 import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
@@ -109,26 +110,22 @@ const Auth = () => {
       }
 
       // Try to check backend for existing profile (optional – if API is unreachable, we still continue)
-      let profiles: Array<{ email?: string; onboardingCompleted?: boolean }> | null = null;
+      let backendProfile: { onboardingCompleted?: boolean } | null = null;
       try {
         const client = generateClient<Schema>();
-        const result = await client.models.UserProfile.list(
-          {
-            filter: { email: { eq: email } },
-          },
+        const profileId = getIdFromEmail(email.trim());
+        const result = await client.models.UserProfile.get(
+          { id: profileId },
           { authMode: "apiKey" }
         );
-        profiles = result.data ?? null;
+        backendProfile = result.data ?? null;
       } catch {
         // Backend unreachable (wrong URL, network, or API not deployed) – continue to onboarding
       }
 
-      if (profiles && profiles.length > 0) {
-        const backendProfile = profiles[0];
-        if (backendProfile.onboardingCompleted) {
-          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
-          return;
-        }
+      if (backendProfile?.onboardingCompleted) {
+        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+        return;
       }
       navigate("/onboarding");
     } catch (error) {
