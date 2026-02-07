@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import html2canvas from "html2canvas";
+import { logError, logInfo } from "@/utils/logger";
 
 export function useShareImage() {
   const [isSharing, setIsSharing] = useState(false);
@@ -21,6 +22,7 @@ export function useShareImage() {
         imageUrls = [],
       } = options;
 
+      logInfo("Share image: capturing", { component: "useShareImage", operation: "captureAndShare", extra: { filename } });
       setIsSharing(true);
       try {
         const imageDataUrls: Record<string, string> = {};
@@ -38,7 +40,6 @@ export function useShareImage() {
               });
               imageDataUrls[url] = dataUrl;
             } catch (err) {
-              const { logError } = await import("@/utils/logger");
               logError(err, { component: "useShareImage", operation: "fetchImageAsDataUrl", extra: { url } });
             }
           })
@@ -82,14 +83,15 @@ export function useShareImage() {
           const file = new File([blob], filename, { type: "image/png" });
           if (navigator.share) {
             try {
+              logInfo("Share image: invoking navigator.share", { component: "useShareImage", operation: "captureAndShare" });
               await navigator.share({
                 files: [file],
                 title: shareTitle,
                 text: shareText,
               });
+              logInfo("Share image: shared successfully", { component: "useShareImage", operation: "captureAndShare" });
             } catch (e) {
               if ((e as Error).name !== "AbortError") {
-                const { logError } = await import("@/utils/logger");
                 logError(e, { component: "useShareImage", operation: "navigator.share" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");

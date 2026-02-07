@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { logError } from "@/utils/logger";
+import { logError, logInfo } from "@/utils/logger";
 
 const STORAGE_KEY_PREFIX = "prom-connect:unread-matches:";
 const UNREAD_UPDATED_EVENT = "prom-connect:unread-matches-updated";
@@ -63,6 +63,7 @@ export function useUnreadMatches(userId: string): UseUnreadMatchesReturn {
       if (next.has(matchId)) return;
       next.add(matchId);
       saveUnreadMatchIds(userId, next);
+      logInfo("Unread match added", { component: "useUnreadMatches", operation: "addUnread", extra: { matchId } });
       dispatchUnreadUpdated();
     },
     [userId]
@@ -75,6 +76,7 @@ export function useUnreadMatches(userId: string): UseUnreadMatchesReturn {
       if (!next.has(matchId)) return;
       next.delete(matchId);
       saveUnreadMatchIds(userId, next);
+      logInfo("Unread match cleared", { component: "useUnreadMatches", operation: "clearUnread", extra: { matchId } });
       dispatchUnreadUpdated();
     },
     [userId]

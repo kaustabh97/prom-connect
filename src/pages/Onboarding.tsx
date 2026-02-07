@@ -21,7 +21,7 @@ import { getUserProfile, hasCompletedOnboarding, clearTestUser } from "@/utils/a
 import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
-import { logError } from "@/utils/logger";
+import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
@@ -148,6 +148,10 @@ const Onboarding = () => {
   // Profile state
   const [step, setStep] = useState<OnboardingStep>("welcome");
   const [flowChoice, setFlowChoice] = useState<"full" | "couple" | "invite" | null>(null);
+
+  useEffect(() => {
+    logInfo("Onboarding step changed", { component: "Onboarding", operation: "stepChange", extra: { step } });
+  }, [step]);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
     fromUserId: string;
@@ -747,6 +751,7 @@ const Onboarding = () => {
         } catch (err) {
           logError(err, { component: "Onboarding", operation: "sendPartnerInvite" });
         }
+        logInfo("Onboarding: profile saved, navigating", { component: "Onboarding", operation: "saveProfile", extra: { flow: "full" } });
         navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
         logError(error, { component: "Onboarding", operation: "saveProfile" });

@@ -1,6 +1,7 @@
 import { getCurrentUser, fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { logError } from "./logger";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -113,7 +114,6 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     // Silently return null for unauthenticated users (expected behavior)
     const err = error as { name?: string };
     if (err?.name !== "UserUnAuthenticatedException") {
-      const { logError } = await import("./logger");
       logError(error, { component: "auth", operation: "getUserProfile" });
     }
     return null;
@@ -135,7 +135,6 @@ export const isAuthenticated = async (): Promise<boolean> => {
     const session = await fetchAuthSession();
     return !!session.tokens;
   } catch (err) {
-    const { logError } = await import("./logger");
     logError(err, { component: "auth", operation: "isAuthenticated" });
     return false;
   }
@@ -183,7 +182,6 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
     const userProfile = profiles[0];
     return userProfile.onboardingCompleted === true;
   } catch (error) {
-    const { logError } = await import("./logger");
     logError(error, { component: "auth", operation: "hasCompletedOnboarding" });
     return false;
   }
@@ -204,7 +202,6 @@ export const getGoogleOAuthRedirectUrl = async (): Promise<string> => {
     const redirectUrl = `https://${cognitoDomain}/oauth2/idpresponse`;
     return redirectUrl;
   } catch (error) {
-    const { logError } = await import("./logger");
     logError(error, { component: "auth", operation: "getOAuthRedirectUrl" });
     return "";
   }

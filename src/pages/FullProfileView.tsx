@@ -13,7 +13,8 @@ import { getUrl } from "aws-amplify/storage";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import SparkleBackground from "@/components/SparkleBackground";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
-import { logError } from "@/utils/logger";
+import ReportModal from "@/components/ReportModal";
+import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
 
@@ -74,11 +75,13 @@ export default function FullProfileView() {
   // Fetch profile from backend when not passed via state
   useEffect(() => {
     if (!profileId || profile) return;
+    logInfo("Full profile view opened", { component: "FullProfileView", operation: "mount", extra: { profileId, fromChat } });
 
     const fetchProfile = async () => {
       try {
         setLoading(true);
         setError(null);
+        logInfo("Fetching full profile", { component: "FullProfileView", operation: "fetchProfile", extra: { profileId } });
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         // @ts-ignore - authMode type
         const { data, errors } = await client.models.UserProfile.get({ id: profileId }, authMode ? { authMode } : undefined);
@@ -99,6 +102,7 @@ export default function FullProfileView() {
           }
         }
         setProfile(transformed);
+        logInfo("Full profile loaded", { component: "FullProfileView", operation: "fetchProfile", extra: { profileId } });
       } catch (err) {
         logError(err, { component: "FullProfileView", operation: "fetchProfile", extra: { profileId } });
         setError("Failed to load profile.");
@@ -113,17 +117,21 @@ export default function FullProfileView() {
 
   const handleLike = useCallback(async () => {
     if (!profile) return;
+    logInfo("User liked profile", { component: "FullProfileView", operation: "handleLike", extra: { profileId: profile.id } });
     const result = await recordSwipe(profile.id, "like");
     if (result.isMatch) {
+      logInfo("Match! Opening match popup", { component: "FullProfileView", operation: "handleLike", extra: { matchId: result.matchId } });
       setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     } else {
+      logInfo("Like recorded, back to discover", { component: "FullProfileView", operation: "handleLike" });
       navigate("/discover/profile");
     }
   }, [profile, recordSwipe, navigate]);
 
   const handlePass = useCallback(() => {
     if (profile) {
+      logInfo("User passed on profile", { component: "FullProfileView", operation: "handlePass", extra: { profileId: profile.id } });
       recordSwipe(profile.id, "pass");
       navigate("/discover/profile");
     }
@@ -167,7 +175,7 @@ export default function FullProfileView() {
     <div className="min-h-dvh bg-gradient-midnight relative overflow-hidden flex flex-col w-full">
       <SparkleBackground />
 
-      <ReportFloatingButton onClick={() => setReportOpen(true)} />
+      <ReportFloatingButton onClick={() => { logInfo("Report modal opened", { component: "FullProfileView", operation: "openReport", extra: { profileId: profile.id } }); setReportOpen(true); }} />
       <ReportModal
         open={reportOpen}
         onOpenChange={setReportOpen}
@@ -183,7 +191,7 @@ export default function FullProfileView() {
           tabIndex={0}
         >
           <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border/50 bg-background/95 backdrop-blur-md shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/discover/profile")}>
+          <Button variant="ghost" size="icon" onClick={() => { logInfo("Back to discover", { component: "FullProfileView", operation: "back" }); navigate("/discover/profile"); }}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <span className="font-display font-semibold">Profile</span>
@@ -417,10 +425,12 @@ export default function FullProfileView() {
         matchedProfile={profile}
         matchId={matchedMatchId}
         onKeepSwiping={() => {
+          logInfo("Match popup: keep swiping", { component: "FullProfileView", operation: "matchPopupKeepSwiping" });
           setMatchedMatchId(null);
           navigate("/discover/profile");
         }}
         onOpenChat={() => {
+          logInfo("Match popup: open chat", { component: "FullProfileView", operation: "matchPopupOpenChat", extra: { matchId: matchedMatchId } });
           if (matchedMatchId) {
             navigate(`/matches?matchId=${matchedMatchId}`);
           } else {

@@ -5,6 +5,7 @@ import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { sendPartnerInvite } from './functions/send-partner-invite/resource';
 import { sendReportEmail } from './functions/send-report-email/resource';
+import { frontendLogger } from './functions/frontend-logger/resource';
 
 const backend = defineBackend({
   auth,
@@ -12,6 +13,7 @@ const backend = defineBackend({
   storage,
   sendPartnerInvite,
   sendReportEmail,
+  frontendLogger,
 });
 
 // Grant SES send email permission for partner invite emails

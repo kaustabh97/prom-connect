@@ -62,6 +62,7 @@ const Auth = () => {
   }, [navigate]);
 
   const handleGoogleSignIn = async () => {
+    logInfo("Auth: Google sign in clicked", { component: "Auth", operation: "googleSignIn" });
     setIsSigningIn(true);
     try {
       await signInWithRedirect({ provider: "Google" });
@@ -74,6 +75,7 @@ const Auth = () => {
   };
 
   const handleTestModeSignIn = async () => {
+    logInfo("Auth: Test mode sign in clicked", { component: "Auth", operation: "testModeSignIn", extra: { email: testEmail.trim() } });
     if (!testEmail.trim()) {
       alert("Please enter an email address");
       return;

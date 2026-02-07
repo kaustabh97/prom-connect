@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { logInfo } from "@/utils/logger";
 
 const STORAGE_KEY_PREFIX = "prom-connect:viewed-matches:";
 const VIEWED_UPDATED_EVENT = "prom-connect:viewed-matches-updated";
@@ -57,6 +58,7 @@ export function useViewedMatches(userId: string): UseViewedMatchesReturn {
       if (next.has(matchId)) return;
       next.add(matchId);
       saveViewedMatchIds(userId, next);
+      logInfo("Match marked viewed", { component: "useViewedMatches", operation: "markMatchViewed", extra: { matchId } });
       window.dispatchEvent(new CustomEvent(VIEWED_UPDATED_EVENT));
     },
     [userId]

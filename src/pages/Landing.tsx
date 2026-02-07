@@ -158,14 +158,20 @@ const Landing = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65, duration: 0.8 }}
-              className="text-sm text-muted-foreground mb-6 px-4 py-3 rounded-xl border-2 border-primary/40 bg-primary/5"
+              className="mb-6 px-5 py-4 rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-primary/5 shadow-[0_0_20px_rgba(251,191,36,0.08)]"
             >
-              <span className="font-medium text-primary">
-                {hasMore ? `${registeredCount}+` : registeredCount}
-              </span>{" "}
-              people are already in the lineup — your perfect prom match could be one of them.
-              <br />
-              Don&apos;t be the one left wondering what if! ✨
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-3xl font-bold tabular-nums text-gradient-gold">
+                  {hasMore ? `${registeredCount}+` : registeredCount}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">people</span>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                are already in the lineup — your perfect prom match could be one of them.
+              </p>
+              <p className="text-sm font-medium text-primary/90 text-center mt-1">
+                Don&apos;t be the one left wondering what if! ✨
+              </p>
             </motion.div>
           )}
 
@@ -179,7 +185,7 @@ const Landing = () => {
             <Button
               variant="gold"
               size="xl"
-              onClick={() => navigate("/auth")}
+              onClick={() => { logInfo("Landing: Sign in clicked", { component: "Landing", operation: "signInClick" }); navigate("/auth"); }}
               className="group w-full sm:w-64"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -205,7 +211,7 @@ const Landing = () => {
             <Button
               variant="gold-outline"
               size="xl"
-              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => { logInfo("Landing: How it works clicked", { component: "Landing", operation: "howItWorksClick" }); document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' }); }}
               className="w-full sm:w-64"
             >
               How it works
@@ -307,7 +313,7 @@ const Landing = () => {
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
             People from campus are already signing up. Set up your profile in under two minutes, start swiping, and who knows — you might just find the one you'll walk in with.
           </p>
-          <Button variant="gold" size="xl" onClick={() => navigate("/auth")}>
+          <Button variant="gold" size="xl" onClick={() => { logInfo("Landing: Get Started clicked", { component: "Landing", operation: "getStartedClick" }); navigate("/auth"); }}>
             Get Started
             <Sparkles className="w-5 h-5 ml-2" />
           </Button>

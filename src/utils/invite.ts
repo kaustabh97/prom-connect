@@ -1,3 +1,5 @@
+import { logInfo } from "./logger";
+
 /** SessionStorage key for invite context (who invited the current user) */
 const INVITE_FROM_KEY = "prom_invite_from";
 
@@ -11,6 +13,7 @@ export function captureInviteFromUrl(): void {
   const invite = params.get("invite");
   if (invite && invite.includes("@")) {
     sessionStorage.setItem(INVITE_FROM_KEY, invite);
+    logInfo("Invite captured from URL", { component: "invite", operation: "captureInviteFromUrl", extra: { invite } });
   }
 }
 

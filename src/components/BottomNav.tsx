@@ -11,6 +11,7 @@ import { useUnreadMatches } from "@/hooks/useUnreadMatches";
 import { BADGE_REFRESH_EVENT } from "@/utils/badgeRefresh";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { logError, logInfo } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { getIdFromEmail } from "@/utils/userId";
 
@@ -122,7 +123,6 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
         setCurrentUserId(profile?.id ?? "");
         setCurrentUserEmail(profile?.email ?? p.email ?? "");
       } catch (err) {
-        const { logError } = await import("@/utils/logger");
         logError(err, { component: "BottomNav", operation: "loadBadgeCounts" });
       }
     };
@@ -162,7 +162,7 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path, { state: { refresh: true } })}
+                onClick={() => { logInfo("BottomNav: tab clicked", { component: "BottomNav", operation: "navClick", extra: { path: item.path } }); navigate(item.path, { state: { refresh: true } }); }}
                 className={`relative flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-colors min-w-0 ${
                   isActive(item.path)
                     ? "text-primary"

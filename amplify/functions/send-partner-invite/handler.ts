@@ -1,7 +1,9 @@
 type PartnerInviteArgs = { toEmail: string; fromName: string; appUrl: string };
 
 export const handler = async (event: { arguments: PartnerInviteArgs }) => {
+  console.log("[send-partner-invite] request", JSON.stringify(event));
   const { toEmail, fromName, appUrl } = event.arguments;
+  console.log("[send-partner-invite] args", { toEmail, fromName, appUrl });
 
   try {
     // @ts-expect-error - Package will be installed by Amplify during build
@@ -23,8 +25,9 @@ See you at Prom!
 The Starlit by the Brick Team
 `.trim();
 
+    const source = process.env.SES_FROM_EMAIL || "noreply@iima.ac.in";
     const command = new SendEmailCommand({
-      Source: process.env.SES_FROM_EMAIL || "noreply@iima.ac.in",
+      Source: source,
       Destination: { ToAddresses: [toEmail] },
       Message: {
         Subject: { Data: subject, Charset: "UTF-8" },
@@ -33,11 +36,14 @@ The Starlit by the Brick Team
         },
       },
     });
+    console.log("[send-partner-invite] ses command", { source, toEmail, subject: subject.slice(0, 50) });
 
     await ses.send(command);
-    return { success: true };
+    const result = { success: true };
+    console.log("[send-partner-invite] response", JSON.stringify(result));
+    return result;
   } catch (err) {
-    console.error("[sendPartnerInvite] Error:", err);
+    console.error("[send-partner-invite] error", err, { toEmail });
     throw new Error("Failed to send invite email");
   }
 };

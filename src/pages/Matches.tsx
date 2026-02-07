@@ -21,7 +21,7 @@ import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { dispatchBadgeRefresh, dispatchViewingMatch } from "@/utils/badgeRefresh";
 import { getIdFromEmail } from "@/utils/userId";
-import { logError } from "@/utils/logger";
+import { logError, logInfo } from "@/utils/logger";
 import { 
   Heart, 
   MessageCircle, 
@@ -74,6 +74,10 @@ const Matches = () => {
     const main = document.getElementById("app-main");
     if (main) main.scrollTo({ top: 0, behavior: "instant" });
   }, [location.pathname]);
+
+  useEffect(() => {
+    logInfo("Matches page loaded", { component: "Matches", operation: "mount" });
+  }, []);
 
   // Load current user on mount
   useEffect(() => {
@@ -572,6 +576,7 @@ const Matches = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
+                logInfo("Matches: chat opened", { component: "Matches", operation: "openChat", extra: { matchId: match.id, otherUserId: match.otherUserId } });
                 setActiveChat(match.id);
                 markMatchViewed(match.id);
                 clearUnread(match.id);
@@ -854,7 +859,7 @@ const ChatView = ({
           <div>
             <button
               type="button"
-              onClick={() => navigate(`/discover/profile/${match.otherUserId}`, { state: { fromChat: true } })}
+              onClick={() => { logInfo("Matches: view full profile from chat", { component: "Matches", operation: "viewFullProfile", extra: { otherUserId: match.otherUserId } }); navigate(`/discover/profile/${match.otherUserId}`, { state: { fromChat: true } }); }}
               className="font-semibold text-foreground hover:text-primary hover:underline text-left"
             >
               {displayName}
@@ -867,7 +872,7 @@ const ChatView = ({
             <Button
               variant="default"
               size="sm"
-              onClick={onAskToProm}
+              onClick={() => { logInfo("Matches: Ask to Prom clicked", { component: "Matches", operation: "askToProm", extra: { otherUserId: match.otherUserId } }); onAskToProm?.(); }}
               className="bg-primary hover:bg-primary/90"
             >
               <Heart className="w-4 h-4 mr-2" />

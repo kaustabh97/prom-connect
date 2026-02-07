@@ -112,6 +112,9 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
 
 export default function Discover() {
   const navigate = useNavigate();
+  useEffect(() => {
+    logInfo("Discover page loaded", { component: "Discover", operation: "mount" });
+  }, []);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<DiscoveryProfileFull[]>([]);
@@ -403,6 +406,7 @@ export default function Discover() {
   }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
+    logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
     const profile = displayQueue.find((p) => p.id === profileId);
     const result = await recordSwipe(profileId, action);
     if (result.isMatch && profile) {
@@ -426,7 +430,7 @@ export default function Discover() {
     if (displayQueue.length === 0) return;
     const currentProfile = displayQueue[0];
     if (!currentProfile) return;
-    
+    logInfo("Discover: next (skip)", { component: "Discover", operation: "handleNext", extra: { profileId: currentProfile.id } });
     setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
     scrollToTop();
   }, [displayQueue, scrollToTop]);
@@ -521,7 +525,7 @@ export default function Discover() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setFiltersOpen(true)}
+                onClick={() => { logInfo("Discover: filters opened", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
                 className="gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-medium shadow-sm"
                 title="Adjust discovery filters"
               >
@@ -586,7 +590,7 @@ export default function Discover() {
               profiles={displayQueue}
               onSwipe={handleSwipe}
               onNext={handleNext}
-              onOpenFilters={() => setFiltersOpen(true)}
+              onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}
             />
@@ -603,7 +607,7 @@ export default function Discover() {
 
       {!loading && displayQueue.length > 0 && displayQueue[0] && (
         <>
-          <ReportFloatingButton onClick={() => setReportOpen(true)} />
+          <ReportFloatingButton onClick={() => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: displayQueue[0]?.id } }); setReportOpen(true); }} />
           <ReportModal
             open={reportOpen}
             onOpenChange={setReportOpen}

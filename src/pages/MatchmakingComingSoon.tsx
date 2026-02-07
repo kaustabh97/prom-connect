@@ -18,6 +18,10 @@ export default function MatchmakingComingSoon() {
   const [hasMore, setHasMore] = useState(false);
 
   useEffect(() => {
+    logInfo("MatchmakingComingSoon page loaded", { component: "MatchmakingComingSoon", operation: "mount" });
+  }, []);
+
+  useEffect(() => {
     const fetchCount = async () => {
       try {
         const { data, nextToken } = await client.models.UserProfile.list(
@@ -61,13 +65,19 @@ export default function MatchmakingComingSoon() {
             Until then, polish up that profile — first impressions matter!
           </p>
           {registeredCount !== null && (
-            <div className="text-sm text-muted-foreground mb-4 px-4 py-3 rounded-xl border-2 border-primary/40 bg-primary/5">
-              <span className="font-medium text-primary">
-                {hasMore ? `${registeredCount}+` : registeredCount}
-              </span>{" "}
-              people are already in the lineup — your perfect prom match could be one of them.
-              <br />
-              Don&apos;t be the one left wondering what if! ✨
+            <div className="mb-6 px-5 py-4 rounded-2xl border-2 border-primary/50 bg-gradient-to-br from-primary/10 to-primary/5 shadow-[0_0_20px_rgba(251,191,36,0.08)]">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-3xl font-bold tabular-nums text-gradient-gold">
+                  {hasMore ? `${registeredCount}+` : registeredCount}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">people</span>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                are already in the lineup — your perfect prom match could be one of them.
+              </p>
+              <p className="text-sm font-medium text-primary/90 text-center mt-1">
+                Don&apos;t be the one left wondering what if! ✨
+              </p>
             </div>
           )}
           <div className="mb-8">

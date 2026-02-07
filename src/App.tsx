@@ -46,6 +46,7 @@ function InviteCapture() {
 function CoupleCompleteRedirect() {
   const [searchParams] = useSearchParams();
   const partnerName = searchParams.get("partnerName");
+  logInfo("Couple complete redirect", { component: "App", operation: "CoupleCompleteRedirect", extra: { partnerName } });
   const search = partnerName
     ? `?partnerName=${encodeURIComponent(partnerName)}&outside=1`
     : "?outside=1";

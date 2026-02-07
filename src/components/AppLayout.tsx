@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import BottomNav from "@/components/BottomNav";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
+import { logError, logInfo } from "@/utils/logger";
 
 const PROM_DATE_CHECK_ROUTES = ["/discover", "/matches", "/profile", "/matchmaking-soon"];
 
@@ -43,8 +44,7 @@ function PromDateGate({
         if (!cancelled && path) setRedirectPath(path);
         if (!cancelled) setChecked(true);
       })
-      .catch(async (err) => {
-        const { logError } = await import("@/utils/logger");
+      .catch((err) => {
         logError(err, { component: "AppLayout", operation: "checkRedirect" });
         if (!cancelled) setChecked(true);
       });
@@ -54,6 +54,7 @@ function PromDateGate({
   }, [shouldCheck, location.pathname]);
 
   if (shouldCheck && checked && redirectPath) {
+    logInfo("Prom date gate: redirecting to prom-date", { component: "AppLayout", operation: "PromDateGate", extra: { redirectPath } });
     return <Navigate to={redirectPath} replace />;
   }
   return <Outlet />;

@@ -1,4 +1,5 @@
 import { APP_URL } from "@/config";
+import { logError, logInfo } from "./logger";
 
 const REFERRAL_MESSAGE = `Starlit by the Brick – IIMA's anonymous matchmaking for Prom 2026! 💫 Find your date. Campus-only, privacy-first. Join at ${APP_URL}`;
 
@@ -24,13 +25,13 @@ export function getReferralWhatsAppUrl(): string {
  * Same flow as MatchmakingComingSoon "Refer a friend".
  */
 export async function handleReferralShare(): Promise<void> {
+  logInfo("Referral share initiated", { component: "share", operation: "handleReferralShare" });
   if (typeof navigator !== "undefined" && navigator.share) {
     try {
       const { text, url, title } = getReferralShareData();
       await navigator.share({ title, text, url });
       return;
     } catch (err) {
-      const { logError } = await import("./logger");
       logError(err, { component: "share", operation: "handleReferralShare" });
     }
   }
@@ -43,6 +44,7 @@ export async function handleReferralShare(): Promise<void> {
  * @deprecated Use handleReferralShare() for the same flow as MatchmakingComingSoon.
  */
 export function shareViaWhatsApp(): void {
+  logInfo("Share via WhatsApp (referral)", { component: "share", operation: "shareViaWhatsApp" });
   const encoded = encodeURIComponent(REFERRAL_MESSAGE);
   const url = `https://wa.me/?text=${encoded}`;
   window.open(url, "_blank", "noopener,noreferrer");
@@ -59,6 +61,7 @@ export function sharePartnerInviteViaWhatsApp(
   inviterEmail: string,
   personalMessage?: string
 ): void {
+  logInfo("Share partner invite via WhatsApp", { component: "share", operation: "sharePartnerInviteViaWhatsApp", extra: { fromName } });
   const inviteUrl = APP_URL;
   const baseIntro = `*Someone's got a crush on you 💕*\n\n${fromName} wants to go to Prom with you and they're on Starlit by the Brick – IIMA's matchmaking for Prom 2026. Join with the link below and say yes 🥺`;
   const personalSection = personalMessage?.trim()
@@ -78,6 +81,7 @@ const PROM_DATE_MESSAGE = `We're going to Prom together! 💫 Save the date – 
  * User can add the saved image from their gallery if they've downloaded it.
  */
 export function sharePromDateViaWhatsApp(): void {
+  logInfo("Share prom date via WhatsApp", { component: "share", operation: "sharePromDateViaWhatsApp" });
   const encoded = encodeURIComponent(PROM_DATE_MESSAGE);
   const url = `https://wa.me/?text=${encoded}`;
   window.open(url, "_blank", "noopener,noreferrer");

@@ -1,6 +1,7 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
 import { sendReportEmail as sendReportEmailFn } from '../functions/send-report-email/resource';
+import { frontendLogger } from '../functions/frontend-logger/resource';
 
 /*== STEP 1 ===============================================================
 The section below creates a Todo database table with a "content" field. Try
@@ -200,6 +201,20 @@ const schema = a.schema({
     .returns(a.json())
     .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
     .handler(a.handler.function(sendReportEmailFn)),
+
+  // Custom mutation to receive frontend logs and write to CloudWatch
+  logFrontendEvent: a
+    .mutation()
+    .arguments({
+      level: a.string().required(),
+      message: a.string().required(),
+      component: a.string(),
+      operation: a.string(),
+      extra: a.json(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
+    .handler(a.handler.function(frontendLogger)),
 
   // Individual messages within a conversation
   Message: a

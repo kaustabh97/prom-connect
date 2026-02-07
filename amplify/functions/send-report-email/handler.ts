@@ -10,12 +10,21 @@ type ReportArgs = {
 const REPORT_TO_EMAIL = "p24kaustabh@iima.ac.in";
 
 export const handler = async (event: { arguments: ReportArgs }) => {
+  console.log("[send-report-email] request", JSON.stringify(event));
   const { personName, personId, context, reportText, reporterEmail, reporterName } =
     event.arguments;
+  console.log("[send-report-email] args", {
+    personName,
+    personId,
+    context,
+    reporterEmail,
+    reporterName,
+    reportTextLength: reportText?.length,
+  });
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error("[sendReportEmail] RESEND_API_KEY not set");
+    console.error("[send-report-email] RESEND_API_KEY not set");
     throw new Error("Email service not configured. Add RESEND_API_KEY to the Lambda environment.");
   }
 
@@ -43,6 +52,14 @@ export const handler = async (event: { arguments: ReportArgs }) => {
     .filter((s) => s !== "")
     .join("\n");
 
+  const resendPayload = {
+    from: "Starlit by the Brick <onboarding@resend.dev>",
+    to: [REPORT_TO_EMAIL],
+    subject,
+    textLength: text.length,
+  };
+  console.log("[send-report-email] resend payload", resendPayload);
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -60,12 +77,14 @@ export const handler = async (event: { arguments: ReportArgs }) => {
 
     if (!res.ok) {
       const errBody = await res.text();
-      console.error("[sendReportEmail] Resend API error:", res.status, errBody);
+      console.error("[send-report-email] Resend API error", { status: res.status, body: errBody });
       throw new Error(`Failed to send report email: ${res.status}`);
     }
-    return { success: true };
+    const result = { success: true };
+    console.log("[send-report-email] response", JSON.stringify(result));
+    return result;
   } catch (err) {
-    console.error("[sendReportEmail] Error:", err);
+    console.error("[send-report-email] error", err, { personName, personId });
     throw new Error("Failed to send report email");
   }
 };

@@ -335,6 +335,10 @@ export default function Profile() {
   };
 
   useEffect(() => {
+    logInfo("Profile page loaded", { component: "Profile", operation: "mount" });
+  }, []);
+
+  useEffect(() => {
     const fetchProfile = async () => {
       try {
         setLoading(true);

@@ -1,7 +1,10 @@
 /**
  * Centralized error logging utility.
  * Use throughout the app for consistent, debuggable error output.
+ * In production, logs are also sent to the backend (CloudWatch).
  */
+
+import type { Schema } from "../../amplify/data/resource";
 
 type LogContext = {
   component?: string;
@@ -23,6 +26,26 @@ function buildPrefix(context: LogContext): string {
   return parts.length ? `[${parts.join(" ")}]` : "";
 }
 
+const isProd = !import.meta.env.DEV;
+
+/** Fire-and-forget: send log to backend. Swallows all errors to avoid recursion. */
+function sendToBackend(level: string, message: string, context: LogContext): void {
+  if (!isProd || typeof window === "undefined") return;
+  const payload = {
+    level,
+    message,
+    component: context.component ?? null,
+    operation: context.operation ?? null,
+    extra: context.extra ?? null,
+  };
+  void import("aws-amplify/data")
+    .then(({ generateClient }) => {
+      const client = generateClient<Schema>();
+      return client.mutations.logFrontendEvent(payload);
+    })
+    .catch(() => {});
+}
+
 /**
  * Log an error with full context. Use in catch blocks.
  */
@@ -38,6 +61,8 @@ export function logError(
   if (stack && import.meta.env.DEV) {
     console.error(`${prefix} Stack:`, stack);
   }
+
+  sendToBackend("error", message, { ...context, extra: { ...context.extra, stack } });
 }
 
 /**
@@ -50,6 +75,7 @@ export function logWarn(
   const prefix = buildPrefix(context);
   const extra = context.extra ? ` ${JSON.stringify(context.extra)}` : "";
   console.warn(`${prefix} ${message}${extra}`);
+  sendToBackend("warn", message, context);
 }
 
 /**
@@ -62,4 +88,5 @@ export function logInfo(
   const prefix = buildPrefix(context);
   const extra = context.extra ? ` ${JSON.stringify(context.extra)}` : "";
   console.info(`${prefix} ${message}${extra}`);
+  sendToBackend("info", message, context);
 }
