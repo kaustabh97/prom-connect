@@ -2134,7 +2134,7 @@ const Onboarding = () => {
           <div className="px-4 pt-4 pb-4">
             {/* Single row: Back | Step counter | Log out */}
             <div className="flex items-center justify-between gap-3 mb-3">
-              {(currentStepIndex > 0 || step === "couplePartnerType") ? (
+              {(currentStepIndex > 0 || step === "couplePartnerType") && !(step === "choice" && isFlowChoiceOnly) ? (
                 <Button
                   variant="outline"
                   size="sm"

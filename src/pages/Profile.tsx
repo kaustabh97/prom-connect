@@ -148,6 +148,7 @@ export default function Profile() {
   const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showChangeFlowDialog, setShowChangeFlowDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -1172,7 +1173,7 @@ export default function Profile() {
                   variant="outline"
                   size="default"
                   className="w-full gap-2 border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground"
-                  onClick={() => navigate("/onboarding?flow=choice")}
+                  onClick={() => setShowChangeFlowDialog(true)}
                 >
                   <User className="w-4 h-4" />
                   I already have a plus one
@@ -1247,6 +1248,29 @@ export default function Profile() {
               ) : (
                 "Delete account"
               )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showChangeFlowDialog} onOpenChange={setShowChangeFlowDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change your flow?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ll choose whether you&apos;re still looking for a prom date or already have a plus one (IIMA or outside). You can change this later from your profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowChangeFlowDialog(false);
+                navigate("/onboarding?flow=choice");
+              }}
+            >
+              Continue
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
