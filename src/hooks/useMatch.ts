@@ -32,15 +32,11 @@ export function useMatch() {
       const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
       const opts = authMode ? { authMode } : undefined;
 
-      // Load current user's UserProfile to get the backend id
-      const { data: profiles } =
-        // @ts-ignore - authMode option not in types yet
-        await client.models.UserProfile.list(
-          { filter: { email: { eq: authProfile.email } } },
-          opts
-        );
-      const canonicalId = authProfile.email ? getIdFromEmail(authProfile.email) : null;
-      const currentUserProfile = profiles?.find((p) => p.id === canonicalId) ?? profiles?.[0];
+      const profileId = getIdFromEmail(authProfile.email.trim());
+      const { data: currentUserProfile } = await client.models.UserProfile.get(
+        { id: profileId },
+        opts
+      );
       if (!currentUserProfile?.id) return;
 
       // Fetch Likes where fromUserId = current user (who we've liked)
@@ -76,14 +72,11 @@ export function useMatch() {
             const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
             const opts = authMode ? { authMode } : undefined;
 
-            const { data: profiles } =
-              // @ts-ignore - authMode
-              await client.models.UserProfile.list(
-                { filter: { email: { eq: authProfile.email } } },
-                opts
-              );
-            const canonicalId = authProfile.email ? getIdFromEmail(authProfile.email) : null;
-            const currentUserProfile = profiles?.find((p) => p.id === canonicalId) ?? profiles?.[0];
+            const profileId = getIdFromEmail(authProfile.email.trim());
+            const { data: currentUserProfile } = await client.models.UserProfile.get(
+              { id: profileId },
+              opts
+            );
             if (currentUserProfile?.id) {
               fromUserId = currentUserProfile.id;
               const currentUserEmail = currentUserProfile.email ?? authProfile.email;

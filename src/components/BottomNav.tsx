@@ -114,12 +114,9 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
         if (!p?.email) return;
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;
-        const { data } = await client.models.UserProfile.list(
-          { filter: { email: { eq: p.email } } },
-          opts
-        );
-        const canonicalId = p.email ? getIdFromEmail(p.email) : null;
-        const profile = data?.find((x) => x.id === canonicalId) ?? data?.[0];
+        const profileId = p.email ? getIdFromEmail(p.email.trim()) : null;
+        if (!profileId) return;
+        const { data: profile } = await client.models.UserProfile.get({ id: profileId }, opts);
         setCurrentUserId(profile?.id ?? "");
         setCurrentUserEmail(profile?.email ?? p.email ?? "");
       } catch (err) {

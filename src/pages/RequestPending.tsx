@@ -9,6 +9,7 @@ import { getUserProfileFromCognito, clearTestUser } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
+import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
@@ -39,11 +40,8 @@ export default function RequestPending() {
       navigate("/auth");
       return;
     }
-    const { data: profiles } = await client.models.UserProfile.list(
-      { filter: { email: { eq: profile.email } } },
-      opts
-    );
-    const userProfile = profiles?.[0];
+    const profileId = getIdFromEmail(profile.email.trim());
+    const { data: userProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
     if (!userProfile?.id) {
       navigate("/onboarding");
       return;
@@ -96,18 +94,16 @@ export default function RequestPending() {
     try {
       const profile = await getUserProfileFromCognito();
       if (!profile?.email) return;
-      const { data: profiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: profile.email } } },
-        opts
-      );
+      const profileId = getIdFromEmail(profile.email.trim());
+      const { data: myProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
       await client.models.MatchRequest.update(
         { id: requestId, status: "withdrawn" },
         opts
       );
-      if (profiles?.[0]?.id) {
+      if (myProfile?.id) {
         await client.models.UserProfile.update(
           {
-            id: profiles[0].id,
+            id: myProfile.id,
             bio: undefined,
             partnerStatus: "Still looking for my prom date 💫",
             partnerEmail: "",

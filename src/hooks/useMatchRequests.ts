@@ -110,18 +110,14 @@ export function useMatchRequests({
         }
         // Mark both users as excluded from discovery (partner match confirmed)
         try {
-          const { data: myProfiles } = await client.models.UserProfile.list(
-            { filter: { email: { eq: currentUserEmail } } },
-            authMode ? { authMode } : undefined
-          );
-          const { data: theirProfiles } = await client.models.UserProfile.list(
-            { filter: { email: { eq: fromEmail } } },
-            authMode ? { authMode } : undefined
-          );
-          const myCanonicalId = currentUserEmail ? getIdFromEmail(currentUserEmail) : null;
-          const theirCanonicalId = fromEmail ? getIdFromEmail(fromEmail) : null;
-          const myProfile = myProfiles?.find((p) => p.id === myCanonicalId) ?? myProfiles?.[0];
-          const theirProfile = theirProfiles?.find((p) => p.id === theirCanonicalId) ?? theirProfiles?.[0];
+          const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
+          const theirProfileId = fromEmail ? getIdFromEmail(fromEmail.trim()) : null;
+          const { data: myProfile } = myProfileId
+            ? await client.models.UserProfile.get({ id: myProfileId }, authMode ? { authMode } : undefined)
+            : { data: null };
+          const { data: theirProfile } = theirProfileId
+            ? await client.models.UserProfile.get({ id: theirProfileId }, authMode ? { authMode } : undefined)
+            : { data: null };
           if (myProfile?.id) {
             await client.models.UserProfile.update(
               { id: myProfile.id, excludeFromDiscovery: true },

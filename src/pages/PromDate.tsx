@@ -7,6 +7,7 @@ import { usePromDate } from "@/hooks/usePromDate";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { getUrl } from "aws-amplify/storage";
+import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -45,14 +46,11 @@ export default function PromDate() {
         navigate("/auth");
         return;
       }
-      const { data } = await client.models.UserProfile.list(
-        { filter: { email: { eq: p.email } } },
-        opts
-      );
-      const id = data?.[0]?.id;
-      if (id) {
-        setCurrentUserId(id);
-        logInfo("PromDate: current user loaded", { component: "PromDate", operation: "load", extra: { currentUserId: id } });
+      const profileId = getIdFromEmail(p.email.trim());
+      const { data: me } = await client.models.UserProfile.get({ id: profileId }, opts);
+      if (me?.id) {
+        setCurrentUserId(me.id);
+        logInfo("PromDate: current user loaded", { component: "PromDate", operation: "load", extra: { currentUserId: me.id } });
       }
     };
     load();

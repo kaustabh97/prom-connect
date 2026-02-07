@@ -96,18 +96,14 @@ const Matches = () => {
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;
 
-        const listUserProfiles = () => {
-          const filters = { filter: { email: { eq: profile.email } } };
-          if (opts) {
-            // @ts-ignore - authMode option not in generated types yet
-            return client.models.UserProfile.list(filters, opts);
-          }
-          return client.models.UserProfile.list(filters);
-        };
-
-        const { data: userProfiles } = await listUserProfiles();
-        const canonicalId = profile.email ? getIdFromEmail(profile.email) : null;
-        const backendProfile = userProfiles?.find((p) => p.id === canonicalId) ?? userProfiles?.[0];
+        const profileId = profile.email ? getIdFromEmail(profile.email.trim()) : null;
+        if (!profileId) {
+          setAuthError("Complete onboarding to start matching.");
+          setCurrentUserId("");
+          setCurrentUserEmail(profile.email);
+          return;
+        }
+        const { data: backendProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
 
         if (!backendProfile?.id) {
           setAuthError("Complete onboarding to start matching.");
@@ -408,14 +404,13 @@ const Matches = () => {
         { id: pendingOutgoingRequest.id, status: "withdrawn" },
         opts
       );
-      const { data: myProfiles } = await client.models.UserProfile.list(
-        { filter: { email: { eq: currentUserEmail } } },
-        opts
-      );
-      if (myProfiles?.[0]?.id) {
-        await client.models.UserProfile.update(
-          {
-            id: myProfiles[0].id,
+      const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
+      if (myProfileId) {
+        const { data: myProfile } = await client.models.UserProfile.get({ id: myProfileId }, opts);
+        if (myProfile?.id) {
+          await client.models.UserProfile.update(
+            {
+              id: myProfile.id,
             bio: undefined,
             partnerStatus: "Still looking for my prom date 💫",
             partnerEmail: "",
@@ -428,6 +423,7 @@ const Matches = () => {
           },
           opts
         );
+        }
       }
       setPendingOutgoingRequest(null);
       await loadPendingOutgoing();
