@@ -5,6 +5,7 @@ import { signOut } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfileFromCognito, clearTestUser } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { logError, logInfo } from "@/utils/logger";
 import { usePromDate } from "@/hooks/usePromDate";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
@@ -351,16 +352,13 @@ export default function Profile() {
           return;
         }
 
-        console.log("Auth user: ");
-        console.log(JSON.stringify(authUser, null, 2));
-
-        // Fetch user profile from backend (apiKey so backend returns by email filter; userPool can restrict results)
-        const { data: profiles, errors } = await (
-          client.models.UserProfile.list as (filter: unknown, opts?: { authMode: string }) => ReturnType<typeof client.models.UserProfile.list>
-        )( { filter: { email: { eq: authUser.email } } }, { authMode: "apiKey" } );
-
-        console.log("Fetched profiles from AWS backend: ");
-        console.log(JSON.stringify(profiles, null, 2));
+        // Deterministic id from email: e.g. p24dipak@iima.ac.in -> user_p24dipak_iima.ac.in
+        const profileId = getIdFromEmail(authUser.email.trim());
+        const getAuthMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+        const { data: backendProfile, errors } = await client.models.UserProfile.get(
+          { id: profileId },
+          getAuthMode ? { authMode: getAuthMode } : undefined
+        );
 
         if (errors) {
           logError(errors[0], { component: "Profile", operation: "fetchProfile", extra: { errors } });
@@ -368,12 +366,10 @@ export default function Profile() {
           return;
         }
 
-        if (profiles && profiles.length > 0) {
-          const backendProfile = profiles[0] as unknown as UserProfileData;
-          setProfile(backendProfile);
+        if (backendProfile) {
+          setProfile(backendProfile as UserProfileData);
           logInfo("Profile loaded", { component: "Profile", operation: "fetchProfile", extra: { profileId: backendProfile.id } });
 
-          // Fetch profile picture from S3 if available
           if (backendProfile.profilePicKey) {
             try {
               const { url } = await getUrl({
