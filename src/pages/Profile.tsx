@@ -352,6 +352,9 @@ export default function Profile() {
           return;
         }
 
+        console.log("Auth user: ");
+        console.log(JSON.stringify(authUser, null, 2));
+
         // Deterministic id from email: e.g. p24dipak@iima.ac.in -> user_p24dipak_iima.ac.in
         const profileId = getIdFromEmail(authUser.email.trim());
         const getAuthMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
@@ -365,6 +368,9 @@ export default function Profile() {
           setError("Failed to load profile. Please try again.");
           return;
         }
+
+        console.log("Fetched profiles from AWS backend: ");
+        console.log(JSON.stringify(backendProfile, null, 2));
 
         if (backendProfile) {
           setProfile(backendProfile as UserProfileData);
