@@ -1,7 +1,7 @@
 import { getCurrentUser, fetchAuthSession } from "aws-amplify/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { logError } from "./logger";
+import { logError, logInfo } from "./logger";
 import { ENABLE_BACKEND_PROFILE_FETCH, GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
@@ -66,12 +66,16 @@ export const clearTestUser = (): void => {
  * In test mode (GOOGLE_LOGIN_CHECK = false), returns test user from localStorage
  */
 export const getUserProfile = async (): Promise<UserProfile | null> => {
+  const context = { component: "auth", operation: "getUserProfile" };
+
   // If Google login is disabled, use test user from localStorage
   if (!GOOGLE_LOGIN_CHECK) {
     const testUser = getTestUser();
     if (testUser) {
+      logInfo("Returning test user from localStorage", { ...context, extra: { hasEmail: !!testUser.email } });
       return testUser;
     }
+    logInfo("No test user in localStorage", context);
     return null;
   }
 
@@ -80,10 +84,16 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     // Check session first to avoid unnecessary error
     const session = await fetchAuthSession();
     if (!session.tokens) {
+      logInfo("No session tokens", context);
       return null;
     }
-    
+
     const user = await getCurrentUser();
+    logInfo("Got current user from Cognito", {
+      ...context,
+      extra: { hasUserId: !!user?.userId, hasUsername: !!user?.username },
+    });
+
     const payload = session.tokens?.idToken?.payload as Record<string, unknown> | undefined;
     const email = payload?.email as string | undefined;
     let name = payload?.name as string | undefined;
@@ -100,6 +110,11 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
     }
     const picture = payload?.picture as string | undefined;
 
+    logInfo("Token payload values for profile", {
+      ...context,
+      extra: { hasEmail: !!email, hasName: !!name, hasPicture: !!picture },
+    });
+
     const profile: UserProfile = {
       username: user.username,
       userId: user.userId,
@@ -108,13 +123,16 @@ export const getUserProfile = async (): Promise<UserProfile | null> => {
       picture,
       fullToken: payload,
     };
-    
+
+    logInfo("Returning Cognito user profile", { ...context, extra: { hasEmail: !!email, hasName: !!name } });
     return profile;
   } catch (error: unknown) {
     // Silently return null for unauthenticated users (expected behavior)
     const err = error as { name?: string };
     if (err?.name !== "UserUnAuthenticatedException") {
-      logError(error, { component: "auth", operation: "getUserProfile" });
+      logError(error, context);
+    } else {
+      logInfo("User not authenticated (expected)", { ...context, extra: { reason: err?.name } });
     }
     return null;
   }
