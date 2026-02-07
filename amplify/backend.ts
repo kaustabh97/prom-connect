@@ -17,10 +17,10 @@ const backend = defineBackend({
   frontendLogger,
 });
 
-// Frontend logger: dedicated log group with dev/prod streams
+// Frontend logger: dedicated log group per branch (omit logGroupName so CDK generates
+// unique names per stack, avoiding "already exists" conflicts when deploying dev + prod)
 const frontendLogsStack = backend.createStack('FrontendLogs');
 const frontendLogGroup = new logs.LogGroup(frontendLogsStack, 'FrontendLogGroup', {
-  logGroupName: '/aws/amplify/prom-connect/frontend-logs',
   retention: logs.RetentionDays.THREE_MONTHS,
 });
 type LambdaWithEnv = {
