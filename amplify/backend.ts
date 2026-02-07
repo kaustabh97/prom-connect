@@ -32,7 +32,7 @@ frontendLoggerLambda.addToRolePolicy(
   new iam.PolicyStatement({
     sid: 'AllowCloudWatchLogsPut',
     actions: ['logs:CreateLogStream', 'logs:PutLogEvents', 'logs:DescribeLogStreams'],
-    resources: [frontendLogGroup.logGroupArn],
+    resources: [frontendLogGroup.logGroupArn, `${frontendLogGroup.logGroupArn}:*`],
   })
 );
 

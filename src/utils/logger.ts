@@ -44,7 +44,11 @@ function sendToBackend(level: string, message: string, context: LogContext): voi
       const client = generateClient<Schema>();
       return client.mutations.logFrontendEvent(payload);
     })
-    .catch(() => {});
+    .catch((e) => {
+      if (import.meta.env.DEV) {
+        console.warn("[logger] sendToBackend failed:", e);
+      }
+    });
 }
 
 /**
