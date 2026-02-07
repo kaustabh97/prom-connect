@@ -1,1 +1,1 @@
-{"name":"frontend-logger","version":"1.0.0","type":"module","dependencies":{}}
+{"name":"frontend-logger","version":"1.0.0","type":"module","dependencies":{"@aws-sdk/client-cloudwatch-logs":"^3.0.0"}}

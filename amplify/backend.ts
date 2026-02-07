@@ -1,5 +1,6 @@
 import { defineBackend } from '@aws-amplify/backend';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
@@ -15,6 +16,22 @@ const backend = defineBackend({
   sendReportEmail,
   frontendLogger,
 });
+
+// Frontend logger: dedicated log group with dev/prod streams
+const frontendLogsStack = backend.createStack('FrontendLogs');
+const frontendLogGroup = new logs.LogGroup(frontendLogsStack, 'FrontendLogGroup', {
+  logGroupName: '/aws/amplify/prom-connect/frontend-logs',
+  retention: logs.RetentionDays.THREE_MONTHS,
+});
+const frontendLoggerLambda = backend.frontendLogger.resources.lambda;
+frontendLoggerLambda.addEnvironment('FRONTEND_LOG_GROUP', frontendLogGroup.logGroupName);
+frontendLoggerLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    sid: 'AllowCloudWatchLogsPut',
+    actions: ['logs:CreateLogStream', 'logs:PutLogEvents', 'logs:DescribeLogStreams'],
+    resources: [frontendLogGroup.logGroupArn],
+  })
+);
 
 // Grant SES send email permission for partner invite emails
 const sendPartnerInviteLambda = backend.sendPartnerInvite.resources.lambda;

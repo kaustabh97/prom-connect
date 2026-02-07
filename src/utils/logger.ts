@@ -1,7 +1,7 @@
 /**
  * Centralized error logging utility.
  * Use throughout the app for consistent, debuggable error output.
- * In production, logs are also sent to the backend (CloudWatch).
+ * Logs are sent to the backend (CloudWatch) in both dev and prod, with separate streams.
  */
 
 import type { Schema } from "../../amplify/data/resource";
@@ -26,14 +26,15 @@ function buildPrefix(context: LogContext): string {
   return parts.length ? `[${parts.join(" ")}]` : "";
 }
 
-const isProd = !import.meta.env.DEV;
+const env = import.meta.env.DEV ? "development" : "production";
 
 /** Fire-and-forget: send log to backend. Swallows all errors to avoid recursion. */
 function sendToBackend(level: string, message: string, context: LogContext): void {
-  if (!isProd || typeof window === "undefined") return;
+  if (typeof window === "undefined") return;
   const payload = {
     level,
     message,
+    env,
     component: context.component ?? null,
     operation: context.operation ?? null,
     extra: context.extra ?? null,

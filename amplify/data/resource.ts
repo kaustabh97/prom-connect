@@ -202,12 +202,13 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
     .handler(a.handler.function(sendReportEmailFn)),
 
-  // Custom mutation to receive frontend logs and write to CloudWatch
+  // Custom mutation to receive frontend logs and write to CloudWatch (separate dev/prod streams)
   logFrontendEvent: a
     .mutation()
     .arguments({
       level: a.string().required(),
       message: a.string().required(),
+      env: a.string().required(),
       component: a.string(),
       operation: a.string(),
       extra: a.json(),
