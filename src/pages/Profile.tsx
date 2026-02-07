@@ -29,9 +29,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera } from "lucide-react";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera, Trash2 } from "lucide-react";
 import { handleReferralShare } from "@/utils/share";
+import { deleteUserProfile } from "@/utils/deleteProfile";
 import SparkleBackground from "@/components/SparkleBackground";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const client = generateClient<Schema>();
 
@@ -135,6 +146,9 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
   const { promDate } = usePromDate({ currentUserId: profile?.id ?? "" });
@@ -166,6 +180,27 @@ export default function Profile() {
       navigate("/");
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!profile?.id || !profile?.email) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteUserProfile(profile.id, profile.email);
+      if (result.success) {
+        if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+        if (GOOGLE_LOGIN_CHECK) await signOut();
+        navigate("/", { replace: true });
+        return;
+      }
+      setDeleteError(result.error ?? "Failed to delete account.");
+    } catch (err) {
+      logError(err, { component: "Profile", operation: "deleteAccount" });
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1124,6 +1159,24 @@ export default function Profile() {
               </Button>
             </motion.div>
 
+            {/* Delete account */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.33 }}
+              className="pt-2"
+            >
+              <Button
+                variant="outline"
+                className="w-full gap-2 text-muted-foreground hover:text-destructive hover:border-destructive/50"
+                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
+                disabled={isDeleting}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete my account
+              </Button>
+            </motion.div>
+
             {/* Log out at end of profile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1148,6 +1201,35 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your profile, all your matches, and conversations.
+              Other users will no longer see you as a match. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDeleteAccount}
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Delete account"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
