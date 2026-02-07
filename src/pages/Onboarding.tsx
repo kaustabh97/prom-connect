@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ import { getUserProfileFromCognito, hasCompletedOnboarding, clearTestUser } from
 import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
+import { resetProfileForDiscovery } from "@/utils/unmatch";
 import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
@@ -136,6 +137,7 @@ const intentions = [
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // Auth state
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -152,6 +154,8 @@ const Onboarding = () => {
   useEffect(() => {
     logInfo("Onboarding step changed", { component: "Onboarding", operation: "stepChange", extra: { step } });
   }, [step]);
+  /** True when user landed with ?flow=choice to change flow (already has profile) */
+  const [isFlowChoiceOnly, setIsFlowChoiceOnly] = useState(false);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
     fromUserId: string;
@@ -245,6 +249,29 @@ const Onboarding = () => {
           // Check if user has already completed onboarding
           const completed = await hasCompletedOnboarding();
           if (completed) {
+            // Allow changing flow: show choice step when URL has ?flow=choice (set by Profile "I already have a plus one", PromDate "Change my flow", or Matches Unmatch)
+            if (searchParams.get("flow") === "choice") {
+              const profileId = getIdFromEmail(authProfile.email!.trim());
+              const { data: existingProfile } = await client.models.UserProfile.get(
+                { id: profileId },
+                { authMode: "apiKey" }
+              );
+              if (existingProfile) {
+                const p = existingProfile as Record<string, unknown>;
+                setProfile((prev) => ({
+                  ...prev,
+                  email: (p.email as string) ?? prev.email,
+                  name: (p.name as string) ?? prev.name,
+                  partnerStatus: (p.partnerStatus as string) ?? "",
+                  partnerEmail: (p.partnerEmail as string) ?? "",
+                  partnerName: (Array.isArray(p.partnerName) ? p.partnerName[0] : p.partnerName) ?? "",
+                }));
+              }
+              setStep("choice");
+              setIsFlowChoiceOnly(true);
+              setIsCheckingAuth(false);
+              return;
+            }
             const promDatePath = await getPromDateRedirectPath();
             if (promDatePath) {
               navigate(promDatePath);
@@ -461,9 +488,23 @@ const Onboarding = () => {
     }
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
+      if (isFlowChoiceOnly) {
+        // Switch discovery on: clear partner fields and set excludeFromDiscovery false, then go to discover
+        const profileId = getIdFromEmail(userEmail.trim());
+        resetProfileForDiscovery(profileId)
+          .then(() => {
+            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+          })
+          .catch((err) => {
+            logError(err, { component: "Onboarding", operation: "handleChoiceFlowSwitch" });
+            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+          });
+        return;
+      }
       setFlowChoice("full");
       setStep("notifications");
     } else {
+      setIsFlowChoiceOnly(false);
       setFlowChoice("couple");
       setStep("couplePartnerType");
     }

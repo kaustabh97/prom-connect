@@ -26,6 +26,7 @@ const schema = a.schema({
       sexualOrientation: a.string(),
       intention: a.string(), // Date for Prom, Long Term, Not Sure
       hometown: a.string(),
+      // Optional: may be null for existing users before flow-choice; app uses ?? or optional chaining
       partnerStatus: a.string(), // Looking for partner, Already have partner
       partnerEmail: a.string(), // Partner's IIMA email when both have partners; for direct matching
       bio: a.string(),
@@ -72,7 +73,7 @@ const schema = a.schema({
       pollBoredInRoom: a.string(),         // Walk & Talk | Sit and vibe
       pollCasualOrDressed: a.string(),     // Casual outfit | Dressed up
       
-      // Profile completion status
+      // Profile completion status (optional: may be null for existing users; app uses ?? or !== true)
       onboardingCompleted: a.boolean(),
       // When true, user is in a confirmed partner match and should not appear in discovery
       excludeFromDiscovery: a.boolean(),

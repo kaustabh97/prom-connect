@@ -14,7 +14,8 @@ import { useUnreadMatches } from "@/hooks/useUnreadMatches";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { unmatchUsers } from "@/utils/unmatch";
 import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
@@ -39,6 +40,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const client = generateClient<Schema>();
 
@@ -68,7 +78,11 @@ const Matches = () => {
   } | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  
+  const [unmatchTarget, setUnmatchTarget] = useState<MatchWithDetails | null>(null);
+  const [showUnmatchWithdrawModal, setShowUnmatchWithdrawModal] = useState(false);
+  const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
+  const [unmatching, setUnmatching] = useState(false);
+
   // Scroll to top when navigating to Matches
   useEffect(() => {
     const main = document.getElementById("app-main");
@@ -436,6 +450,57 @@ const Matches = () => {
     }
   };
 
+  const handleUnmatchWithFormData = async (formData: WithdrawFormData) => {
+    if (!unmatchTarget || !currentUserId) return;
+    setUnmatching(true);
+    try {
+      const result = await unmatchUsers({
+        matchId: unmatchTarget.id,
+        currentUserId,
+        otherUserId: unmatchTarget.otherUserId,
+        isPromDate: !!unmatchTarget.isPromDate,
+        currentUserFormData: formData,
+      });
+      if (result.success) {
+        setUnmatchTarget(null);
+        setShowUnmatchWithdrawModal(false);
+        setActiveChat(null);
+        await refreshMatches();
+        await refreshPromDate();
+        navigate(unmatchTarget.isPromDate ? "/onboarding?flow=choice" : (MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon"), { replace: true });
+      }
+    } catch (e) {
+      logError(e, { component: "Matches", operation: "unmatch" });
+    } finally {
+      setUnmatching(false);
+    }
+  };
+
+  const handleUnmatchNoFormData = async () => {
+    if (!unmatchTarget || !currentUserId) return;
+    setUnmatching(true);
+    try {
+      const result = await unmatchUsers({
+        matchId: unmatchTarget.id,
+        currentUserId,
+        otherUserId: unmatchTarget.otherUserId,
+        isPromDate: false,
+      });
+      if (result.success) {
+        setUnmatchTarget(null);
+        setShowUnmatchConfirm(false);
+        setActiveChat(null);
+        await refreshMatches();
+        await refreshPromDate();
+        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", { replace: true });
+      }
+    } catch (e) {
+      logError(e, { component: "Matches", operation: "unmatch" });
+    } finally {
+      setUnmatching(false);
+    }
+  };
+
   if (pendingOutgoingRequest && !authError) {
     return (
       <div className="min-h-dvh bg-gradient-midnight relative flex flex-col w-full">
@@ -647,6 +712,11 @@ const Matches = () => {
             acceptingPromAskId={acceptingPromAskId}
             onDeclinePromAsk={handleDeclinePromAsk}
             refreshPromAsk={refreshPromAsk}
+            onUnmatch={() => {
+              setUnmatchTarget(activeMatch);
+              if (activeMatch.isPromDate) setShowUnmatchWithdrawModal(true);
+              else setShowUnmatchConfirm(true);
+            }}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -683,6 +753,28 @@ const Matches = () => {
         )}
       </AnimatePresence>
 
+      <WithdrawModal
+        open={showUnmatchWithdrawModal}
+        onOpenChange={(open) => { if (!open) setUnmatchTarget(null); setShowUnmatchWithdrawModal(open); }}
+        onConfirm={handleUnmatchWithFormData}
+      />
+
+      <AlertDialog open={showUnmatchConfirm} onOpenChange={(open) => { if (!open) setUnmatchTarget(null); setShowUnmatchConfirm(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmatch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ll disappear from each other&apos;s matches. You can find each other again in Discover.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unmatching}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={unmatching} onClick={handleUnmatchNoFormData}>
+              {unmatching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Unmatch"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
@@ -701,6 +793,7 @@ interface ChatViewProps {
   onDeclinePromAsk?: (requestId: string) => Promise<boolean>;
   refreshPromAsk?: () => Promise<void>;
   acceptingPromAskId?: string | null;
+  onUnmatch?: () => void;
 }
 
 const ChatView = ({ 
@@ -716,6 +809,7 @@ const ChatView = ({
   onDeclinePromAsk,
   refreshPromAsk,
   acceptingPromAskId,
+  onUnmatch,
 }: ChatViewProps) => {
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
@@ -886,7 +980,7 @@ const ChatView = ({
                 <Flag className="w-4 h-4 mr-2" />
                 Report
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={() => onUnmatch?.()}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Unmatch
               </DropdownMenuItem>

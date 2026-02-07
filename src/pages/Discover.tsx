@@ -164,8 +164,8 @@ export default function Discover() {
               opts
             );
             if (userProfile) {
-              const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
-                                  (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+              const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
+                                  ((userProfile.partnerEmail ?? "").trim() !== "");
               if (!isCoupleFlow) {
                 setFiltersOpen(true);
               }
@@ -208,8 +208,8 @@ export default function Discover() {
           return;
         }
 
-        const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
-                            (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+        const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
+                            ((userProfile.partnerEmail ?? "").trim() !== "");
 
         const gendersInterestedIn = mapSexualOrientationToGenders(
           userProfile.sexualOrientation,

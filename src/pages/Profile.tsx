@@ -87,6 +87,7 @@ type UserProfileData = {
   pollBoredInRoom?: string | null;
   pollCasualOrDressed?: string | null;
   onboardingCompleted?: boolean | null;
+  partnerStatus?: string | null;
   profilePicKey?: string | null;
 };
 
@@ -1159,12 +1160,32 @@ export default function Profile() {
               </Button>
             </motion.div>
 
+            {/* Change flow: for users looking for dates, allow switching to "I have a plus one". partnerStatus may be null for existing users. */}
+            {(profile?.partnerStatus ?? "") !== "Already found my plus-one ✨" && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.31 }}
+                className="pt-2"
+              >
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="w-full gap-2 border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground"
+                  onClick={() => navigate("/onboarding?flow=choice")}
+                >
+                  <User className="w-4 h-4" />
+                  I already have a plus one
+                </Button>
+              </motion.div>
+            )}
+
             {/* Log out at end of profile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.33 }}
-              className="pt-2"
+              className="pt-1"
             >
               <Button
                 variant="outline"
@@ -1186,7 +1207,7 @@ export default function Profile() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35 }}
-              className="pt-1.5 pb-6"
+              className="pt-0.5 pb-6"
             >
               <Button
                 variant="outline"
