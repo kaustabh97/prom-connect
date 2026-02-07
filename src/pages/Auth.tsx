@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import { Heart, Mail, FlaskConical } from "lucide-react";
-import { signInWithRedirect } from "aws-amplify/auth";
+import { signInWithRedirect, fetchAuthSession } from "aws-amplify/auth";
 import { useEffect, useState } from "react";
 import { getUserProfile, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
@@ -38,7 +38,15 @@ const Auth = () => {
       logInfo("Auth check result", { component: "Auth", operation: "checkUser", extra: { hasProfile: !!profile, hasCode: !!code } });
       
       if (profile) {
-        // Check if user has completed onboarding
+        // After Google OAuth redirect, ensure session/tokens are ready before fetching profile from backend
+        if (code) {
+          try {
+            await fetchAuthSession();
+          } catch (_) {
+            // Session may still be hydrating; continue and let hasCompletedOnboarding handle it
+          }
+        }
+        // Fetch user's profile from backend (uses userPool in production) and check onboarding
         const completed = await hasCompletedOnboarding();
         setIsLoading(false);
         
