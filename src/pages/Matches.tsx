@@ -28,18 +28,11 @@ import {
   MessageCircle, 
   X,
   Send,
-  ChevronDown,
   Flag,
   Trash2,
   Loader2,
   AlertTriangle,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -968,24 +961,15 @@ const ChatView = ({
               Ask to Prom
             </Button>
           )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                Unmatch
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setReportOpen(true)}>
-                <Flag className="w-4 h-4 mr-2" />
-                Report
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={() => onUnmatch?.()}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Unmatch
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => onUnmatch?.()}
+          >
+            <Trash2 className="w-4 h-4" />
+            Unmatch
+          </Button>
         </div>
       </header>
 

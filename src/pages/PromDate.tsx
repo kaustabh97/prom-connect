@@ -128,7 +128,6 @@ export default function PromDate() {
   const handleChangeFlowClick = async () => {
     setIsChangingFlow(true);
     setChangeFlowError(null);
-    setOptionsOpen(false);
     try {
       if (showOutsideView) {
         await resetProfileForDiscovery(currentUserId);
@@ -290,28 +289,30 @@ export default function PromDate() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="mt-6 w-full max-w-xs flex gap-2"
+            className="mt-6 w-full max-w-xs mx-auto flex flex-col items-center gap-3"
           >
-            <Button
-              variant="outline"
-              size="default"
-              className="flex-1 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
-              disabled={isChangingFlow}
-              onClick={handleChangeFlowClick}
-            >
-              <User className="w-4 h-4 shrink-0" />
-              Looking for dates
-            </Button>
-            <Button
-              variant="outline"
-              size="default"
-              className="flex-1 gap-2 text-destructive border-destructive/50 hover:bg-destructive/10 text-sm"
-              disabled={isDeleting}
-              onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
-            >
-              <Trash2 className="w-4 h-4 shrink-0" />
-              Delete account
-            </Button>
+            <div className="w-full flex gap-2">
+              <Button
+                variant="outline"
+                size="default"
+                className="flex-1 w-0 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
+                disabled={isChangingFlow}
+                onClick={handleChangeFlowClick}
+              >
+                <User className="w-4 h-4 shrink-0" />
+                Looking for dates
+              </Button>
+              <Button
+                variant="outline"
+                size="default"
+                className="flex-1 w-0 gap-2 text-destructive border-destructive/50 hover:bg-destructive/10 text-sm"
+                disabled={isDeleting}
+                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
+              >
+                <Trash2 className="w-4 h-4 shrink-0" />
+                Delete account
+              </Button>
+            </div>
           </motion.div>
           </>
         )}
@@ -394,7 +395,7 @@ export default function PromDate() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
-            className="mt-6 w-full max-w-xs flex flex-col gap-3"
+            className="mt-6 w-full max-w-xs mx-auto flex flex-col items-center gap-3"
           >
             <Button
               variant="outline"
@@ -404,11 +405,11 @@ export default function PromDate() {
               <MessageCircle className="w-5 h-5" />
               Chat with {theirName}
             </Button>
-            <div className="flex gap-2">
+            <div className="w-full flex gap-2">
               <Button
                 variant="outline"
                 size="default"
-                className="flex-1 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
+                className="flex-1 w-0 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
                 disabled={isChangingFlow}
                 onClick={handleChangeFlowClick}
               >
@@ -418,7 +419,7 @@ export default function PromDate() {
               <Button
                 variant="outline"
                 size="default"
-                className="flex-1 gap-2 text-destructive border-destructive/50 hover:bg-destructive/10 text-sm"
+                className="flex-1 w-0 gap-2 text-destructive border-destructive/50 hover:bg-destructive/10 text-sm"
                 disabled={isDeleting}
                 onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
               >

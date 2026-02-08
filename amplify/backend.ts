@@ -1,5 +1,6 @@
 import { defineBackend } from '@aws-amplify/backend';
 import { Duration } from 'aws-cdk-lib';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as events from 'aws-cdk-lib/aws-events';
@@ -73,12 +74,40 @@ sendReportEmailLambda.addEnvironment(
   process.env.RESEND_API_KEY ?? ''
 );
 
-// Discovery score cron: run compute-discovery-scores every 3 hours (EventBridge rule)
+// Discovery score: run on schedule (every 3 hours) and once on every deploy
 const computeDiscoveryScoresLambda = backend.computeDiscoveryScores.resources.lambda;
 const computeStack = backend.computeDiscoveryScores.resources.lambda.stack;
 new events.Rule(computeStack, 'ComputeDiscoveryScoresSchedule', {
   schedule: events.Schedule.rate(Duration.hours(3)),
   targets: [new targets.LambdaFunction(computeDiscoveryScoresLambda)],
   description: 'Run discovery score computation every 3 hours',
+});
+
+// Invoke discovery score Lambda once on deploy (so DB has scores right after deploy, not only after first schedule run)
+new cr.AwsCustomResource(computeStack, 'ComputeDiscoveryScoresOnDeploy', {
+  onCreate: {
+    service: 'Lambda',
+    action: 'invoke',
+    parameters: {
+      FunctionName: computeDiscoveryScoresLambda.functionName,
+      InvocationType: 'Event',
+    },
+    physicalResourceId: cr.PhysicalResourceId.of('ComputeDiscoveryScoresOnDeploy'),
+  },
+  onUpdate: {
+    service: 'Lambda',
+    action: 'invoke',
+    parameters: {
+      FunctionName: computeDiscoveryScoresLambda.functionName,
+      InvocationType: 'Event',
+    },
+    physicalResourceId: cr.PhysicalResourceId.of('ComputeDiscoveryScoresOnDeploy'),
+  },
+  policy: cr.AwsCustomResourcePolicy.fromStatements([
+    new iam.PolicyStatement({
+      actions: ['lambda:InvokeFunction'],
+      resources: [computeDiscoveryScoresLambda.functionArn],
+    }),
+  ]),
 });
 
