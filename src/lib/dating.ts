@@ -82,6 +82,17 @@ export const FILTER_STORAGE_KEY = "prom-discovery-filters";
 /** Cohort options for Preferences (multi-select). Matches onboarding. */
 export const PREFERRED_COHORT_OPTIONS = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"] as const;
 
+/**
+ * Returns the display label for a cohort value (backend stays PGP1/PGP2).
+ * PGP1 → "PGP/FABM 1", PGP2 → "PGP/FABM 2" for inclusivity of FABM programme.
+ */
+export function getCohortDisplayLabel(cohort: string | undefined | null): string {
+  if (!cohort) return "";
+  if (cohort === "PGP1") return "PGP/FABM 1";
+  if (cohort === "PGP2") return "PGP/FABM 2";
+  return cohort;
+}
+
 /** Intention options for Preferences (single-select). Matches onboarding. */
 export const PREFERRED_INTENTION_OPTIONS = [
   "Just here for prom night",

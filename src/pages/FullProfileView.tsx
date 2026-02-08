@@ -4,7 +4,7 @@ import { useScrollWheel } from "@/hooks/useScrollWheel";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Heart, ChevronRight, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin, Sparkles, Vote } from "lucide-react";
-import type { DiscoveryProfileFull } from "@/lib/dating";
+import { getCohortDisplayLabel, type DiscoveryProfileFull } from "@/lib/dating";
 import { useMatch } from "@/hooks/useMatch";
 import { useDailyLikeCount } from "@/hooks/useDailyLikeCount";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
@@ -267,7 +267,7 @@ export default function FullProfileView() {
                 )}
                 {profile.cohort && (
                   <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                    {profile.cohort}
+                    {getCohortDisplayLabel(profile.cohort)}
                   </span>
                 )}
                 {profile.hometown && (

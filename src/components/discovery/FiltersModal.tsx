@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { DiscoveryFilters } from "@/lib/dating";
 import { logInfo } from "@/utils/logger";
-import { GENDER_OPTIONS, PREFERRED_COHORT_OPTIONS, PREFERRED_INTENTION_OPTIONS } from "@/lib/dating";
+import { GENDER_OPTIONS, getCohortDisplayLabel, PREFERRED_COHORT_OPTIONS, PREFERRED_INTENTION_OPTIONS } from "@/lib/dating";
 import { Sparkles } from "lucide-react";
 
 interface FiltersModalProps {
@@ -173,7 +173,7 @@ export default function FiltersModal({
                           : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
                       }
                     >
-                      {c}
+                      {getCohortDisplayLabel(c)}
                     </Button>
                   </motion.div>
                 ))}

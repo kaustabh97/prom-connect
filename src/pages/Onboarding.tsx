@@ -19,6 +19,7 @@ import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfileFromCognito, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
+import { getCohortDisplayLabel } from "@/lib/dating";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
 import { resetProfileForDiscovery, unmatchUsers } from "@/utils/unmatch";
@@ -1549,7 +1550,7 @@ const Onboarding = () => {
                 <SelectContent>
                   {cohorts.map((cohort) => (
                     <SelectItem key={cohort} value={cohort}>
-                      {cohort}
+                      {getCohortDisplayLabel(cohort)}
                     </SelectItem>
                   ))}
                 </SelectContent>

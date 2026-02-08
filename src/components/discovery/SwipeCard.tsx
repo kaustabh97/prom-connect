@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import type { DiscoveryProfileFull } from "@/lib/dating";
+import { getCohortDisplayLabel, type DiscoveryProfileFull } from "@/lib/dating";
 import { Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Heart, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +93,7 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 )}
                 {profile.cohort && (
                   <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                    {profile.cohort}
+                    {getCohortDisplayLabel(profile.cohort)}
                   </span>
                 )}
                 {profile.hometown && (
