@@ -6,15 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Heart, ChevronRight, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin, Sparkles, Vote } from "lucide-react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
 import { useMatch } from "@/hooks/useMatch";
+import { useDailyLikeCount } from "@/hooks/useDailyLikeCount";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUrl } from "aws-amplify/storage";
+import { getUserProfileFromCognito } from "@/utils/auth";
+import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import SparkleBackground from "@/components/SparkleBackground";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
 import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
@@ -62,6 +66,11 @@ export default function FullProfileView() {
   const [loading, setLoading] = useState(!state?.profile);
   const [error, setError] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserGender, setCurrentUserGender] = useState<string | undefined>(undefined);
+
+  const { toast } = useToast();
+  const dailyLikeInfo = useDailyLikeCount(currentUserId, currentUserGender, 0);
 
   // Fetch profile from backend when not passed via state
   useEffect(() => {
@@ -106,8 +115,36 @@ export default function FullProfileView() {
     fetchProfile();
   }, [profileId, profile]);
 
+  // Fetch current user profile for daily like limit (men only)
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const authProfile = await getUserProfileFromCognito();
+        if (!authProfile?.email) return;
+        const profileId = getIdFromEmail(authProfile.email.trim());
+        const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+        const { data: userProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
+        if (userProfile) {
+          setCurrentUserId(userProfile.id ?? null);
+          setCurrentUserGender(userProfile.gender ?? undefined);
+        }
+      } catch (err) {
+        logError(err, { component: "FullProfileView", operation: "fetchCurrentUser" });
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
   const handleLike = useCallback(async () => {
     if (!profile) return;
+    if (dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit) {
+      toast({
+        title: "Daily likes used",
+        description: "You have finished likes for today. You can still browse profiles but you need to come back tomorrow for more likes.",
+        variant: "destructive",
+      });
+      return;
+    }
     logInfo("User liked profile", { component: "FullProfileView", operation: "handleLike", extra: { profileId: profile.id } });
     const result = await recordSwipe(profile.id, "like");
     if (result.isMatch) {
@@ -118,7 +155,7 @@ export default function FullProfileView() {
       logInfo("Like recorded, back to discover", { component: "FullProfileView", operation: "handleLike" });
       navigate("/discover/profile");
     }
-  }, [profile, recordSwipe, navigate]);
+  }, [profile, recordSwipe, navigate, dailyLikeInfo.hasLimit, dailyLikeInfo.atLimit, toast]);
 
   const handlePass = useCallback(() => {
     if (profile) {
@@ -181,12 +218,19 @@ export default function FullProfileView() {
           className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain scroll-touch outline-none pb-4"
           tabIndex={0}
         >
-          <header className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-border/50 bg-background/95 backdrop-blur-md shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => { logInfo("Back to discover", { component: "FullProfileView", operation: "back" }); navigate("/discover/profile"); }}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <span className="font-display font-semibold">Profile</span>
-          <div className="w-10" />
+          <header className="sticky top-0 z-10 flex flex-col gap-1 p-4 border-b border-border/50 bg-background/95 backdrop-blur-md shrink-0">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="icon" onClick={() => { logInfo("Back to discover", { component: "FullProfileView", operation: "back" }); navigate("/discover/profile"); }}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <span className="font-display font-semibold">Profile</span>
+            <div className="w-10" />
+          </div>
+          {dailyLikeInfo.hasLimit && !fromChat && (
+            <p className="text-xs text-muted-foreground text-center">
+              {dailyLikeInfo.count ?? 0}/{dailyLikeInfo.limit ?? 10} likes used today
+            </p>
+          )}
         </header>
 
         {/* Photo */}
@@ -406,14 +450,22 @@ export default function FullProfileView() {
               <Button
                 variant="default"
                 size="icon"
-                className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                className={
+                  dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit
+                    ? "h-14 w-14 rounded-full bg-muted/50 text-muted-foreground cursor-not-allowed opacity-60"
+                    : "h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                }
                 onClick={handleLike}
               >
-                <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
+                <Heart
+                  className={`w-7 h-7 ${dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit ? "text-muted-foreground" : "fill-primary-foreground text-primary-foreground"}`}
+                />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top" className="font-medium">
-              Like – interested in this profile
+              {dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit
+                ? "You've used today's likes – come back tomorrow"
+                : "Like – interested in this profile"}
             </TooltipContent>
           </Tooltip>
         </div>

@@ -12,6 +12,8 @@ interface SwipeCardProps {
   profile: DiscoveryProfileFull;
   isTop: boolean;
   onSwipe?: (action: "like" | "pass") => void;
+  /** When true, Like button is visually disabled but still clickable (shows toast in parent). */
+  likeDisabled?: boolean;
 }
 
 /** Chip for About me / attributes - Bumble-style rounded pill */
@@ -31,7 +33,7 @@ function AttributeChip({
 }
 
 const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
-  function SwipeCard({ profile, isTop, onSwipe }, ref) {
+  function SwipeCard({ profile, isTop, onSwipe, likeDisabled }, ref) {
     const mainPhoto = profile.photoUrls?.[0];
 
     const aboutChips: { key: string; icon?: React.ElementType; label: string }[] = [];
@@ -163,14 +165,22 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                       <Button
                         variant="default"
                         size="icon"
-                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                        className={
+                          likeDisabled
+                            ? "h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-muted/50 text-muted-foreground cursor-not-allowed opacity-60"
+                            : "h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                        }
                         onClick={() => onSwipe("like")}
                       >
-                        <Heart className="w-7 h-7 sm:w-8 sm:h-8 fill-primary-foreground text-primary-foreground" />
+                        <Heart
+                          className={`w-7 h-7 sm:w-8 sm:h-8 ${likeDisabled ? "text-muted-foreground" : "fill-primary-foreground text-primary-foreground"}`}
+                        />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="font-medium">
-                      Like – interested in this profile
+                      {likeDisabled
+                        ? "You've used today's likes – come back tomorrow"
+                        : "Like – interested in this profile"}
                     </TooltipContent>
                   </Tooltip>
                 </div>

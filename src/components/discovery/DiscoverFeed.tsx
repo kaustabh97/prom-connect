@@ -2,12 +2,14 @@ import { useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import SwipeCard from "./SwipeCard";
 import type { DiscoveryProfileFull } from "@/lib/dating";
+import type { DailyLikeInfo } from "@/hooks/useDailyLikeCount";
 import { Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
   onSwipe: (profileId: string, action: "like" | "pass") => void;
+  dailyLikeInfo?: DailyLikeInfo;
   onOpenFilters: () => void;
   onProfileChange?: (profileId: string) => void;
   scrollToTop?: () => void;
@@ -16,6 +18,7 @@ interface DiscoverFeedProps {
 export default function DiscoverFeed({
   profiles,
   onSwipe,
+  dailyLikeInfo,
   onOpenFilters,
   onProfileChange,
   scrollToTop,
@@ -71,6 +74,7 @@ export default function DiscoverFeed({
                 profile={currentProfile}
                 isTop
                 onSwipe={handleSwipe}
+                likeDisabled={dailyLikeInfo?.hasLimit === true && dailyLikeInfo?.atLimit === true}
               />
             </motion.div>
           )}
