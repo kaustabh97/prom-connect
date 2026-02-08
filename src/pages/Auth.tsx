@@ -306,13 +306,6 @@ const Auth = () => {
               )}
             </div>
 
-            {/* Privacy note */}
-            <p className="text-center text-xs text-muted-foreground mt-6">
-              By signing in, you agree to our{" "}
-              <a href="#" className="text-primary hover:underline">Privacy Policy</a>
-              {" "}and{" "}
-              <a href="#" className="text-primary hover:underline">Terms of Service</a>
-            </p>
           </div>
         </div>
       </motion.div>
