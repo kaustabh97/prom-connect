@@ -203,8 +203,9 @@ export default function Discover() {
         const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
                             ((userProfile.partnerEmail ?? "").trim() !== "");
 
+        const sexualOrientation = userProfile.sexualOrientation?.trim() || "Straight";
         const gendersInterestedIn = mapSexualOrientationToGenders(
-          userProfile.sexualOrientation,
+          sexualOrientation,
           userProfile.gender
         );
 
