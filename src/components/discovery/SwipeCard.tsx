@@ -1,13 +1,17 @@
 import { forwardRef } from "react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
-import { Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Heart, X, ChevronRight } from "lucide-react";
+import { Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Heart, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SwipeCardProps {
   profile: DiscoveryProfileFull;
   isTop: boolean;
   onSwipe?: (action: "like" | "pass") => void;
-  onNext?: () => void;
 }
 
 /** Chip for About me / attributes - Bumble-style rounded pill */
@@ -27,7 +31,7 @@ function AttributeChip({
 }
 
 const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
-  function SwipeCard({ profile, isTop, onSwipe, onNext }, ref) {
+  function SwipeCard({ profile, isTop, onSwipe }, ref) {
     const mainPhoto = profile.photoUrls?.[0];
 
     const aboutChips: { key: string; icon?: React.ElementType; label: string }[] = [];
@@ -136,37 +140,39 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 </section>
               )}
 
-              {/* Like / Next / Pass – integrated at end of profile */}
-              {isTop && (onSwipe || onNext) && (
-                <div className="flex items-center justify-center gap-4 pt-6 pb-2 px-4 border-t border-border/50 mt-4">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10"
-                    onClick={() => onSwipe?.("pass")}
-                    title="Pass – won't see again"
-                  >
-                    <X className="w-6 h-6 sm:w-7 sm:h-7 text-red-500" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 border-border/50 hover:border-primary/50 hover:bg-primary/10"
-                    onClick={onNext}
-                    disabled={!onNext}
-                    title="Next – skip for now, may see again"
-                  >
-                    <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
-                  </Button>
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary hover:bg-primary/90"
-                    onClick={() => onSwipe?.("like")}
-                    title="Like"
-                  >
-                    <Heart className="w-6 h-6 sm:w-7 sm:h-7 fill-primary-foreground text-primary-foreground" />
-                  </Button>
+              {/* Like / Pass – integrated at end of profile */}
+              {isTop && onSwipe && (
+                <div className="flex items-center justify-center gap-6 pt-6 pb-2 px-4 border-t border-border/50 mt-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-full border-2 border-muted-foreground/30 bg-muted/30 hover:border-muted-foreground/60 hover:bg-muted/50 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-black/20"
+                        onClick={() => onSwipe("pass")}
+                      >
+                        <ChevronRight className="w-7 h-7 sm:w-8 sm:h-8 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="font-medium">
+                      Pass – skip this profile
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="default"
+                        size="icon"
+                        className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                        onClick={() => onSwipe("like")}
+                      >
+                        <Heart className="w-7 h-7 sm:w-8 sm:h-8 fill-primary-foreground text-primary-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="font-medium">
+                      Like – interested in this profile
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               )}
 

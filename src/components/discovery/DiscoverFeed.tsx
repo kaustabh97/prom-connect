@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
   onSwipe: (profileId: string, action: "like" | "pass") => void;
-  onNext?: () => void;
   onOpenFilters: () => void;
   onProfileChange?: (profileId: string) => void;
   scrollToTop?: () => void;
@@ -17,7 +16,6 @@ interface DiscoverFeedProps {
 export default function DiscoverFeed({
   profiles,
   onSwipe,
-  onNext,
   onOpenFilters,
   onProfileChange,
   scrollToTop,
@@ -39,11 +37,6 @@ export default function DiscoverFeed({
     },
     [currentProfile, onSwipe, scrollToTop]
   );
-
-  const handleNext = useCallback(() => {
-    if (scrollToTop) scrollToTop();
-    onNext?.();
-  }, [onNext, scrollToTop]);
 
   if (profiles.length === 0) {
     return (
@@ -78,7 +71,6 @@ export default function DiscoverFeed({
                 profile={currentProfile}
                 isTop
                 onSwipe={handleSwipe}
-                onNext={handleNext}
               />
             </motion.div>
           )}

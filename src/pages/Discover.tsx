@@ -109,7 +109,6 @@ export default function Discover() {
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
-  const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
@@ -372,9 +371,9 @@ export default function Discover() {
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
   const displayQueue = useMemo(() => {
     return filteredProfiles.filter(
-      (p) => !hasPassed(p.id) && !hasLiked(p.id) && !skippedProfileIds.has(p.id)
+      (p) => !hasPassed(p.id) && !hasLiked(p.id)
     );
-  }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
+  }, [filteredProfiles, hasPassed, hasLiked, tick]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
     logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
@@ -395,24 +394,6 @@ export default function Discover() {
       main.scrollTo({ top: 0, behavior: "instant" });
     }
   }, []);
-
-  // Handle "Next" (arrow) - skip for now, can loop back later
-  const handleNext = useCallback(() => {
-    if (displayQueue.length === 0) return;
-    const currentProfile = displayQueue[0];
-    if (!currentProfile) return;
-    logInfo("Discover: next (skip)", { component: "Discover", operation: "handleNext", extra: { profileId: currentProfile.id } });
-    setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
-    scrollToTop();
-  }, [displayQueue, scrollToTop]);
-
-  // When all profiles done, loop back: show profiles that were only "next'd" (not passed)
-  useEffect(() => {
-    if (displayQueue.length === 0 && skippedProfileIds.size > 0) {
-      setSkippedProfileIds(new Set());
-      scrollToTop();
-    }
-  }, [displayQueue.length, skippedProfileIds.size, scrollToTop]);
 
   const handleProfileChange = useCallback((_profileId: string) => {
     const main = document.getElementById("app-main");
@@ -596,7 +577,6 @@ export default function Discover() {
             <DiscoverFeed
               profiles={displayQueue}
               onSwipe={handleSwipe}
-              onNext={handleNext}
               onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useScrollWheel } from "@/hooks/useScrollWheel";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Heart, X, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin, Sparkles, Vote } from "lucide-react";
+import { Heart, ChevronRight, ArrowLeft, Wine, Cigarette, Utensils, Coffee, Mountain, MapPin, Sparkles, Vote } from "lucide-react";
 import type { DiscoveryProfileFull } from "@/lib/dating";
 import { useMatch } from "@/hooks/useMatch";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
@@ -14,6 +14,7 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 import SparkleBackground from "@/components/SparkleBackground";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { logError, logInfo } from "@/utils/logger";
 
 const client = generateClient<Schema>();
@@ -385,12 +386,36 @@ export default function FullProfileView() {
       {/* Fixed Like / Pass - only when viewing from Discover, not from chat */}
       {!fromChat && (
         <div className="fixed bottom-16 left-0 right-0 max-w-[500px] mx-auto px-4 py-3 border-t border-border/50 bg-background/95 backdrop-blur-md flex items-center justify-center gap-6 safe-area-pb z-20">
-          <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={handlePass}>
-            <X className="w-6 h-6" />
-          </Button>
-          <Button variant="default" size="icon" className="h-12 w-12 rounded-full bg-primary" onClick={handleLike}>
-            <Heart className="w-6 h-6 fill-primary-foreground text-primary-foreground" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-14 w-14 rounded-full border-2 border-muted-foreground/30 bg-muted/30 hover:border-muted-foreground/60 hover:bg-muted/50 transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg shadow-black/20"
+                onClick={handlePass}
+              >
+                <ChevronRight className="w-7 h-7 text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="font-medium">
+              Pass – skip this profile
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="default"
+                size="icon"
+                className="h-14 w-14 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_24px_hsl(43_74%_66%_/_0.4)] hover:shadow-[0_0_32px_hsl(43_74%_66%_/_0.5)] transition-all duration-200 hover:scale-105 active:scale-95"
+                onClick={handleLike}
+              >
+                <Heart className="w-7 h-7 fill-primary-foreground text-primary-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="font-medium">
+              Like – interested in this profile
+            </TooltipContent>
+          </Tooltip>
         </div>
       )}
     </div>
