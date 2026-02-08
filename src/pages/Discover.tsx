@@ -19,6 +19,7 @@ import {
   mapSexualOrientationToGenders,
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
+import { sortDiscoveryProfiles } from "@/lib/discoveryScore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Filter, Heart, Flower2, Loader2 } from "lucide-react";
@@ -91,6 +92,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     pollDeepOrSilly: backendProfile.pollDeepOrSilly || undefined,
     pollBoredInRoom: backendProfile.pollBoredInRoom || undefined,
     pollCasualOrDressed: backendProfile.pollCasualOrDressed || undefined,
+    discoveryScore: backendProfile.discoveryScore ?? undefined,
   };
 }
 
@@ -115,6 +117,7 @@ export default function Discover() {
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
   const [currentUserGender, setCurrentUserGender] = useState<string | undefined>(undefined);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [likedMeIds, setLikedMeIds] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
   const dailyLikeInfo = useDailyLikeCount(currentProfileId, currentUserGender, tick);
@@ -151,10 +154,7 @@ export default function Discover() {
           if (currentUser?.email) {
             const profileId = getIdFromEmail(currentUser.email.trim());
             const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
-            const { data: userProfile } = await client.models.UserProfile.get(
-              { id: profileId },
-              opts
-            );
+            const { data: userProfile } = await getUserProfileById(profileId, opts);
             if (userProfile) {
               const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
                                   ((userProfile.partnerEmail ?? "").trim() !== "");
@@ -190,10 +190,7 @@ export default function Discover() {
 
         const profileId = getIdFromEmail(currentUser.email.trim());
         const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
-        const { data: userProfile } = await client.models.UserProfile.get(
-          { id: profileId },
-          opts
-        );
+        const { data: userProfile } = await getUserProfileById(profileId, opts);
 
         if (!userProfile) {
           setFiltersInitialized(true);
@@ -262,7 +259,7 @@ export default function Discover() {
         const opts = authMode ? { authMode } : undefined;
         const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
         const { data: myProfile } = myProfileId
-          ? await client.models.UserProfile.get({ id: myProfileId }, opts)
+          ? await getUserProfileById(myProfileId, opts)
           : { data: null };
         const resolvedMyProfileId = myProfile?.id ?? "";
         setCurrentProfileId(resolvedMyProfileId);
@@ -287,6 +284,20 @@ export default function Discover() {
           } catch (err) {
             logError(err, { component: "Discover", operation: "fetchPendingRequest", extra: { profileId: resolvedMyProfileId } });
           }
+          // Who liked me (for like reciprocity boost in sort)
+          try {
+            const { data: likesToMe } = await client.models.Like.listLikeByToUserId(
+              { toUserId: resolvedMyProfileId },
+              opts
+            );
+            const ids = new Set((likesToMe ?? []).map((l) => l.fromUserId).filter(Boolean) as string[]);
+            setLikedMeIds(ids);
+          } catch (err) {
+            logError(err, { component: "Discover", operation: "fetchLikedMe", extra: { profileId: resolvedMyProfileId } });
+            setLikedMeIds(new Set());
+          }
+        } else {
+          setLikedMeIds(new Set());
         }
 
         // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
@@ -325,14 +336,31 @@ export default function Discover() {
           return;
         }
 
-        // Filter: exclude current user, only completed onboarding, exclude prom date & request pending
+        // Reported by me: exclude from discovery (report/block)
+        let reportedProfileIds = new Set<string>();
+        if (resolvedMyProfileId) {
+          try {
+            const { data: myReports } = await client.models.Report.listReportByReporterUserId(
+              { reporterUserId: resolvedMyProfileId },
+              listOpts
+            );
+            (myReports ?? []).forEach((r) => {
+              if (r.reportedProfileId) reportedProfileIds.add(r.reportedProfileId);
+            });
+          } catch (err) {
+            logError(err, { component: "Discover", operation: "fetchMyReports", extra: { profileId: resolvedMyProfileId } });
+          }
+        }
+
+        // Filter: exclude current user, only completed onboarding, exclude prom date, request pending, reported
         const filteredBackend = backendProfiles.filter(
           (p) =>
             p.email !== currentUserEmail &&
             p.onboardingCompleted === true &&
             p.excludeFromDiscovery !== true &&
             !p.bio?.trim().startsWith("Partner:") &&
-            !requestPendingUserIds.has(p.id ?? "")
+            !requestPendingUserIds.has(p.id ?? "") &&
+            !reportedProfileIds.has(p.id ?? "")
         );
 
         // Transform to DiscoveryProfileFull format (same length as filteredBackend)
@@ -369,11 +397,12 @@ export default function Discover() {
     fetchProfiles();
   }, [refreshKey]); // Fetch on mount and when nav requests refresh
 
-  // Apply filters to fetched profiles
+  // Apply filters then sort by discovery score, liked-me boost, preference match, exploration
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return [];
-    return applyFilters(profiles, filters);
-  }, [profiles, filters]);
+    const filtered = applyFilters(profiles, filters);
+    return sortDiscoveryProfiles(filtered, filters, { likedMeIds });
+  }, [profiles, filters, likedMeIds]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
@@ -494,7 +523,7 @@ export default function Discover() {
       const currentUser = await getUserProfileFromCognito();
       const myProfileId = currentUser?.email ? getIdFromEmail(currentUser.email.trim()) : null;
       if (myProfileId) {
-        const { data: myProfile } = await client.models.UserProfile.get({ id: myProfileId }, opts);
+        const { data: myProfile } = await getUserProfileById(myProfileId, opts);
         if (myProfile?.id) {
           await client.models.UserProfile.update(
             {
@@ -623,7 +652,7 @@ export default function Discover() {
               scrollToTop={scrollToTop}
               onReportClick={currentDisplayProfile ? () => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: currentDisplayProfile.id } }); setReportOpen(true); } : undefined}
               onRoseClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
-              showRoseButton={showRoseButton}
+              showRoseButton={false}
             />
           )}
         </div>
@@ -644,6 +673,8 @@ export default function Discover() {
             personName={currentDisplayProfile.name}
             personId={currentDisplayProfile.id}
             context="Discover"
+            reporterUserId={currentProfileId || undefined}
+            onReportCreated={() => setRefreshKey((k) => k + 1)}
           />
         </>
       )}

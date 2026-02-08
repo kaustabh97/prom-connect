@@ -13,7 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { logError, logInfo } from "@/utils/logger";
 import { Flag, Loader2 } from "lucide-react";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
 const REPORT_EMAIL = "mosaic@iima.ac.in";
+const client = generateClient<Schema>();
 
 /** Fallback: open Gmail with report pre-filled */
 function openGmailReportFallback(
@@ -78,6 +81,10 @@ interface ReportModalProps {
   context?: string;
   reporterEmail?: string;
   reporterName?: string;
+  /** Current user's profile id; when set, a Report record is created so reported profile is excluded from discovery */
+  reporterUserId?: string;
+  /** Called after report is submitted and Report record created (e.g. refresh Discover feed) */
+  onReportCreated?: () => void;
 }
 
 export default function ReportModal({
@@ -89,6 +96,8 @@ export default function ReportModal({
   context = "Starlit by the Brick",
   reporterEmail,
   reporterName,
+  reporterUserId,
+  onReportCreated,
 }: ReportModalProps) {
   const [reportText, setReportText] = useState("");
   const [sending, setSending] = useState(false);
@@ -126,6 +135,21 @@ export default function ReportModal({
       );
       if (result.ok) {
         logInfo("Report submitted successfully", { component: "ReportModal", operation: "submit", extra: { personName, personId } });
+        if (reporterUserId && personId) {
+          try {
+            await client.models.Report.create(
+              {
+                reporterUserId,
+                reportedProfileId: personId,
+                createdAt: new Date().toISOString(),
+              },
+              { authMode: "apiKey" }
+            );
+            onReportCreated?.();
+          } catch (err) {
+            logError(err, { component: "ReportModal", operation: "createReport", extra: { reporterUserId, personId } });
+          }
+        }
         toast({ title: "Report sent", description: "Thank you for helping keep Starlit by the Brick safe." });
         setReportText("");
         onOpenChange(false);

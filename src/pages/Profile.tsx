@@ -32,6 +32,7 @@ import {
 import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera, Trash2, Settings } from "lucide-react";
 import { handleReferralShare } from "@/utils/share";
 import { deleteUserProfile } from "@/utils/deleteProfile";
+import { getUserProfileById } from "@/lib/dataAccess";
 import SparkleBackground from "@/components/SparkleBackground";
 import {
   AlertDialog,
@@ -88,6 +89,7 @@ type UserProfileData = {
   pollCasualOrDressed?: string | null;
   onboardingCompleted?: boolean | null;
   partnerStatus?: string | null;
+  partnerEmail?: string | null;
   profilePicKey?: string | null;
 };
 
@@ -149,7 +151,6 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChangeFlowDialog, setShowChangeFlowDialog] = useState(false);
-  const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -247,7 +248,7 @@ export default function Profile() {
     try {
       // @ts-ignore - authMode
       const { errors } = await client.models.UserProfile.update(
-        { id: profile.id, email: profile.email, bio: bioEditValue.trim() || undefined },
+        { id: profile.id, email: profile.email, bio: bioEditValue.trim() || undefined, updatedAt: new Date().toISOString() },
         authMode ? { authMode } : undefined
       );
       if (errors) throw new Error(errors[0]?.message);
@@ -287,7 +288,7 @@ export default function Profile() {
       const s3Path = (result as { path?: string }).path ?? `profile-pics/${fileName}`;
       // @ts-ignore - authMode
       const { errors } = await client.models.UserProfile.update(
-        { id: profile.id, email: profile.email, profilePicKey: s3Path },
+        { id: profile.id, email: profile.email, profilePicKey: s3Path, updatedAt: new Date().toISOString() },
         authMode ? { authMode } : undefined
       );
       if (errors) throw new Error(errors[0]?.message);
@@ -313,7 +314,7 @@ export default function Profile() {
       });
       // @ts-ignore - authMode
       const { errors } = await client.models.UserProfile.update(
-        { id: profile.id, email: profile.email, ...prefData },
+        { id: profile.id, email: profile.email, ...prefData, updatedAt: new Date().toISOString() },
         authMode ? { authMode } : undefined
       );
       if (errors) throw new Error(errors[0]?.message);
@@ -336,7 +337,7 @@ export default function Profile() {
       });
       // @ts-ignore - authMode
       const { errors } = await client.models.UserProfile.update(
-        { id: profile.id, email: profile.email, ...pollData },
+        { id: profile.id, email: profile.email, ...pollData, updatedAt: new Date().toISOString() },
         authMode ? { authMode } : undefined
       );
       if (errors) throw new Error(errors[0]?.message);
@@ -354,7 +355,7 @@ export default function Profile() {
     setSavingFun(true);
     try {
       // @ts-ignore - authMode
-      const updateData: Record<string, string | undefined> = { id: profile.id, email: profile.email };
+      const updateData: Record<string, string | undefined> = { id: profile.id, email: profile.email, updatedAt: new Date().toISOString() };
       FUN_QUESTIONS.forEach(({ key }) => {
         updateData[key] = funEditValues[key] || undefined;
       });
@@ -396,8 +397,8 @@ export default function Profile() {
         // Deterministic id from email: e.g. p24dipak@iima.ac.in -> user_p24dipak_iima.ac.in
         const profileId = getIdFromEmail(authUser.email.trim());
         const getAuthMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
-        const { data: backendProfile, errors } = await client.models.UserProfile.get(
-          { id: profileId },
+        const { data: backendProfile, errors } = await getUserProfileById(
+          profileId,
           getAuthMode ? { authMode: getAuthMode } : undefined
         );
 
@@ -1162,48 +1163,34 @@ export default function Profile() {
               </Button>
             </motion.div>
 
-            {/* Change flow or delete account - one combined button above Log out */}
+            {/* Change flow + Delete account — two small buttons in same row */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.31 }}
-              className="pt-2"
+              className="pt-2 flex gap-2"
             >
-              <Sheet open={showAccountSheet} onOpenChange={setShowAccountSheet}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
-                  >
-                    Change flow or delete account
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-2xl">
-                  <SheetHeader>
-                    <SheetTitle>Change flow or delete account</SheetTitle>
-                  </SheetHeader>
-                  <div className="flex flex-col gap-2 pt-4">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2"
-                      onClick={() => { setShowAccountSheet(false); setShowChangeFlowDialog(true); }}
-                    >
-                      <User className="w-4 h-4" />
-                      Change my flow
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
-                      disabled={isDeleting}
-                      onClick={() => { setShowAccountSheet(false); setDeleteError(null); setShowDeleteDialog(true); }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete my account
-                    </Button>
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <Button
+                variant="outline"
+                size="default"
+                className="flex-1 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
+                onClick={() => setShowChangeFlowDialog(true)}
+              >
+                <User className="w-4 h-4 shrink-0" />
+                {((profile?.partnerStatus ?? "") === "Already found my plus-one ✨" || ((profile?.partnerEmail ?? "").trim() !== ""))
+                  ? "Looking for dates"
+                  : "Already a partner"}
+              </Button>
+              <Button
+                variant="outline"
+                size="default"
+                className="flex-1 gap-2 text-destructive border-destructive/50 hover:bg-destructive/10 text-sm"
+                disabled={isDeleting}
+                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
+              >
+                <Trash2 className="w-4 h-4 shrink-0" />
+                Delete account
+              </Button>
             </motion.div>
 
             {/* Log out at end of profile */}
@@ -1234,10 +1221,9 @@ export default function Profile() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogTitle>Leave the dance floor?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete your profile, all your matches, and conversations.
-              Other users will no longer see you as a match. This cannot be undone.
+              Just so you know — we&apos;ll remove your profile, your matches, and all your chats for good. You won&apos;t show up in anyone&apos;s feed anymore. We&apos;re a little sad to see you go, but the door&apos;s always open if you want to come back and start fresh.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (
@@ -1263,9 +1249,9 @@ export default function Profile() {
       <AlertDialog open={showChangeFlowDialog} onOpenChange={setShowChangeFlowDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Change your flow?</AlertDialogTitle>
+            <AlertDialogTitle>Switch it up?</AlertDialogTitle>
             <AlertDialogDescription>
-              You&apos;ll choose whether you&apos;re still looking for a prom date or already have a plus one (IIMA or outside). You can change this later from your profile.
+              No worries — we&apos;ll take you back to pick your vibe: still on the hunt for your plus-one, or already found them? You can change this anytime from your profile.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
