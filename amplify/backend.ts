@@ -1,4 +1,5 @@
 import { defineBackend } from '@aws-amplify/backend';
+import { Duration } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as events from 'aws-cdk-lib/aws-events';
@@ -76,7 +77,7 @@ sendReportEmailLambda.addEnvironment(
 const computeDiscoveryScoresLambda = backend.computeDiscoveryScores.resources.lambda;
 const computeStack = backend.computeDiscoveryScores.resources.lambda.stack;
 new events.Rule(computeStack, 'ComputeDiscoveryScoresSchedule', {
-  schedule: events.Schedule.rate(events.Duration.hours(3)),
+  schedule: events.Schedule.rate(Duration.hours(3)),
   targets: [new targets.LambdaFunction(computeDiscoveryScoresLambda)],
   description: 'Run discovery score computation every 3 hours',
 });

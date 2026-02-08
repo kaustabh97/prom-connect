@@ -78,13 +78,11 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
     type Schema = import("../../data/resource").Schema;
     const client = generateClient<Schema>();
 
-    const opts = { authMode: "apiKey" as const };
-
     type ProfileRow = Schema["UserProfile"]["type"];
     const allProfiles: ProfileRow[] = [];
     let nextToken: string | undefined;
     do {
-      const res = await client.models.UserProfile.list({ nextToken }, opts);
+      const res = await client.models.UserProfile.list({ nextToken });
       allProfiles.push(...(res.data ?? []));
       nextToken = res.nextToken ?? undefined;
     } while (nextToken);
@@ -101,8 +99,7 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
     let likeNextToken: string | undefined;
     do {
       const likeRes = await (client.models.Like as { list: (opts: unknown) => Promise<{ data?: { toUserId?: string }[]; nextToken?: string }> }).list(
-        { nextToken: likeNextToken },
-        opts
+        { nextToken: likeNextToken }
       );
       const page = likeRes.data ?? [];
       for (const like of page) {
@@ -123,15 +120,12 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
       const ageSanity = age != null && age <= MAX_REALISTIC_AGE ? 1 : 0;
       // Negative age band (8): if age > 60, force score to 0
       if (age != null && age > MAX_REALISTIC_AGE) {
-        await client.models.UserProfile.update(
-          {
-            id,
-            email: profile.email ?? undefined,
-            discoveryScore: 0,
-            lastDiscoveryScoreAt: now,
-          } as Parameters<typeof client.models.UserProfile.update>[0],
-          opts
-        );
+        await client.models.UserProfile.update({
+          id,
+          email: profile.email ?? undefined,
+          discoveryScore: 0,
+          lastDiscoveryScoreAt: now,
+        } as Parameters<typeof client.models.UserProfile.update>[0]);
         updated += 1;
         continue;
       }
@@ -146,15 +140,12 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
         WEIGHT_COMPLETENESS * completeness +
         WEIGHT_RECENCY * recency;
 
-      await client.models.UserProfile.update(
-        {
-          id,
-          email: profile.email ?? undefined,
-          discoveryScore: Math.round(score * 100) / 100,
-          lastDiscoveryScoreAt: now,
-        } as Parameters<typeof client.models.UserProfile.update>[0],
-        opts
-      );
+      await client.models.UserProfile.update({
+        id,
+        email: profile.email ?? undefined,
+        discoveryScore: Math.round(score * 100) / 100,
+        lastDiscoveryScoreAt: now,
+      } as Parameters<typeof client.models.UserProfile.update>[0]);
       updated += 1;
     }
 
