@@ -5,23 +5,28 @@ import {
   DEFAULT_FILTERS,
   FILTER_STORAGE_KEY,
   GENDER_OPTIONS,
-  NON_NEGOTIABLE_OPTIONS,
+  PREFERRED_COHORT_OPTIONS,
+  PREFERRED_INTENTION_OPTIONS,
 } from "@/lib/dating";
 
 function loadFilters(): DiscoveryFilters {
   try {
     const raw = localStorage.getItem(FILTER_STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as DiscoveryFilters;
-      const filters = {
+      const parsed = JSON.parse(raw) as Partial<DiscoveryFilters>;
+      const filters: DiscoveryFilters = {
         ageMin: typeof parsed.ageMin === "number" ? parsed.ageMin : DEFAULT_FILTERS.ageMin,
         ageMax: typeof parsed.ageMax === "number" ? parsed.ageMax : DEFAULT_FILTERS.ageMax,
         gendersInterestedIn: Array.isArray(parsed.gendersInterestedIn)
           ? parsed.gendersInterestedIn
           : DEFAULT_FILTERS.gendersInterestedIn,
-        nonNegotiables: Array.isArray(parsed.nonNegotiables)
-          ? parsed.nonNegotiables
-          : DEFAULT_FILTERS.nonNegotiables,
+        preferredCohorts: Array.isArray(parsed.preferredCohorts)
+          ? parsed.preferredCohorts
+          : DEFAULT_FILTERS.preferredCohorts,
+        preferredIntention:
+          parsed.preferredIntention != null && typeof parsed.preferredIntention === "string"
+            ? parsed.preferredIntention
+            : DEFAULT_FILTERS.preferredIntention,
       };
       return filters;
     }
@@ -62,6 +67,7 @@ export function useFilters() {
     filters,
     setFilters,
     genderOptions: GENDER_OPTIONS,
-    nonNegotiableOptions: NON_NEGOTIABLE_OPTIONS,
+    preferredCohortOptions: PREFERRED_COHORT_OPTIONS,
+    preferredIntentionOptions: PREFERRED_INTENTION_OPTIONS,
   };
 }

@@ -48,32 +48,6 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
   // Start empty; S3 URLs added in fetch loop when profilePicKey exists
   const photoUrls: string[] = [];
 
-  // Build non-negotiables from lifestyle preferences
-  const nonNegotiables: string[] = [];
-  if (backendProfile.smokingPreference === "Never") {
-    nonNegotiables.push("Non-smoking");
-  } else if (["Passively", "Sometimes", "Regularly"].includes(backendProfile.smokingPreference || "")) {
-    nonNegotiables.push("Smoking okay");
-  }
-  
-  if (backendProfile.alcoholPreference === "Never") {
-    nonNegotiables.push("No alcohol");
-  } else if (backendProfile.alcoholPreference === "Sometimes" || backendProfile.alcoholPreference === "Regularly") {
-    nonNegotiables.push("Alcohol okay");
-  }
-  
-  if (backendProfile.intention === "Date for Prom" || backendProfile.intention === "In a relationship, looking for a prom date") {
-    nonNegotiables.push("Serious intent");
-  } else if (backendProfile.intention === "Not Sure") {
-    nonNegotiables.push("Casual / open");
-  }
-  
-  if (backendProfile.foodPreference === "Veg") {
-    nonNegotiables.push("Veg only");
-  } else {
-    nonNegotiables.push("No dietary preference");
-  }
-
   return {
     id: backendProfile.id || "",
     name: backendProfile.name || "Anonymous",
@@ -116,7 +90,6 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     pollDeepOrSilly: backendProfile.pollDeepOrSilly || undefined,
     pollBoredInRoom: backendProfile.pollBoredInRoom || undefined,
     pollCasualOrDressed: backendProfile.pollCasualOrDressed || undefined,
-    nonNegotiables,
   };
 }
 

@@ -120,22 +120,6 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 </section>
               )}
 
-              {profile.nonNegotiables?.length > 0 && (
-                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
-                  <h3 className="text-sm font-bold text-foreground mb-3">I'm looking for</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {profile.nonNegotiables.map((n, i) => (
-                      <span
-                        key={`nn-${i}-${n}`}
-                        className="px-3 py-2 rounded-full bg-primary/15 text-primary text-sm font-medium border border-primary/20"
-                      >
-                        {n}
-                      </span>
-                    ))}
-                  </div>
-                </section>
-              )}
-
               {profile.tags?.length > 0 && (
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
                   <h3 className="text-sm font-bold text-foreground mb-3">My interests</h3>

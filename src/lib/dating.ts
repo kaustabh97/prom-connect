@@ -53,8 +53,6 @@ export interface DiscoveryProfileFull {
   pollDeepOrSilly?: string;
   pollBoredInRoom?: string;
   pollCasualOrDressed?: string;
-  // Non-negotiables (for filtering and display)
-  nonNegotiables: string[];
 }
 
 // ============================================================================
@@ -65,27 +63,31 @@ export interface DiscoveryFilters {
   ageMin: number;
   ageMax: number;
   gendersInterestedIn: string[]; // e.g. ["Woman", "Man", "Non-Binary"]
-  nonNegotiables: string[]; // e.g. ["Non-smoking", "Serious intent"]
+  /** Preferred cohorts (multi-select). Display-only preference; does not filter profiles. */
+  preferredCohorts: string[];
+  /** Preferred intention (single-select). Display-only preference; does not filter profiles. */
+  preferredIntention: string | null;
 }
 
 export const DEFAULT_FILTERS: DiscoveryFilters = {
   ageMin: 21,
   ageMax: 45,
   gendersInterestedIn: ["Woman", "Man", "Non-Binary"],
-  nonNegotiables: [],
+  preferredCohorts: [],
+  preferredIntention: null,
 };
 
 export const FILTER_STORAGE_KEY = "prom-discovery-filters";
 
-export const NON_NEGOTIABLE_OPTIONS = [
-  "Non-smoking",
-  "Smoking okay",
-  "No alcohol",
-  "Alcohol okay",
-  "Serious intent",
-  "Casual / open",
-  "Veg only",
-  "No dietary preference",
+/** Cohort options for Preferences (multi-select). Matches onboarding. */
+export const PREFERRED_COHORT_OPTIONS = ["PGP1", "PGP2", "PGPX", "PhD", "AA", "Staff", "Other"] as const;
+
+/** Intention options for Preferences (single-select). Matches onboarding. */
+export const PREFERRED_INTENTION_OPTIONS = [
+  "Just here for prom night",
+  "Taken, but need a prom buddy",
+  "Looking for something real",
+  "Let's see where this goes",
 ] as const;
 
 export const GENDER_OPTIONS = ["Woman", "Man", "Non-Binary"] as const;
@@ -125,48 +127,6 @@ export function mapSexualOrientationToGenders(
   }
 
   return [...GENDER_OPTIONS];
-}
-
-/**
- * Map user's lifestyle preferences to non-negotiables for filters
- */
-export function mapPreferencesToNonNegotiables(
-  smokingPreference?: string | null,
-  alcoholPreference?: string | null,
-  intention?: string | null,
-  foodPreference?: string | null
-): string[] {
-  const nonNegotiables: string[] = [];
-
-  // Smoking preferences
-  if (smokingPreference === "Never") {
-    nonNegotiables.push("Non-smoking");
-  } else if (["Passively", "Sometimes", "Regularly"].includes(smokingPreference || "")) {
-    nonNegotiables.push("Smoking okay");
-  }
-
-  // Alcohol preferences
-  if (alcoholPreference === "Never") {
-    nonNegotiables.push("No alcohol");
-  } else if (alcoholPreference === "Sometimes" || alcoholPreference === "Regularly") {
-    nonNegotiables.push("Alcohol okay");
-  }
-
-  // Intention preferences
-  if (intention === "Date for Prom" || intention === "In a relationship, looking for a prom date") {
-    nonNegotiables.push("Serious intent");
-  } else if (intention === "Not Sure") {
-    nonNegotiables.push("Casual / open");
-  }
-
-  // Food preferences
-  if (foodPreference === "Veg") {
-    nonNegotiables.push("Veg only");
-  } else if (foodPreference) {
-    nonNegotiables.push("No dietary preference");
-  }
-
-  return nonNegotiables;
 }
 
 // ============================================================================
@@ -219,7 +179,6 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
     teaOrCoffee: "Tea",
     mountainOrBeach: "Mountain",
     sexualOrientation: "Straight",
-    nonNegotiables: ["Non-smoking", "Serious intent"],
   },
   {
     id: "p2",
@@ -236,7 +195,6 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
     teaOrCoffee: "Coffee",
     mountainOrBeach: "Beach",
     sexualOrientation: "Straight",
-    nonNegotiables: ["Non-smoking", "Alcohol okay", "Serious intent"],
   },
   {
     id: "p3",
@@ -253,7 +211,6 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
     teaOrCoffee: "Tea",
     mountainOrBeach: "Mountain",
     sexualOrientation: "Straight",
-    nonNegotiables: ["Non-smoking", "No alcohol", "Serious intent"],
   },
   {
     id: "p4",
@@ -270,7 +227,6 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
     teaOrCoffee: "Coffee",
     mountainOrBeach: "Both",
     sexualOrientation: "Straight",
-    nonNegotiables: ["Non-smoking", "Serious intent"],
   },
   {
     id: "p5",
@@ -287,7 +243,6 @@ export const MOCK_DISCOVERY_PROFILES_FULL: DiscoveryProfileFull[] = [
     teaOrCoffee: "Both",
     mountainOrBeach: "Beach",
     sexualOrientation: "Straight",
-    nonNegotiables: ["Non-smoking", "Serious intent"],
   },
 ];
 
@@ -301,8 +256,8 @@ function normalizeGender(g: string): string {
 
 /**
  * Apply filters to a list of profiles.
- * For now only the sexual-orientation / "Interested in" (gender) filter is applied.
- * Age range and non-negotiables are kept in the UI for future use but do not filter results.
+ * Only the "Interested in" (gender) filter is applied.
+ * Age range and Preferences (cohort, intention) do not filter results.
  */
 export function applyFilters(
   profiles: DiscoveryProfileFull[],
@@ -317,9 +272,7 @@ export function applyFilters(
       );
       if (!matchesGender) return false;
     }
-    // Age and non-negotiables: not applied for now (filters UI kept for later)
-    // if (p.age < filters.ageMin || p.age > filters.ageMax) return false;
-    // for (const nn of filters.nonNegotiables) { ... }
+    // Age and Preferences (cohort, intention) are not applied
     return true;
   });
 }

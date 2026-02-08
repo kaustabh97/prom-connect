@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import type { DiscoveryFilters } from "@/lib/dating";
 import { logInfo } from "@/utils/logger";
-import { GENDER_OPTIONS, NON_NEGOTIABLE_OPTIONS } from "@/lib/dating";
+import { GENDER_OPTIONS, PREFERRED_COHORT_OPTIONS, PREFERRED_INTENTION_OPTIONS } from "@/lib/dating";
 import { Sparkles } from "lucide-react";
 
 interface FiltersModalProps {
@@ -43,13 +43,17 @@ export default function FiltersModal({
     }));
   };
 
-  const toggleNonNegotiable = (n: string) => {
+  const togglePreferredCohort = (c: string) => {
     setLocal((prev) => ({
       ...prev,
-      nonNegotiables: prev.nonNegotiables.includes(n)
-        ? prev.nonNegotiables.filter((x) => x !== n)
-        : [...prev.nonNegotiables, n],
+      preferredCohorts: prev.preferredCohorts.includes(c)
+        ? prev.preferredCohorts.filter((x) => x !== c)
+        : [...prev.preferredCohorts, c],
     }));
+  };
+
+  const setPreferredIntention = (i: string | null) => {
+    setLocal((prev) => ({ ...prev, preferredIntention: i }));
   };
 
   const handleSave = () => {
@@ -139,43 +143,70 @@ export default function FiltersModal({
             </div>
           </motion.div>
 
-          {/* Non-negotiables */}
+          {/* Preferences (display-only; does not filter profiles) */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="space-y-3"
+            className="space-y-4"
           >
             <div>
               <Label className="text-base font-semibold text-foreground flex items-center gap-2">
-                <span className="text-primary">Non-Negotiables</span>
+                <span className="text-primary">Preferences</span>
               </Label>
-              <p className="text-xs text-muted-foreground mt-1.5 ml-1">
-                Only see profiles that match these preferences
-              </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {NON_NEGOTIABLE_OPTIONS.map((n) => (
-                <motion.div
-                  key={n}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button
-                    type="button"
-                    variant={local.nonNegotiables.includes(n) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleNonNegotiable(n)}
-                    className={
-                      local.nonNegotiables.includes(n)
-                        ? "bg-primary/25 text-primary border-primary/40 hover:bg-primary/30 shadow-md shadow-primary/20 font-semibold"
-                        : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
-                    }
-                  >
-                    {n}
-                  </Button>
-                </motion.div>
-              ))}
+
+            {/* Cohort selection (multi-select) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">Cohort</Label>
+              <div className="flex flex-wrap gap-2">
+                {PREFERRED_COHORT_OPTIONS.map((c) => (
+                  <motion.div key={c} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      type="button"
+                      variant={local.preferredCohorts.includes(c) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => togglePreferredCohort(c)}
+                      className={
+                        local.preferredCohorts.includes(c)
+                          ? "bg-primary/25 text-primary border-primary/40 hover:bg-primary/30 shadow-md shadow-primary/20 font-semibold"
+                          : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
+                      }
+                    >
+                      {c}
+                    </Button>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Intention (single-select) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-muted-foreground">Intention</Label>
+              <div className="flex flex-wrap gap-2">
+                {PREFERRED_INTENTION_OPTIONS.map((i) => (
+                  <motion.div key={i} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      type="button"
+                      variant={local.preferredIntention === i ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setPreferredIntention(local.preferredIntention === i ? null : i)}
+                      className={
+                        local.preferredIntention === i
+                          ? "bg-primary/25 text-primary border-primary/40 hover:bg-primary/30 shadow-md shadow-primary/20 font-semibold"
+                          : "bg-background/40 border-primary/20 hover:bg-background/60 hover:border-primary/30 text-foreground/80"
+                      }
+                    >
+                      {i}
+                    </Button>
+                  </motion.div>
+                ))}
+              </div>
+              {local.preferredIntention && (
+                <p className="text-xs text-muted-foreground">
+                  Tap again to clear
+                </p>
+              )}
             </div>
           </motion.div>
         </div>

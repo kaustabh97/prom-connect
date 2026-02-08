@@ -21,15 +21,6 @@ const client = generateClient<Schema>();
 /** Transform backend UserProfile to DiscoveryProfileFull (matches Discover.tsx logic) */
 function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]): DiscoveryProfileFull {
   const photoUrls: string[] = [];
-  const nonNegotiables: string[] = [];
-  if (backendProfile.smokingPreference === "Never") nonNegotiables.push("Non-smoking");
-  else if (["Passively", "Sometimes", "Regularly"].includes(backendProfile.smokingPreference || "")) nonNegotiables.push("Smoking okay");
-  if (backendProfile.alcoholPreference === "Never") nonNegotiables.push("No alcohol");
-  else if (backendProfile.alcoholPreference === "Sometimes" || backendProfile.alcoholPreference === "Regularly") nonNegotiables.push("Alcohol okay");
-  if (backendProfile.intention === "Date for Prom" || backendProfile.intention === "In a relationship, looking for a prom date") nonNegotiables.push("Serious intent");
-  else if (backendProfile.intention === "Not Sure") nonNegotiables.push("Casual / open");
-  if (backendProfile.foodPreference === "Veg") nonNegotiables.push("Veg only");
-  else nonNegotiables.push("No dietary preference");
 
   return {
     id: backendProfile.id || "",
@@ -49,7 +40,6 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     teaOrCoffee: backendProfile.teaOrCoffee || undefined,
     mountainOrBeach: backendProfile.mountainOrBeach || undefined,
     sexualOrientation: backendProfile.sexualOrientation || undefined,
-    nonNegotiables,
   };
 }
 
@@ -373,20 +363,6 @@ export default function FullProfileView() {
               )}
             </ul>
           </section>
-
-          {/* Non-negotiables */}
-          {profile.nonNegotiables?.length > 0 && (
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">I'm looking for</h2>
-              <div className="flex flex-wrap gap-2">
-                {profile.nonNegotiables.map((n) => (
-                  <span key={n} className="px-3 py-1.5 rounded-full bg-primary/15 text-primary text-sm font-medium border border-primary/20">
-                    {n}
-                  </span>
-                ))}
-              </div>
-            </section>
-          )}
 
           {/* Interests */}
           {profile.tags?.length > 0 && (
