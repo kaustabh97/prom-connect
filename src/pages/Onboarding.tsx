@@ -157,6 +157,8 @@ const Onboarding = () => {
   }, [step]);
   /** True when user landed with ?flow=choice to change flow (already has profile) */
   const [isFlowChoiceOnly, setIsFlowChoiceOnly] = useState(false);
+  /** True when we sent user to fill missing DOB/cohort/photo before showing flow choice */
+  const [completingProfileForFlowChange, setCompletingProfileForFlowChange] = useState(false);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
     fromUserId: string;
@@ -263,13 +265,35 @@ const Onboarding = () => {
                   ...prev,
                   email: (p.email as string) ?? prev.email,
                   name: (p.name as string) ?? prev.name,
+                  dateOfBirth: (p.dateOfBirth as string) ?? prev.dateOfBirth,
+                  age: (p.age as number) ?? prev.age,
+                  cohort: (p.cohort as string) ?? prev.cohort,
+                  gender: (p.gender as string) ?? prev.gender,
+                  profilePicKey: (p.profilePicKey as string) ?? prev.profilePicKey,
                   partnerStatus: (p.partnerStatus as string) ?? "",
                   partnerEmail: (p.partnerEmail as string) ?? "",
                   partnerName: (Array.isArray(p.partnerName) ? p.partnerName[0] : p.partnerName) ?? "",
                 }));
+                const hasDob = !!(p.dateOfBirth || p.age);
+                const hasCohortGender = !!(p.cohort && p.gender);
+                const hasPhoto = !!(p.profilePicKey);
+                if (!hasDob) {
+                  setStep("dateOfBirth");
+                  setCompletingProfileForFlowChange(true);
+                } else if (!hasPhoto) {
+                  setStep("photoUpload");
+                  setCompletingProfileForFlowChange(true);
+                } else if (!hasCohortGender) {
+                  setStep("ageCohortGender");
+                  setCompletingProfileForFlowChange(true);
+                } else {
+                  setStep("choice");
+                  setIsFlowChoiceOnly(true);
+                }
+              } else {
+                setStep("choice");
+                setIsFlowChoiceOnly(true);
               }
-              setStep("choice");
-              setIsFlowChoiceOnly(true);
               setIsCheckingAuth(false);
               return;
             }
@@ -547,10 +571,16 @@ const Onboarding = () => {
   };
 
   // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
-  const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
+  const handleChoice = async (option: (typeof partnerStatusOptions)[number] | "request") => {
     if (option === "request") {
-      setFlowChoice("invite");
-      setStep("partnerRequest");
+      setSaveError(null);
+      try {
+        await saveInitialProfileToBackend();
+        setFlowChoice("invite");
+        setStep("partnerRequest");
+      } catch {
+        // saveInitialProfileToBackend already sets setSaveError and setIsSaving
+      }
       return;
     }
     setProfile(prev => ({ ...prev, partnerStatus: option }));
@@ -733,7 +763,19 @@ const Onboarding = () => {
 
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < effectiveSteps.length) {
-      setStep(effectiveSteps[nextIndex]);
+      const nextStepValue = effectiveSteps[nextIndex];
+      if (step === "ageCohortGender" && nextStepValue === "choice" && completingProfileForFlowChange) {
+        try {
+          await saveInitialProfileToBackend();
+          setCompletingProfileForFlowChange(false);
+          setIsFlowChoiceOnly(true);
+          setStep("choice");
+        } catch {
+          // saveInitialProfileToBackend already sets setSaveError
+        }
+        return;
+      }
+      setStep(nextStepValue);
     }
   };
 
@@ -855,6 +897,62 @@ const Onboarding = () => {
         setSaveError(error instanceof Error ? error.message : "Failed to save profile. Please try again.");
         setIsSaving(false);
       }
+  };
+
+  /** Save initial onboarding data (DOB, cohort, gender, photo) without setting onboardingCompleted. Used before "request from X" and when completing missing data on flow change. */
+  const saveInitialProfileToBackend = async (): Promise<void> => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const isAuthenticated = !!session.tokens;
+      const authMode = isAuthenticated ? "userPool" : "apiKey";
+      const opts = { authMode: authMode as "userPool" | "apiKey" };
+      const profileId = getIdFromEmail(profile.email.trim());
+      const { data: existingProfile, errors: getErrors } = await client.models.UserProfile.get(
+        { id: profileId },
+        opts
+      );
+      if (getErrors) throw new Error(getErrors[0]?.message || "Failed to check profile");
+      const heightStr =
+        profile.heightFeet != null && profile.heightInches != null
+          ? `${profile.heightFeet}'${profile.heightInches}"`
+          : undefined;
+      const initialData: Record<string, unknown> = {
+        email: profile.email,
+        name: profile.name,
+        dateOfBirth: profile.dateOfBirth || undefined,
+        age: profile.age ?? undefined,
+        height: heightStr,
+        cohort: profile.cohort || undefined,
+        gender: profile.gender || undefined,
+        profilePicKey: profile.profilePicKey || undefined,
+      };
+      if (existingProfile?.id) {
+        await client.models.UserProfile.update(
+          { id: existingProfile.id, ...initialData } as Parameters<typeof client.models.UserProfile.update>[0],
+          opts
+        );
+      } else {
+        const currentUser = await getUserProfileFromCognito();
+        await client.models.UserProfile.create(
+          {
+            id: profileId,
+            userId: currentUser?.userId ?? "",
+            ...initialData,
+          } as Parameters<typeof client.models.UserProfile.create>[0],
+          opts
+        );
+      }
+      logInfo("Onboarding: initial profile saved", { component: "Onboarding", operation: "saveInitialProfileToBackend" });
+    } catch (err) {
+      logError(err, { component: "Onboarding", operation: "saveInitialProfileToBackend" });
+      setSaveError(err instanceof Error ? err.message : "Failed to save. Please try again.");
+      throw err;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const saveCoupleOutside = async () => {
@@ -1072,14 +1170,24 @@ const Onboarding = () => {
           opts
         );
       } else {
+        const heightStr =
+          profile.heightFeet != null && profile.heightInches != null
+            ? `${profile.heightFeet}'${profile.heightInches}"`
+            : undefined;
         const { data: created } = await client.models.UserProfile.create(
           {
             id: getIdFromEmail(profile.email),
             email: profile.email,
             name: profile.name || userName || undefined,
             userId: (await getUserProfileFromCognito())?.userId ?? "",
+            dateOfBirth: profile.dateOfBirth || undefined,
+            age: profile.age ?? undefined,
+            height: heightStr,
+            cohort: profile.cohort || undefined,
+            gender: profile.gender || undefined,
+            profilePicKey: profile.profilePicKey || undefined,
             onboardingCompleted: true,
-          },
+          } as Parameters<typeof client.models.UserProfile.create>[0],
           opts
         );
         partnerProfileId = created?.id ?? "";
@@ -1270,7 +1378,12 @@ const Onboarding = () => {
                       }`}
                       onClick={() => handleChoice(isRequestOption ? "request" : option)}
                     >
-                      {isSaving && option === "Still looking for my prom date 💫" ? (
+                      {isSaving && isRequestOption ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Saving...
+                        </>
+                      ) : isSaving && option === "Still looking for my prom date 💫" ? (
                         <>
                           <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
                           Switching...
