@@ -4,6 +4,7 @@ import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { logError } from "@/utils/logger";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { getUserProfileById } from "@/lib/dataAccess";
 
 const client = generateClient<Schema>();
 
@@ -22,7 +23,7 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
     const opts = authMode ? { authMode } : undefined;
 
     const profileId = getIdFromEmail(profile.email.trim());
-    const { data: userProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
+    const { data: userProfile } = await getUserProfileById(profileId, opts);
     if (!userProfile) return null;
     const userId = userProfile.id;
     const bio = userProfile.bio;

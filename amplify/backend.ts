@@ -1,12 +1,15 @@
 import { defineBackend } from '@aws-amplify/backend';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { sendPartnerInvite } from './functions/send-partner-invite/resource';
 import { sendReportEmail } from './functions/send-report-email/resource';
 import { sendRoseEmail } from './functions/send-rose-email/resource';
+import { computeDiscoveryScores } from './functions/compute-discovery-scores/resource';
 import { frontendLogger } from './functions/frontend-logger/resource';
 
 const backend = defineBackend({
@@ -16,6 +19,7 @@ const backend = defineBackend({
   sendPartnerInvite,
   sendReportEmail,
   sendRoseEmail,
+  computeDiscoveryScores,
   frontendLogger,
 });
 
@@ -67,3 +71,13 @@ sendReportEmailLambda.addEnvironment(
   'RESEND_API_KEY',
   process.env.RESEND_API_KEY ?? ''
 );
+
+// Discovery score cron: run compute-discovery-scores every 3 hours (EventBridge rule)
+const computeDiscoveryScoresLambda = backend.computeDiscoveryScores.resources.lambda;
+const computeStack = backend.computeDiscoveryScores.resources.lambda.stack;
+new events.Rule(computeStack, 'ComputeDiscoveryScoresSchedule', {
+  schedule: events.Schedule.rate(events.Duration.hours(3)),
+  targets: [new targets.LambdaFunction(computeDiscoveryScoresLambda)],
+  description: 'Run discovery score computation every 3 hours',
+});
+

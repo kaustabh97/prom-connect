@@ -853,6 +853,7 @@ const Onboarding = () => {
             {
               id: existingProfile.id,
               ...profileData,
+              updatedAt: new Date().toISOString(),
             } as Parameters<typeof client.models.UserProfile.update>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
@@ -867,6 +868,7 @@ const Onboarding = () => {
             {
               id: getIdFromEmail(profile.email),
               ...profileData,
+              updatedAt: new Date().toISOString(),
             } as Parameters<typeof client.models.UserProfile.create>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );

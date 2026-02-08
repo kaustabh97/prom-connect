@@ -7,7 +7,6 @@ interface ProfileData {
   promptAnswer: string;
   personality: { extrovert: number; openness: number };
   campusSpots: string[];
-  compatScore: number;
 }
 
 interface AnonymousCardProps {

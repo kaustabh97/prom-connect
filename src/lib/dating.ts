@@ -53,6 +53,8 @@ export interface DiscoveryProfileFull {
   pollDeepOrSilly?: string;
   pollBoredInRoom?: string;
   pollCasualOrDressed?: string;
+  /** Backend-computed discovery score 0–1 (email match, age sanity, popularity). Updated by cron. */
+  discoveryScore?: number | null;
 }
 
 // ============================================================================

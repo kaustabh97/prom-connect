@@ -4,6 +4,7 @@ import type { Schema } from "../../amplify/data/resource";
 import { logError, logInfo } from "./logger";
 import { getIdFromEmail } from "./userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { getUserProfileById } from "@/lib/dataAccess";
 
 const client = generateClient<Schema>();
 
@@ -179,8 +180,7 @@ export const hasCompletedOnboarding = async (): Promise<boolean> => {
     const authMode = GOOGLE_LOGIN_CHECK ? ('userPool' as const) : ('apiKey' as const);
     const profileId = getIdFromEmail(profile.email.trim());
     const opts = { authMode };
-    // @ts-ignore - authMode option not in generated types yet
-    const { data: userProfile, errors } = await client.models.UserProfile.get({ id: profileId }, opts);
+    const { data: userProfile, errors } = await getUserProfileById(profileId, opts);
 
     if (errors || !userProfile) {
       return false;
