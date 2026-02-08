@@ -57,8 +57,8 @@ sendRoseEmailLambda.addToRolePolicy(
     resources: ['*'],
   })
 );
-// SES identities are per-region. Set SES_REGION to the region where cultcomm@iima.ac.in (and recipients) are verified (e.g. ap-south-1).
-(sendRoseEmailLambda as unknown as LambdaWithEnv).addEnvironment('SES_REGION', process.env.SES_REGION ?? '');
+// SES identities are per-region. Default ap-south-1 (Mumbai) where cultcomm@iima.ac.in is verified.
+(sendRoseEmailLambda as unknown as LambdaWithEnv).addEnvironment('SES_REGION', process.env.SES_REGION ?? 'ap-south-1');
 (sendRoseEmailLambda as unknown as LambdaWithEnv).addEnvironment('SES_FROM_EMAIL', process.env.SES_FROM_EMAIL ?? '');
 
 // Report emails use Resend API (no SES). RESEND_API_KEY from env when running sandbox.
