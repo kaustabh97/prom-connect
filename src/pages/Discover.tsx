@@ -398,12 +398,12 @@ export default function Discover() {
     fetchProfiles();
   }, [refreshKey]); // Fetch on mount and when nav requests refresh
 
-  // Apply filters then sort by discovery score, liked-me boost, preference match, exploration
+  // Apply filters then sort per viewer: combined score (global + their prefs), liked-me, per-viewer tie-breaker
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return [];
     const filtered = applyFilters(profiles, filters);
-    return sortDiscoveryProfiles(filtered, filters, { likedMeIds });
-  }, [profiles, filters, likedMeIds]);
+    return sortDiscoveryProfiles(filtered, filters, { likedMeIds, viewerId: currentProfileId });
+  }, [profiles, filters, likedMeIds, currentProfileId]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded

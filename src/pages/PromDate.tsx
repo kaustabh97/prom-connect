@@ -119,6 +119,7 @@ export default function PromDate() {
   const showBothView = promDate && !showOutsideView;
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showChangeFlowDialog, setShowChangeFlowDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isChangingFlow, setIsChangingFlow] = useState(false);
@@ -297,7 +298,7 @@ export default function PromDate() {
                 size="default"
                 className="flex-1 w-0 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
                 disabled={isChangingFlow}
-                onClick={handleChangeFlowClick}
+                onClick={() => { setChangeFlowError(null); setShowChangeFlowDialog(true); }}
               >
                 <User className="w-4 h-4 shrink-0" />
                 Looking for dates
@@ -411,7 +412,7 @@ export default function PromDate() {
                 size="default"
                 className="flex-1 w-0 gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground text-sm"
                 disabled={isChangingFlow}
-                onClick={handleChangeFlowClick}
+                onClick={() => { setChangeFlowError(null); setShowChangeFlowDialog(true); }}
               >
                 <User className="w-4 h-4 shrink-0" />
                 Looking for dates
@@ -439,6 +440,30 @@ export default function PromDate() {
           See you on the dance floor.
         </motion.p>
       </div>
+
+      <AlertDialog open={showChangeFlowDialog} onOpenChange={(open) => { if (!open) setChangeFlowError(null); setShowChangeFlowDialog(open); }}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch to looking for dates?</AlertDialogTitle>
+            <AlertDialogDescription>
+              No worries — we&apos;ll take you back to pick your vibe: still on the hunt for your plus-one, or already found them? You can change this anytime from your profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {changeFlowError && (
+            <p className="text-sm text-destructive">{changeFlowError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isChangingFlow}>Cancel</AlertDialogCancel>
+            <Button
+              variant="default"
+              disabled={isChangingFlow}
+              onClick={() => handleChangeFlowClick()}
+            >
+              {isChangingFlow ? <Loader2 className="w-4 h-4 animate-spin" /> : "Continue"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-md">
