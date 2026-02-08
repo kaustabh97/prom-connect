@@ -124,7 +124,12 @@ const Auth = () => {
       }
 
       if (backendProfile?.onboardingCompleted) {
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+        const promDatePath = await getPromDateRedirectPath();
+        if (promDatePath) {
+          navigate(promDatePath);
+        } else {
+          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+        }
         return;
       }
       navigate("/onboarding");

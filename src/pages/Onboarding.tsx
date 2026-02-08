@@ -21,7 +21,7 @@ import { getUserProfileFromCognito, hasCompletedOnboarding, clearTestUser } from
 import { getIdFromEmail } from "@/utils/userId";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
-import { resetProfileForDiscovery } from "@/utils/unmatch";
+import { resetProfileForDiscovery, unmatchUsers } from "@/utils/unmatch";
 import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
@@ -479,6 +479,72 @@ const Onboarding = () => {
     return () => { cancelled = true; };
   }, [step, userEmail]);
 
+  /** When switching to "Still looking" from flow choice, clear any existing Match/MatchRequest so backend reflects new flow (fixes logout→login showing old flow). */
+  const clearExistingMatchIfSwitchingToDiscovery = async (profileId: string): Promise<void> => {
+    const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+    const [as1, as2] = await Promise.all([
+      client.models.Match.listMatchByUser1Id({ user1Id: profileId }, opts),
+      client.models.Match.listMatchByUser2Id({ user2Id: profileId }, opts),
+    ]);
+    const all = [...(as1.data ?? []), ...(as2.data ?? [])];
+    const promMatch = all.find((m) => m.status === "active" && m.isPromDate);
+    if (promMatch?.id) {
+      const otherUserId = promMatch.user1Id === profileId ? promMatch.user2Id : promMatch.user1Id;
+      if (otherUserId) {
+        await unmatchUsers({
+          matchId: promMatch.id,
+          currentUserId: profileId,
+          otherUserId,
+          isPromDate: true,
+          currentUserFormData: undefined,
+        });
+      }
+    }
+    const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+      { fromUserId: profileId },
+      opts
+    );
+    const pending = (outgoing ?? []).filter((r) => r.status === "pending");
+    if (pending.length > 0) {
+      await resetProfileForDiscovery(profileId);
+      for (const r of pending) {
+        if (r.id) await client.models.MatchRequest.update({ id: r.id, status: "withdrawn" }, opts);
+      }
+    }
+  };
+
+  /** When switching to "Already have plus one" from flow choice, clear any existing Match and withdraw outgoing MatchRequests so backend is clean for new partner flow. */
+  const clearExistingDiscoveryStateWhenSwitchingToPartnerFlow = async (profileId: string): Promise<void> => {
+    const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+    const [as1, as2] = await Promise.all([
+      client.models.Match.listMatchByUser1Id({ user1Id: profileId }, opts),
+      client.models.Match.listMatchByUser2Id({ user2Id: profileId }, opts),
+    ]);
+    const all = [...(as1.data ?? []), ...(as2.data ?? [])];
+    const activeMatches = all.filter((m) => m.status === "active");
+    for (const match of activeMatches) {
+      if (!match.id) continue;
+      const otherUserId = match.user1Id === profileId ? match.user2Id : match.user1Id;
+      if (otherUserId) {
+        await unmatchUsers({
+          matchId: match.id,
+          currentUserId: profileId,
+          otherUserId,
+          isPromDate: !!match.isPromDate,
+          currentUserFormData: undefined,
+        });
+      }
+    }
+    const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+      { fromUserId: profileId },
+      opts
+    );
+    const pending = (outgoing ?? []).filter((r) => r.status === "pending");
+    for (const r of pending) {
+      if (r.id) await client.models.MatchRequest.update({ id: r.id, status: "withdrawn" }, opts);
+    }
+  };
+
   // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
   const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
     if (option === "request") {
@@ -489,15 +555,46 @@ const Onboarding = () => {
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
       if (isFlowChoiceOnly) {
-        // Go through normal onboarding steps: notifications, sexual orientation & prom preference, hometown, optional questions
-        setIsFlowChoiceOnly(false);
-        setFlowChoice("full");
-        setStep("notifications");
+        const profileId = getIdFromEmail(userEmail.trim());
+        setSaveError(null);
+        setIsSaving(true);
+        (async () => {
+          try {
+            await clearExistingMatchIfSwitchingToDiscovery(profileId);
+            setIsFlowChoiceOnly(false);
+            setFlowChoice("full");
+            setStep("notifications");
+          } catch (err) {
+            logError(err, { component: "Onboarding", operation: "clearExistingMatchIfSwitchingToDiscovery" });
+            setSaveError("Could not switch flow. Please try again.");
+          } finally {
+            setIsSaving(false);
+          }
+        })();
         return;
       }
       setFlowChoice("full");
       setStep("notifications");
     } else {
+      if (isFlowChoiceOnly) {
+        const profileId = getIdFromEmail(userEmail.trim());
+        setSaveError(null);
+        setIsSaving(true);
+        (async () => {
+          try {
+            await clearExistingDiscoveryStateWhenSwitchingToPartnerFlow(profileId);
+            setIsFlowChoiceOnly(false);
+            setFlowChoice("couple");
+            setStep("couplePartnerType");
+          } catch (err) {
+            logError(err, { component: "Onboarding", operation: "clearExistingDiscoveryStateWhenSwitchingToPartnerFlow" });
+            setSaveError("Could not switch flow. Please try again.");
+          } finally {
+            setIsSaving(false);
+          }
+        })();
+        return;
+      }
       setIsFlowChoiceOnly(false);
       setFlowChoice("couple");
       setStep("couplePartnerType");
@@ -1164,6 +1261,7 @@ const Onboarding = () => {
                     <Button
                       key={option}
                       variant={isSelected ? "default" : "outline"}
+                      disabled={isSaving}
                       className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-center px-4 sm:px-6 py-4 sm:py-5 ${
                         isSelected
                           ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
@@ -1171,7 +1269,17 @@ const Onboarding = () => {
                       }`}
                       onClick={() => handleChoice(isRequestOption ? "request" : option)}
                     >
-                      {isSelected ? (
+                      {isSaving && option === "Still looking for my prom date 💫" ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Switching...
+                        </>
+                      ) : isSaving && option === "Already found my plus-one ✨" ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Switching...
+                        </>
+                      ) : isSelected ? (
                         <>
                           <Check className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />
                           <span>{option}</span>
