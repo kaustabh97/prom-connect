@@ -88,6 +88,7 @@ export const handler = async (event: { arguments: RoseEmailArgs }) => {
       throw new Error(`You can only send up to ${MAX_ROSES_PER_USER} roses.`);
     }
 
+    // @ts-expect-error - Package will be installed by Amplify during build
     const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
     const ses = new SESClient({ region: process.env.AWS_REGION || "us-east-1" });
     const from = process.env.SES_FROM_EMAIL || "cultcomm@iima.ac.in";
