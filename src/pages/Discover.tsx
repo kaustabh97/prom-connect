@@ -20,6 +20,7 @@ import {
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { sortDiscoveryProfiles } from "@/lib/discoveryScore";
+import { getUserProfileById } from "@/lib/dataAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Filter, Heart, Flower2, Loader2 } from "lucide-react";
