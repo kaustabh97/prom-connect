@@ -28,7 +28,7 @@ import {
   MessageCircle, 
   X,
   Send,
-  MoreVertical,
+  ChevronDown,
   Flag,
   Trash2,
   Loader2,
@@ -971,8 +971,9 @@ const ChatView = ({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="w-5 h-5" />
+              <Button variant="ghost" size="sm" className="gap-1.5">
+                Unmatch
+                <ChevronDown className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

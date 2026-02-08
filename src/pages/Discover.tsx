@@ -11,7 +11,7 @@ import { getUrl } from "aws-amplify/storage";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { logError, logInfo, logWarn } from "@/utils/logger";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK, APP_URL } from "@/config";
 
 import {
   applyFilters,
@@ -20,11 +20,20 @@ import {
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Filter, Heart, Flower2, Loader2 } from "lucide-react";
 import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
 import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { usePromDate } from "@/hooks/usePromDate";
@@ -140,6 +149,11 @@ export default function Discover() {
   } | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showRoseButton, setShowRoseButton] = useState(false);
+  const [showRoseModal, setShowRoseModal] = useState(false);
+  const [roseEmail, setRoseEmail] = useState("");
+  const [roseSending, setRoseSending] = useState(false);
+  const [roseError, setRoseError] = useState<string | null>(null);
 
   // When user clicks Discover in nav (or same tab), refetch profiles and clear refresh state
   useEffect(() => {
@@ -230,6 +244,7 @@ export default function Discover() {
         } else if (!hasBeenInitialized) {
           localStorage.setItem(filtersInitializedKey, "true");
         }
+        setShowRoseButton(!isCoupleFlow);
         setFiltersInitialized(true);
       } catch (err) {
         logError(err, { component: "Discover", operation: "syncFiltersFromProfile" });
@@ -435,6 +450,42 @@ export default function Discover() {
     }
   }, []);
 
+  const handleSendRose = async () => {
+    const to = roseEmail.trim();
+    if (!to) return;
+    if (!currentProfileId) {
+      setRoseError("Please sign in to send a rose.");
+      return;
+    }
+    setRoseSending(true);
+    setRoseError(null);
+    try {
+      const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+      const { data, errors } = await client.queries.sendRoseEmail({
+        currentUserId: currentProfileId,
+        toEmail: to,
+        appUrl: APP_URL,
+      }, opts);
+      if (errors?.length) {
+        const msg = errors[0]?.message ?? "Failed to send";
+        setRoseError(msg);
+        return;
+      }
+      if ((data as { success?: boolean })?.success) {
+        setShowRoseModal(false);
+        setRoseEmail("");
+      } else {
+        setRoseError("Failed to send");
+      }
+    } catch (err) {
+      logError(err, { component: "Discover", operation: "sendRoseEmail" });
+      const message = err instanceof Error ? err.message : "Failed to send. Please try again.";
+      setRoseError(message);
+    } finally {
+      setRoseSending(false);
+    }
+  };
+
   // Scroll to top when profile changes so user sees top of new card (photo, name)
   useEffect(() => {
     const topId = displayQueue[0]?.id;
@@ -588,6 +639,19 @@ export default function Discover() {
         onSave={setFilters}
       />
 
+      {showRoseButton && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="fixed bottom-20 left-4 z-40 h-12 w-12 rounded-full border-2 border-rose-400/60 bg-rose-50/90 shadow-lg backdrop-blur-sm hover:border-rose-500 hover:bg-rose-100/90"
+          onClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
+          title="Send a rose"
+          aria-label="Send a rose"
+        >
+          <Flower2 className="h-6 w-6 text-rose-600" />
+        </Button>
+      )}
+
       {!loading && displayQueue.length > 0 && displayQueue[0] && (
         <>
           <ReportFloatingButton onClick={() => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: displayQueue[0]?.id } }); setReportOpen(true); }} />
@@ -600,6 +664,59 @@ export default function Discover() {
           />
         </>
       )}
+
+      <Dialog open={showRoseModal} onOpenChange={(open) => { if (!open) setRoseError(null); setShowRoseModal(open); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700">
+              <Flower2 className="h-5 w-5" />
+              Send a rose
+            </DialogTitle>
+            <DialogDescription>
+              Send an anonymous email from Starlit by the Brick. They’ll see that someone wants to go to Prom with them and get a link to join. They’ll never know who sent it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <label htmlFor="rose-email" className="text-sm font-medium text-foreground">
+              Their email
+            </label>
+            <Input
+              id="rose-email"
+              type="email"
+              placeholder="name@iima.ac.in"
+              value={roseEmail}
+              onChange={(e) => setRoseEmail(e.target.value)}
+              className="border-rose-200 focus-visible:ring-rose-400"
+              disabled={roseSending}
+            />
+            {roseError && (
+              <p className="text-sm text-destructive">{roseError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRoseModal(false)} disabled={roseSending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={handleSendRose}
+              disabled={roseSending || !roseEmail.trim()}
+            >
+              {roseSending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Flower2 className="h-4 w-4 mr-2" />
+                  Send rose
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MatchPopup
         open={matchPopupOpen}

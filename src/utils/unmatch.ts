@@ -52,7 +52,7 @@ export async function resetProfileForDiscovery(
   const updatePayload: Record<string, unknown> = {
     id: profile.id,
     email: profile.email,
-    bio: undefined,
+    bio: "", // clear "Partner: X" when switching back to discovery
     partnerStatus: "Still looking for my prom date 💫",
     partnerEmail: "",
     partnerName: "",

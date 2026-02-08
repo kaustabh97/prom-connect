@@ -13,7 +13,7 @@ import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Loader2, LogOut, MessageCircle, Sparkles, User, MoreHorizontal, Trash2 } from "lucide-react";
+import { Loader2, LogOut, MessageCircle, Sparkles, User, Trash2 } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
 import {
@@ -130,16 +130,17 @@ export default function PromDate() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showChangeFlowWithdrawModal, setShowChangeFlowWithdrawModal] = useState(false);
   const [isChangingFlow, setIsChangingFlow] = useState(false);
   const [changeFlowError, setChangeFlowError] = useState<string | null>(null);
 
-  const handleChangeFlowConfirm = async (formData: WithdrawFormData) => {
+  /** Change flow: unmatch / reset without asking withdraw details; user chooses flow on next screen. */
+  const handleChangeFlowClick = async () => {
     setIsChangingFlow(true);
     setChangeFlowError(null);
+    setOptionsOpen(false);
     try {
       if (showOutsideView) {
-        await resetProfileForDiscovery(currentUserId, formData);
+        await resetProfileForDiscovery(currentUserId);
         navigate("/onboarding?flow=choice", { replace: true });
         return;
       }
@@ -152,7 +153,7 @@ export default function PromDate() {
         currentUserId,
         otherUserId: promDate.otherUserId,
         isPromDate: !!promDate.match.isPromDate,
-        currentUserFormData: formData,
+        currentUserFormData: undefined,
       });
       if (result.success) {
         navigate("/onboarding?flow=choice", { replace: true });
@@ -164,7 +165,6 @@ export default function PromDate() {
       setChangeFlowError(err instanceof Error ? err.message : "Failed to change flow");
     } finally {
       setIsChangingFlow(false);
-      setShowChangeFlowWithdrawModal(false);
     }
   };
 
@@ -272,7 +272,7 @@ export default function PromDate() {
           </p>
         </motion.div>
 
-        {/* Outside partner: single card + Chat placeholder + Options */}
+        {/* Outside partner: single card + Change flow or delete account */}
         {showOutsideView && (
           <>
           <motion.div
@@ -305,22 +305,22 @@ export default function PromDate() {
               <SheetTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full gap-2 border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary"
+                  size="default"
+                  className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
                 >
-                  <MoreHorizontal className="w-4 h-4" />
-                  Options
+                  Change flow or delete account
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="rounded-t-2xl">
                 <SheetHeader>
-                  <SheetTitle>Options</SheetTitle>
+                  <SheetTitle>Change flow or delete account</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-2 pt-4">
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2"
                     disabled={isChangingFlow}
-                    onClick={() => { setOptionsOpen(false); setShowChangeFlowWithdrawModal(true); }}
+                    onClick={handleChangeFlowClick}
                   >
                     <User className="w-4 h-4" />
                     Change my flow
@@ -412,14 +412,14 @@ export default function PromDate() {
           <CountdownTimer targetDate="2026-02-15T20:00:00" />
         </motion.div>
 
-        {/* Chat button - always for IIMA couples (hidden in share image) */}
+        {/* Chat button + Change flow or delete account - always for IIMA couples (hidden in share image) */}
         {showBothView && (
           <motion.div
             data-share-hide
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
-            className="mt-6 w-full max-w-xs flex flex-col gap-2"
+            className="mt-6 w-full max-w-xs flex flex-col gap-3"
           >
             <Button
               variant="outline"
@@ -432,27 +432,23 @@ export default function PromDate() {
             <Sheet open={optionsOpen} onOpenChange={setOptionsOpen}>
               <SheetTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full gap-2 text-muted-foreground hover:text-foreground"
+                  variant="outline"
+                  size="default"
+                  className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
                 >
-                  <MoreHorizontal className="w-4 h-4" />
-                  Options
+                  Change flow or delete account
                 </Button>
               </SheetTrigger>
               <SheetContent side="bottom" className="rounded-t-2xl">
                 <SheetHeader>
-                  <SheetTitle>Options</SheetTitle>
+                  <SheetTitle>Change flow or delete account</SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-2 pt-4">
                   <Button
                     variant="outline"
                     className="w-full justify-start gap-2"
                     disabled={isChangingFlow}
-                    onClick={() => {
-                      setOptionsOpen(false);
-                      setShowChangeFlowWithdrawModal(true);
-                    }}
+                    onClick={handleChangeFlowClick}
                   >
                     <User className="w-4 h-4" />
                     Change my flow
@@ -481,12 +477,6 @@ export default function PromDate() {
           See you on the dance floor.
         </motion.p>
       </div>
-
-      <WithdrawModal
-        open={showChangeFlowWithdrawModal}
-        onOpenChange={setShowChangeFlowWithdrawModal}
-        onConfirm={handleChangeFlowConfirm}
-      />
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-md">

@@ -1,0 +1,1 @@
+{"name":"send-rose-email","version":"1.0.0","type":"module","dependencies":{"@aws-sdk/client-ses":"^3.0.0","aws-amplify":"^6.0.0"}}

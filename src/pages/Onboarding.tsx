@@ -489,16 +489,10 @@ const Onboarding = () => {
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
       if (isFlowChoiceOnly) {
-        // Switch discovery on: clear partner fields and set excludeFromDiscovery false, then go to discover
-        const profileId = getIdFromEmail(userEmail.trim());
-        resetProfileForDiscovery(profileId)
-          .then(() => {
-            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
-          })
-          .catch((err) => {
-            logError(err, { component: "Onboarding", operation: "handleChoiceFlowSwitch" });
-            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
-          });
+        // Go through normal onboarding steps: notifications, sexual orientation & prom preference, hometown, optional questions
+        setIsFlowChoiceOnly(false);
+        setFlowChoice("full");
+        setStep("notifications");
         return;
       }
       setFlowChoice("full");
@@ -680,7 +674,7 @@ const Onboarding = () => {
             : undefined;
 
         // Only include fields that exist on the deployed CreateUserProfileInput.
-        const profileData = {
+        const profileData: Record<string, unknown> = {
           email: profile.email,
           name: profile.name,
           dateOfBirth: profile.dateOfBirth,
@@ -702,6 +696,15 @@ const Onboarding = () => {
           bio: profile.bio || undefined,
           onboardingCompleted: true,
         };
+        // Full flow = discovery: clear partner fields and ensure they appear in discover
+        if (flowChoice === "full") {
+          profileData.partnerStatus = "Still looking for my prom date 💫";
+          profileData.partnerEmail = "";
+          profileData.excludeFromDiscovery = false;
+          if (typeof profileData.bio === "string" && profileData.bio.trim().startsWith("Partner:")) {
+            profileData.bio = "";
+          }
+        }
 
         if (existingProfile) {
           // Update existing profile
@@ -709,27 +712,8 @@ const Onboarding = () => {
           const { data: updatedProfile, errors: updateErrors } = await client.models.UserProfile.update(
             {
               id: existingProfile.id,
-              email: profileData.email,
-              name: profileData.name,
-              dateOfBirth: profileData.dateOfBirth,
-              age: profileData.age,
-              height: profileData.height,
-              cohort: profileData.cohort,
-              gender: profileData.gender,
-              sexualOrientation: profileData.sexualOrientation,
-              intention: profileData.intention,
-              hometown: profileData.hometown,
-              notificationsEnabled: profileData.notificationsEnabled,
-              profilePicKey: profileData.profilePicKey,
-              alcoholPreference: profileData.alcoholPreference,
-              smokingPreference: profileData.smokingPreference,
-              foodPreference: profileData.foodPreference,
-              favouritePlace: profileData.favouritePlace,
-              teaOrCoffee: profileData.teaOrCoffee,
-              mountainOrBeach: profileData.mountainOrBeach,
-              bio: profileData.bio,
-              onboardingCompleted: profileData.onboardingCompleted,
-            },
+              ...profileData,
+            } as Parameters<typeof client.models.UserProfile.update>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
 
@@ -741,28 +725,9 @@ const Onboarding = () => {
           // @ts-ignore - TypeScript types don't match runtime behavior for create arguments
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
-              id: getIdFromEmail(profileData.email),
-              email: profileData.email,
-              name: profileData.name,
-              dateOfBirth: profileData.dateOfBirth,
-              age: profileData.age,
-              height: profileData.height,
-              cohort: profileData.cohort,
-              gender: profileData.gender,
-              sexualOrientation: profileData.sexualOrientation,
-              intention: profileData.intention,
-              hometown: profileData.hometown,
-              notificationsEnabled: profileData.notificationsEnabled,
-              profilePicKey: profileData.profilePicKey,
-              alcoholPreference: profileData.alcoholPreference,
-              smokingPreference: profileData.smokingPreference,
-              foodPreference: profileData.foodPreference,
-              favouritePlace: profileData.favouritePlace,
-              teaOrCoffee: profileData.teaOrCoffee,
-              mountainOrBeach: profileData.mountainOrBeach,
-              bio: profileData.bio,
-              onboardingCompleted: profileData.onboardingCompleted,
-            },
+              id: getIdFromEmail(profile.email),
+              ...profileData,
+            } as Parameters<typeof client.models.UserProfile.create>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
 

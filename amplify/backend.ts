@@ -6,6 +6,7 @@ import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { sendPartnerInvite } from './functions/send-partner-invite/resource';
 import { sendReportEmail } from './functions/send-report-email/resource';
+import { sendRoseEmail } from './functions/send-rose-email/resource';
 import { frontendLogger } from './functions/frontend-logger/resource';
 
 const backend = defineBackend({
@@ -14,6 +15,7 @@ const backend = defineBackend({
   storage,
   sendPartnerInvite,
   sendReportEmail,
+  sendRoseEmail,
   frontendLogger,
 });
 
@@ -39,6 +41,16 @@ frontendLoggerLambda.addToRolePolicy(
 // Grant SES send email permission for partner invite emails
 const sendPartnerInviteLambda = backend.sendPartnerInvite.resources.lambda;
 sendPartnerInviteLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    sid: 'AllowSesSendEmail',
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  })
+);
+
+// Grant SES send email permission for anonymous rose emails (from cultcomm@iima.ac.in)
+const sendRoseEmailLambda = backend.sendRoseEmail.resources.lambda;
+sendRoseEmailLambda.addToRolePolicy(
   new iam.PolicyStatement({
     sid: 'AllowSesSendEmail',
     actions: ['ses:SendEmail', 'ses:SendRawEmail'],

@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera, Trash2 } from "lucide-react";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera, Trash2, Settings } from "lucide-react";
 import { handleReferralShare } from "@/utils/share";
 import { deleteUserProfile } from "@/utils/deleteProfile";
 import SparkleBackground from "@/components/SparkleBackground";
@@ -149,6 +149,7 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChangeFlowDialog, setShowChangeFlowDialog] = useState(false);
+  const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -1161,32 +1162,56 @@ export default function Profile() {
               </Button>
             </motion.div>
 
-            {/* Change flow: for users looking for dates, allow switching to "I have a plus one". partnerStatus may be null for existing users. */}
-            {(profile?.partnerStatus ?? "") !== "Already found my plus-one ✨" && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.31 }}
-                className="pt-2"
-              >
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="w-full gap-2 border-primary/40 bg-primary/5 hover:bg-primary/10 text-foreground"
-                  onClick={() => setShowChangeFlowDialog(true)}
-                >
-                  <User className="w-4 h-4" />
-                  I already have a plus one
-                </Button>
-              </motion.div>
-            )}
+            {/* Change flow or delete account - one combined button above Log out */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.31 }}
+              className="pt-2"
+            >
+              <Sheet open={showAccountSheet} onOpenChange={setShowAccountSheet}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
+                  >
+                    Change flow or delete account
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-2xl">
+                  <SheetHeader>
+                    <SheetTitle>Change flow or delete account</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      onClick={() => { setShowAccountSheet(false); setShowChangeFlowDialog(true); }}
+                    >
+                      <User className="w-4 h-4" />
+                      Change my flow
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
+                      disabled={isDeleting}
+                      onClick={() => { setShowAccountSheet(false); setDeleteError(null); setShowDeleteDialog(true); }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete my account
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </motion.div>
 
             {/* Log out at end of profile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.33 }}
-              className="pt-1"
+              className="pt-1 pb-6"
             >
               <Button
                 variant="outline"
@@ -1200,24 +1225,6 @@ export default function Profile() {
                   <LogOut className="w-4 h-4" />
                 )}
                 Log out
-              </Button>
-            </motion.div>
-
-            {/* Delete account - below Log out, red, tight spacing */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="pt-0.5 pb-6"
-            >
-              <Button
-                variant="outline"
-                className="w-full gap-2 text-destructive border-destructive/60 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
-                onClick={() => { setDeleteError(null); setShowDeleteDialog(true); }}
-                disabled={isDeleting}
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete my account
               </Button>
             </motion.div>
           </div>
