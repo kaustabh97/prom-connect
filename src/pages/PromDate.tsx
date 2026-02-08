@@ -33,7 +33,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
-import { MATCHMAKING_ENABLED } from "@/config";
 
 const client = generateClient<Schema>();
 

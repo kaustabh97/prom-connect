@@ -12,7 +12,8 @@ import { BADGE_REFRESH_EVENT } from "@/utils/badgeRefresh";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { logError, logInfo } from "@/utils/logger";
-import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { useMatchmakingEnabled } from "@/hooks/useMatchmakingEnabled";
 import { getIdFromEmail } from "@/utils/userId";
 
 const discoverNavItems = [
@@ -126,12 +127,13 @@ export default function BottomNav({ hideNav = false }: BottomNavProps) {
     load();
   }, []);
 
+  const matchmakingEnabled = useMatchmakingEnabled();
   const hasPromDate = !!promDate;
   const isOnPromDatePage = location.pathname === "/prom-date";
   // Prom Date is a dead-end page – hide nav when on it, when matched, or while checking redirect
   if (hideNav || hasPromDate || isOnPromDatePage) return null;
 
-  const navItems = MATCHMAKING_ENABLED
+  const navItems = matchmakingEnabled
     ? [...discoverNavItems, { path: "/profile", label: "Profile", icon: User }]
     : [...matchmakingSoonNavItems, { path: "/profile", label: "Profile", icon: User }];
 

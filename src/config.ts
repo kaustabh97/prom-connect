@@ -56,7 +56,8 @@ export const GOOGLE_LOGIN_CHECK = IS_PROD_DOMAIN || RAW_GOOGLE_LOGIN_CHECK;
 /**
  * Enable/disable matchmaking (Discover, Matches, Chat)
  *
- * Branch-based: disabled on main, enabled on development branches.
+ * - On non-main branches: always enabled.
+ * - On main: enabled only from 12 AM on 9 Feb (IST) onwards.
  * Set at build time via VITE_AMPLIFY_BRANCH (injected by Amplify from AWS_BRANCH).
  * When VITE_AMPLIFY_BRANCH is unset (e.g. local dev), matchmaking is enabled.
  *
@@ -68,4 +69,11 @@ export const GOOGLE_LOGIN_CHECK = IS_PROD_DOMAIN || RAW_GOOGLE_LOGIN_CHECK;
  * - Normal flow: Discover, Matches, Chat, Profile
  */
 const AMPLIFY_BRANCH = import.meta.env.VITE_AMPLIFY_BRANCH as string | undefined;
-export const MATCHMAKING_ENABLED = AMPLIFY_BRANCH !== "main";
+
+/** 12 AM on 9 Feb (IST) – matchmaking goes live on main at this time */
+export const MATCHMAKING_GO_LIVE_DATE = "2026-02-09T00:00:00+05:30";
+
+export function getMatchmakingEnabled(): boolean {
+  if (AMPLIFY_BRANCH !== "main") return true;
+  return Date.now() >= new Date(MATCHMAKING_GO_LIVE_DATE).getTime();
+}

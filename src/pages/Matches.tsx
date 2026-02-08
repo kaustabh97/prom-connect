@@ -14,7 +14,7 @@ import { useUnreadMatches } from "@/hooks/useUnreadMatches";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { GOOGLE_LOGIN_CHECK, getMatchmakingEnabled } from "@/config";
 import { unmatchUsers } from "@/utils/unmatch";
 import { getUrl } from "aws-amplify/storage";
 import ReportModal from "@/components/ReportModal";
@@ -467,7 +467,7 @@ const Matches = () => {
         setActiveChat(null);
         await refreshMatches();
         await refreshPromDate();
-        navigate(unmatchTarget.isPromDate ? "/onboarding?flow=choice" : (MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon"), { replace: true });
+        navigate(unmatchTarget.isPromDate ? "/onboarding?flow=choice" : (getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon"), { replace: true });
       }
     } catch (e) {
       logError(e, { component: "Matches", operation: "unmatch" });
@@ -492,7 +492,7 @@ const Matches = () => {
         setActiveChat(null);
         await refreshMatches();
         await refreshPromDate();
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", { replace: true });
+        navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon", { replace: true });
       }
     } catch (e) {
       logError(e, { component: "Matches", operation: "unmatch" });

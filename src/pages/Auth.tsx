@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { getUserProfileFromCognito, hasCompletedOnboarding, setTestUser, type UserProfile } from "@/utils/auth";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getIdFromEmail } from "@/utils/userId";
-import { BETA_MODE, GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { BETA_MODE, GOOGLE_LOGIN_CHECK, getMatchmakingEnabled } from "@/config";
 import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
@@ -52,7 +52,7 @@ const Auth = () => {
           if (promDatePath) {
             navigate(promDatePath);
           } else {
-            navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+            navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon");
           }
         } else {
           logInfo("Redirecting to onboarding", { component: "Auth", operation: "checkUser" });
@@ -128,7 +128,7 @@ const Auth = () => {
         if (promDatePath) {
           navigate(promDatePath);
         } else {
-          navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+          navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon");
         }
         return;
       }

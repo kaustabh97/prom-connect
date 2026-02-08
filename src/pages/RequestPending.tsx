@@ -10,7 +10,7 @@ import { logError, logInfo } from "@/utils/logger";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getIdFromEmail } from "@/utils/userId";
-import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { GOOGLE_LOGIN_CHECK, getMatchmakingEnabled } from "@/config";
 import { Button } from "@/components/ui/button";
 import { Loader2, LogOut } from "lucide-react";
 
@@ -53,7 +53,7 @@ export default function RequestPending() {
     const pending = (outgoing ?? []).find((r) => r.status === "pending");
     if (!pending) {
       logInfo("RequestPending: no pending request, redirecting", { component: "RequestPending", operation: "loadPendingRequest" });
-      navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon");
+      navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon");
       return;
     }
     logInfo("RequestPending: pending request loaded", { component: "RequestPending", operation: "loadPendingRequest", extra: { requestId: pending.id } });
@@ -117,12 +117,12 @@ export default function RequestPending() {
           opts
         );
         logInfo("RequestPending: withdraw complete, redirecting", { component: "RequestPending", operation: "withdrawConfirm" });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", {
+        navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon", {
           state: { refresh: true },
         });
       } else {
         logInfo("RequestPending: withdraw complete, redirecting", { component: "RequestPending", operation: "withdrawConfirm" });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon", {
+        navigate(getMatchmakingEnabled() ? "/discover/profile" : "/matchmaking-soon", {
           state: { refresh: true },
         });
       }

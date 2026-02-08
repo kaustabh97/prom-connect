@@ -16,7 +16,7 @@ import PromDate from "./pages/PromDate";
 import RequestPending from "./pages/RequestPending";
 import MatchmakingComingSoon from "./pages/MatchmakingComingSoon";
 import NotFound from "./pages/NotFound";
-import { MATCHMAKING_ENABLED } from "@/config";
+import { useMatchmakingEnabled } from "@/hooks/useMatchmakingEnabled";
 
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -55,6 +55,31 @@ function CoupleCompleteRedirect() {
 
 const queryClient = new QueryClient();
 
+function AppRoutes() {
+  const matchmakingEnabled = useMatchmakingEnabled();
+  return (
+    <Routes>
+      <Route path="/" element={<Landing />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/couple-complete" element={<CoupleCompleteRedirect />} />
+      <Route element={<AppLayout />}>
+        <Route path="/discover" element={<Navigate to={matchmakingEnabled ? "/discover/profile" : "/matchmaking-soon"} replace />} />
+        <Route path="/discover/profile" element={matchmakingEnabled ? <Discover /> : <Navigate to="/matchmaking-soon" replace />} />
+        <Route path="/discover/profile/:profileId" element={matchmakingEnabled ? <FullProfileView /> : <Navigate to="/matchmaking-soon" replace />} />
+        <Route path="/matches" element={<Matches />} />
+        <Route path="/matchmaking-soon" element={<MatchmakingComingSoon />} />
+        <Route path="/prom-date" element={<PromDate />} />
+        <Route path="/request-pending" element={<RequestPending />} />
+        <Route path="/profile" element={<Profile />} />
+      </Route>
+      <Route path="/test-chat" element={<TestChat />} />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -62,25 +87,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <InviteCapture />
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/couple-complete" element={<CoupleCompleteRedirect />} />
-          <Route element={<AppLayout />}>
-            <Route path="/discover" element={<Navigate to={MATCHMAKING_ENABLED ? "/discover/profile" : "/matchmaking-soon"} replace />} />
-            <Route path="/discover/profile" element={MATCHMAKING_ENABLED ? <Discover /> : <Navigate to="/matchmaking-soon" replace />} />
-            <Route path="/discover/profile/:profileId" element={MATCHMAKING_ENABLED ? <FullProfileView /> : <Navigate to="/matchmaking-soon" replace />} />
-            <Route path="/matches" element={<Matches />} />
-            <Route path="/matchmaking-soon" element={<MatchmakingComingSoon />} />
-            <Route path="/prom-date" element={<PromDate />} />
-            <Route path="/request-pending" element={<RequestPending />} />
-            <Route path="/profile" element={<Profile />} />
-          </Route>
-          <Route path="/test-chat" element={<TestChat />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

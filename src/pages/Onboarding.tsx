@@ -26,7 +26,7 @@ import { resetProfileForDiscovery, unmatchUsers } from "@/utils/unmatch";
 import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
-import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { GOOGLE_LOGIN_CHECK, getMatchmakingEnabled } from "@/config";
 import {
   Dialog,
   DialogContent,
@@ -277,7 +277,7 @@ const Onboarding = () => {
             if (promDatePath) {
               navigate(promDatePath);
             } else {
-              navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+              navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
             }
             return;
           }
@@ -840,7 +840,7 @@ const Onboarding = () => {
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
           const hasPending = (requestsToMe ?? []).some((r) => r.status === "pending");
-          if (hasPending && MATCHMAKING_ENABLED) {
+          if (hasPending && getMatchmakingEnabled()) {
             navigate("/matches");
             setIsSaving(false);
             return;
@@ -849,7 +849,7 @@ const Onboarding = () => {
           logError(err, { component: "Onboarding", operation: "sendPartnerInvite" });
         }
         logInfo("Onboarding: profile saved, navigating", { component: "Onboarding", operation: "saveProfile", extra: { flow: "full" } });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+        navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
         logError(error, { component: "Onboarding", operation: "saveProfile" });
         setSaveError(error instanceof Error ? error.message : "Failed to save profile. Please try again.");
@@ -1006,11 +1006,11 @@ const Onboarding = () => {
           // Navigation to /request-pending will happen after popup is closed
         } else {
           // Partner exists - they'll see the request in Matches
-          navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+          navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
       } catch (err) {
         logError(err, { component: "Onboarding", operation: "createMatchRequest" });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+        navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       }
     } catch (error) {
       logError(error, { component: "Onboarding", operation: "saveCoupleIIMA" });
