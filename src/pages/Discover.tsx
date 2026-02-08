@@ -24,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Filter, Heart, Flower2, Loader2 } from "lucide-react";
 import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
-import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
 import {
   Dialog,
@@ -115,6 +114,7 @@ export default function Discover() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
   const [currentUserGender, setCurrentUserGender] = useState<string | undefined>(undefined);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const { toast } = useToast();
   const dailyLikeInfo = useDailyLikeCount(currentProfileId, currentUserGender, tick);
@@ -383,6 +383,12 @@ export default function Discover() {
     );
   }, [filteredProfiles, hasPassed, hasLiked, tick]);
 
+  // Clamp currentIndex when queue shrinks (e.g. after pass/like)
+  useEffect(() => {
+    if (displayQueue.length === 0) return;
+    setCurrentIndex((i) => Math.min(i, displayQueue.length - 1));
+  }, [displayQueue.length]);
+
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
     logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
     if (action === "like" && dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit) {
@@ -400,7 +406,10 @@ export default function Discover() {
       setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     }
+    setCurrentIndex(0);
   };
+
+  const currentDisplayProfile = displayQueue[currentIndex] ?? displayQueue[0] ?? null;
 
   // Scroll to top so user sees top of card (photo, name) not bottom
   const scrollToTop = useCallback(() => {
@@ -410,6 +419,12 @@ export default function Discover() {
       main.scrollTo({ top: 0, behavior: "instant" });
     }
   }, []);
+
+  const handleNext = useCallback(() => {
+    if (displayQueue.length === 0) return;
+    setCurrentIndex((i) => (i + 1) % displayQueue.length);
+    scrollToTop();
+  }, [displayQueue.length, scrollToTop]);
 
   const handleProfileChange = useCallback((_profileId: string) => {
     const main = document.getElementById("app-main");
@@ -458,13 +473,13 @@ export default function Discover() {
 
   // Scroll to top when profile changes so user sees top of new card (photo, name)
   useEffect(() => {
-    const topId = displayQueue[0]?.id;
+    const topId = currentDisplayProfile?.id;
     if (!topId) return;
     const main = document.getElementById("app-main");
     if (!main) return;
     main.scrollTop = 0;
     main.scrollTo({ top: 0, behavior: "instant" });
-  }, [displayQueue[0]?.id]);
+  }, [currentDisplayProfile?.id]);
 
   const handleWithdrawConfirm = async (data: WithdrawFormData) => {
     if (!pendingOutgoingRequest?.id) return;
@@ -599,11 +614,16 @@ export default function Discover() {
           ) : (
             <DiscoverFeed
               profiles={displayQueue}
+              currentIndex={currentIndex}
+              onNext={handleNext}
               onSwipe={handleSwipe}
               dailyLikeInfo={dailyLikeInfo}
               onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}
+              onReportClick={currentDisplayProfile ? () => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: currentDisplayProfile.id } }); setReportOpen(true); } : undefined}
+              onRoseClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
+              showRoseButton={showRoseButton}
             />
           )}
         </div>
@@ -616,27 +636,13 @@ export default function Discover() {
         onSave={setFilters}
       />
 
-      {showRoseButton && (
-        <Button
-          variant="outline"
-          size="icon"
-          className="fixed bottom-20 left-4 z-40 h-12 w-12 rounded-full border-2 border-rose-400/60 bg-rose-50/90 shadow-lg backdrop-blur-sm hover:border-rose-500 hover:bg-rose-100/90"
-          onClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
-          title="Send a rose"
-          aria-label="Send a rose"
-        >
-          <Flower2 className="h-6 w-6 text-rose-600" />
-        </Button>
-      )}
-
-      {!loading && displayQueue.length > 0 && displayQueue[0] && (
+      {!loading && displayQueue.length > 0 && currentDisplayProfile && (
         <>
-          <ReportFloatingButton onClick={() => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: displayQueue[0]?.id } }); setReportOpen(true); }} />
           <ReportModal
             open={reportOpen}
             onOpenChange={setReportOpen}
-            personName={displayQueue[0].name}
-            personId={displayQueue[0].id}
+            personName={currentDisplayProfile.name}
+            personId={currentDisplayProfile.id}
             context="Discover"
           />
         </>

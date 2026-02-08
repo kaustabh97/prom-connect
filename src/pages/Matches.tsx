@@ -739,7 +739,6 @@ const Matches = () => {
             key="prom-ask-modal"
             matchId={activeMatch.id}
             otherUserId={activeMatch.otherUserId}
-            matchCompatScore={activeMatch.compatScore || 0}
             onClose={() => setShowPromAsk(false)}
             onSend={async (msg) => {
               const result = await sendPromAsk(activeMatch.otherUserId, activeMatch.id, msg);

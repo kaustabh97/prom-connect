@@ -8,22 +8,32 @@ import { Button } from "@/components/ui/button";
 
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
+  currentIndex: number;
+  onNext: () => void;
   onSwipe: (profileId: string, action: "like" | "pass") => void;
   dailyLikeInfo?: DailyLikeInfo;
   onOpenFilters: () => void;
   onProfileChange?: (profileId: string) => void;
   scrollToTop?: () => void;
+  onReportClick?: () => void;
+  onRoseClick?: () => void;
+  showRoseButton?: boolean;
 }
 
 export default function DiscoverFeed({
   profiles,
+  currentIndex,
+  onNext,
   onSwipe,
   dailyLikeInfo,
   onOpenFilters,
   onProfileChange,
   scrollToTop,
+  onReportClick,
+  onRoseClick,
+  showRoseButton,
 }: DiscoverFeedProps) {
-  const currentProfile = profiles[0] ?? null;
+  const currentProfile = profiles[currentIndex] ?? profiles[0] ?? null;
 
   // Notify parent when profile changes (for scroll-to-top)
   useEffect(() => {
@@ -73,8 +83,12 @@ export default function DiscoverFeed({
               <SwipeCard
                 profile={currentProfile}
                 isTop
+                onNext={onNext}
                 onSwipe={handleSwipe}
                 likeDisabled={dailyLikeInfo?.hasLimit === true && dailyLikeInfo?.atLimit === true}
+                onReportClick={onReportClick}
+                onRoseClick={onRoseClick}
+                showRoseButton={showRoseButton}
               />
             </motion.div>
           )}

@@ -90,7 +90,9 @@ export const handler = async (event: { arguments: RoseEmailArgs }) => {
 
     // @ts-expect-error - Package will be installed by Amplify during build
     const { SESClient, SendEmailCommand } = await import("@aws-sdk/client-ses");
-    const ses = new SESClient({ region: process.env.AWS_REGION || "us-east-1" });
+    // Use same region where SES identities (From/To) are verified (e.g. ap-south-1). Defaults to Lambda region.
+    const sesRegion = process.env.SES_REGION || process.env.AWS_REGION || "us-east-1";
+    const ses = new SESClient({ region: sesRegion });
     const from = process.env.SES_FROM_EMAIL || "cultcomm@iima.ac.in";
 
     const subject = "🌹 Someone wants to go to Prom with you — Starlit by the Brick";
@@ -121,10 +123,13 @@ export const handler = async (event: { arguments: RoseEmailArgs }) => {
 
     return { success: true };
   } catch (err) {
-    console.error("[send-rose-email] error", err);
+    const sesCode = err && typeof err === "object" && "name" in err ? (err as { name?: string }).name : undefined;
+    const sesMessage = err instanceof Error ? err.message : String(err);
+    console.error("[send-rose-email] error", { err, sesCode, sesMessage, from: process.env.SES_FROM_EMAIL || "cultcomm@iima.ac.in", to, region: process.env.SES_REGION || process.env.AWS_REGION || "us-east-1" });
     if (err instanceof Error && err.message.includes("only send up to")) {
       throw err;
     }
-    throw new Error("Failed to send rose email");
+    // Surface SES error so you can fix (e.g. region mismatch: verify identities in same region as Lambda, or set SES_REGION)
+    throw new Error(`Failed to send rose email: ${sesMessage}`);
   }
 };
