@@ -39,18 +39,24 @@ export function useMatch() {
       );
       if (!currentUserProfile?.id) return;
 
-      // Fetch Likes where fromUserId = current user (who we've liked)
-      // @ts-ignore - filter type
-      const { data: likes } =
-        await client.models.Like.list(
-          { filter: { fromUserId: { eq: currentUserProfile.id } } },
+      // Fetch all Likes where fromUserId = current user (paginate to get full list)
+      let allLikes: { toUserId?: string | null }[] = [];
+      let nextToken: string | undefined;
+      do {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (client.models.Like as any).list(
+          { filter: { fromUserId: { eq: currentUserProfile.id } }, nextToken },
           opts
         );
-      if (likes) {
-        likes.forEach((like) => {
+        const page = result.data ?? [];
+        allLikes = allLikes.concat(page);
+        nextToken = result.nextToken ?? undefined;
+      } while (nextToken);
+      if (allLikes.length > 0) {
+        allLikes.forEach((like) => {
           if (like.toUserId) likedIds.add(like.toUserId);
         });
-        logInfo("Likes loaded from backend", { component: "useMatch", operation: "loadLikesFromBackend", extra: { count: likes.length } });
+        logInfo("Likes loaded from backend", { component: "useMatch", operation: "loadLikesFromBackend", extra: { count: allLikes.length } });
       }
     } catch (err) {
       logError(err, { component: "useMatch", operation: "loadLikes" });
@@ -72,48 +78,47 @@ export function useMatch() {
             const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
             const opts = authMode ? { authMode } : undefined;
 
-            const profileId = getIdFromEmail(authProfile.email.trim());
+            const currentUserProfileId = getIdFromEmail(authProfile.email.trim());
             const { data: currentUserProfile } = await client.models.UserProfile.get(
-              { id: profileId },
+              { id: currentUserProfileId },
               opts
             );
             if (currentUserProfile?.id) {
               fromUserId = currentUserProfile.id;
               const currentUserEmail = currentUserProfile.email ?? authProfile.email;
 
-              // Fetch liked user's profile for email metadata
+              // Fetch liked user's profile for email metadata (profileId = liked profile)
               const { data: likedProfile } =
                 // @ts-ignore - authMode
                 await client.models.UserProfile.get({ id: profileId }, opts);
               const likedUserEmail = likedProfile?.email;
 
-              // Create Like
+              // Create Like (profileId = liked profile's id)
               // @ts-ignore - authMode type
               await client.models.Like.create({ fromUserId, toUserId: profileId }, opts);
 
               // Check if the other person has already liked us (mutual like → match)
               // Query: likes FROM profileId (people they liked), filter for toUserId = us
-              // @ts-ignore - filter type
-              const { data: theirLikes } =
-                await client.models.Like.list(
-                  { filter: { fromUserId: { eq: profileId } } },
-                  opts
-                );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const { data: theirLikes } = await (client.models.Like as any).list(
+                { filter: { fromUserId: { eq: profileId } } },
+                opts
+              );
               const mutualLike =
                 theirLikes?.some((like) => like.toUserId === fromUserId) ?? false;
               if (mutualLike) {
                 logInfo("Mutual like - creating match", { component: "useMatch", operation: "recordSwipe", extra: { profileId } });
                 result.isMatch = true;
-                // Create Match record
+                // Create Match record (profileId = liked profile)
                 const u1 = fromUserId;
                 const u2 = profileId;
-                // @ts-ignore - authMode type
-                const { data: matchData } = await client.models.Match.create(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { data: matchData } = await (client.models.Match as any).create(
                   {
                     user1Id: u1,
                     user2Id: u2,
-                    user1Email: currentUserEmail,
-                    user2Email: likedUserEmail,
+                    user1Email: currentUserEmail ?? undefined,
+                    user2Email: likedUserEmail ?? undefined,
                     status: "active",
                     createdAt: new Date().toISOString(),
                   },
