@@ -2,27 +2,38 @@ import { useCallback, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import SwipeCard from "./SwipeCard";
 import type { DiscoveryProfileFull } from "@/lib/dating";
+import type { DailyLikeInfo } from "@/hooks/useDailyLikeCount";
 import { Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface DiscoverFeedProps {
   profiles: DiscoveryProfileFull[];
+  currentIndex: number;
+  onNext: () => void;
   onSwipe: (profileId: string, action: "like" | "pass") => void;
-  onNext?: () => void;
+  dailyLikeInfo?: DailyLikeInfo;
   onOpenFilters: () => void;
   onProfileChange?: (profileId: string) => void;
   scrollToTop?: () => void;
+  onReportClick?: () => void;
+  onRoseClick?: () => void;
+  showRoseButton?: boolean;
 }
 
 export default function DiscoverFeed({
   profiles,
-  onSwipe,
+  currentIndex,
   onNext,
+  onSwipe,
+  dailyLikeInfo,
   onOpenFilters,
   onProfileChange,
   scrollToTop,
+  onReportClick,
+  onRoseClick,
+  showRoseButton,
 }: DiscoverFeedProps) {
-  const currentProfile = profiles[0] ?? null;
+  const currentProfile = profiles[currentIndex] ?? profiles[0] ?? null;
 
   // Notify parent when profile changes (for scroll-to-top)
   useEffect(() => {
@@ -39,11 +50,6 @@ export default function DiscoverFeed({
     },
     [currentProfile, onSwipe, scrollToTop]
   );
-
-  const handleNext = useCallback(() => {
-    if (scrollToTop) scrollToTop();
-    onNext?.();
-  }, [onNext, scrollToTop]);
 
   if (profiles.length === 0) {
     return (
@@ -77,8 +83,12 @@ export default function DiscoverFeed({
               <SwipeCard
                 profile={currentProfile}
                 isTop
+                onNext={onNext}
                 onSwipe={handleSwipe}
-                onNext={handleNext}
+                likeDisabled={dailyLikeInfo?.hasLimit === true && dailyLikeInfo?.atLimit === true}
+                onReportClick={onReportClick}
+                onRoseClick={onRoseClick}
+                showRoseButton={showRoseButton}
               />
             </motion.div>
           )}

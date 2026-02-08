@@ -11,7 +11,7 @@ import { getUrl } from "aws-amplify/storage";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { logError, logInfo, logWarn } from "@/utils/logger";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
+import { GOOGLE_LOGIN_CHECK, APP_URL } from "@/config";
 
 import {
   applyFilters,
@@ -20,14 +20,24 @@ import {
   FILTER_STORAGE_KEY,
 } from "@/lib/dating";
 import { Button } from "@/components/ui/button";
-import { Filter, Heart } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Filter, Heart, Flower2, Loader2 } from "lucide-react";
 import ShareWhatsAppButton from "@/components/ShareWhatsAppButton";
 import { MatchPopup } from "@/components/discovery/MatchPopup";
-import ReportFloatingButton from "@/components/ReportFloatingButton";
 import ReportModal from "@/components/ReportModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { usePromDate } from "@/hooks/usePromDate";
+import { useDailyLikeCount } from "@/hooks/useDailyLikeCount";
+import { useToast } from "@/hooks/use-toast";
 
 const client = generateClient<Schema>();
 
@@ -38,32 +48,6 @@ const client = generateClient<Schema>();
 function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]): DiscoveryProfileFull {
   // Start empty; S3 URLs added in fetch loop when profilePicKey exists
   const photoUrls: string[] = [];
-
-  // Build non-negotiables from lifestyle preferences
-  const nonNegotiables: string[] = [];
-  if (backendProfile.smokingPreference === "Never") {
-    nonNegotiables.push("Non-smoking");
-  } else if (["Passively", "Sometimes", "Regularly"].includes(backendProfile.smokingPreference || "")) {
-    nonNegotiables.push("Smoking okay");
-  }
-  
-  if (backendProfile.alcoholPreference === "Never") {
-    nonNegotiables.push("No alcohol");
-  } else if (backendProfile.alcoholPreference === "Sometimes" || backendProfile.alcoholPreference === "Regularly") {
-    nonNegotiables.push("Alcohol okay");
-  }
-  
-  if (backendProfile.intention === "Date for Prom" || backendProfile.intention === "In a relationship, looking for a prom date") {
-    nonNegotiables.push("Serious intent");
-  } else if (backendProfile.intention === "Not Sure") {
-    nonNegotiables.push("Casual / open");
-  }
-  
-  if (backendProfile.foodPreference === "Veg") {
-    nonNegotiables.push("Veg only");
-  } else {
-    nonNegotiables.push("No dietary preference");
-  }
 
   return {
     id: backendProfile.id || "",
@@ -107,7 +91,6 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     pollDeepOrSilly: backendProfile.pollDeepOrSilly || undefined,
     pollBoredInRoom: backendProfile.pollBoredInRoom || undefined,
     pollCasualOrDressed: backendProfile.pollCasualOrDressed || undefined,
-    nonNegotiables,
   };
 }
 
@@ -127,10 +110,14 @@ export default function Discover() {
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
-  const [skippedProfileIds, setSkippedProfileIds] = useState<Set<string>>(new Set());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
+  const [currentUserGender, setCurrentUserGender] = useState<string | undefined>(undefined);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const { toast } = useToast();
+  const dailyLikeInfo = useDailyLikeCount(currentProfileId, currentUserGender, tick);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
@@ -140,6 +127,11 @@ export default function Discover() {
   } | null>(null);
   const [withdrawing, setWithdrawing] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showRoseButton, setShowRoseButton] = useState(false);
+  const [showRoseModal, setShowRoseModal] = useState(false);
+  const [roseEmail, setRoseEmail] = useState("");
+  const [roseSending, setRoseSending] = useState(false);
+  const [roseError, setRoseError] = useState<string | null>(null);
 
   // When user clicks Discover in nav (or same tab), refetch profiles and clear refresh state
   useEffect(() => {
@@ -164,8 +156,8 @@ export default function Discover() {
               opts
             );
             if (userProfile) {
-              const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
-                                  (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+              const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
+                                  ((userProfile.partnerEmail ?? "").trim() !== "");
               if (!isCoupleFlow) {
                 setFiltersOpen(true);
               }
@@ -208,11 +200,12 @@ export default function Discover() {
           return;
         }
 
-        const isCoupleFlow = userProfile.partnerStatus === "Already found my plus-one ✨" ||
-                            (userProfile.partnerEmail && userProfile.partnerEmail.trim() !== "");
+        const isCoupleFlow = (userProfile.partnerStatus ?? "") === "Already found my plus-one ✨" ||
+                            ((userProfile.partnerEmail ?? "").trim() !== "");
 
+        const sexualOrientation = userProfile.sexualOrientation?.trim() || "Straight";
         const gendersInterestedIn = mapSexualOrientationToGenders(
-          userProfile.sexualOrientation,
+          sexualOrientation,
           userProfile.gender
         );
 
@@ -230,6 +223,7 @@ export default function Discover() {
         } else if (!hasBeenInitialized) {
           localStorage.setItem(filtersInitializedKey, "true");
         }
+        setShowRoseButton(!isCoupleFlow);
         setFiltersInitialized(true);
       } catch (err) {
         logError(err, { component: "Discover", operation: "syncFiltersFromProfile" });
@@ -272,6 +266,7 @@ export default function Discover() {
           : { data: null };
         const resolvedMyProfileId = myProfile?.id ?? "";
         setCurrentProfileId(resolvedMyProfileId);
+        setCurrentUserGender(myProfile?.gender ?? undefined);
         if (resolvedMyProfileId) {
           try {
             const { data: outgoing } =
@@ -384,12 +379,26 @@ export default function Discover() {
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
   const displayQueue = useMemo(() => {
     return filteredProfiles.filter(
-      (p) => !hasPassed(p.id) && !hasLiked(p.id) && !skippedProfileIds.has(p.id)
+      (p) => !hasPassed(p.id) && !hasLiked(p.id)
     );
-  }, [filteredProfiles, hasPassed, hasLiked, tick, skippedProfileIds]);
+  }, [filteredProfiles, hasPassed, hasLiked, tick]);
+
+  // Clamp currentIndex when queue shrinks (e.g. after pass/like)
+  useEffect(() => {
+    if (displayQueue.length === 0) return;
+    setCurrentIndex((i) => Math.min(i, displayQueue.length - 1));
+  }, [displayQueue.length]);
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
     logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
+    if (action === "like" && dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit) {
+      toast({
+        title: "Daily likes used",
+        description: "You have finished likes for today. You can still browse profiles but you need to come back tomorrow for more likes.",
+        variant: "destructive",
+      });
+      return;
+    }
     const profile = displayQueue.find((p) => p.id === profileId);
     const result = await recordSwipe(profileId, action);
     if (result.isMatch && profile) {
@@ -397,7 +406,10 @@ export default function Discover() {
       setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     }
+    setCurrentIndex(0);
   };
+
+  const currentDisplayProfile = displayQueue[currentIndex] ?? displayQueue[0] ?? null;
 
   // Scroll to top so user sees top of card (photo, name) not bottom
   const scrollToTop = useCallback(() => {
@@ -408,23 +420,11 @@ export default function Discover() {
     }
   }, []);
 
-  // Handle "Next" (arrow) - skip for now, can loop back later
   const handleNext = useCallback(() => {
     if (displayQueue.length === 0) return;
-    const currentProfile = displayQueue[0];
-    if (!currentProfile) return;
-    logInfo("Discover: next (skip)", { component: "Discover", operation: "handleNext", extra: { profileId: currentProfile.id } });
-    setSkippedProfileIds((prev) => new Set(prev).add(currentProfile.id));
+    setCurrentIndex((i) => (i + 1) % displayQueue.length);
     scrollToTop();
-  }, [displayQueue, scrollToTop]);
-
-  // When all profiles done, loop back: show profiles that were only "next'd" (not passed)
-  useEffect(() => {
-    if (displayQueue.length === 0 && skippedProfileIds.size > 0) {
-      setSkippedProfileIds(new Set());
-      scrollToTop();
-    }
-  }, [displayQueue.length, skippedProfileIds.size, scrollToTop]);
+  }, [displayQueue.length, scrollToTop]);
 
   const handleProfileChange = useCallback((_profileId: string) => {
     const main = document.getElementById("app-main");
@@ -435,15 +435,51 @@ export default function Discover() {
     }
   }, []);
 
+  const handleSendRose = async () => {
+    const to = roseEmail.trim();
+    if (!to) return;
+    if (!currentProfileId) {
+      setRoseError("Please sign in to send a rose.");
+      return;
+    }
+    setRoseSending(true);
+    setRoseError(null);
+    try {
+      const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+      const { data, errors } = await client.queries.sendRoseEmail({
+        currentUserId: currentProfileId,
+        toEmail: to,
+        appUrl: APP_URL,
+      }, opts);
+      if (errors?.length) {
+        const msg = errors[0]?.message ?? "Failed to send";
+        setRoseError(msg);
+        return;
+      }
+      if ((data as { success?: boolean })?.success) {
+        setShowRoseModal(false);
+        setRoseEmail("");
+      } else {
+        setRoseError("Failed to send");
+      }
+    } catch (err) {
+      logError(err, { component: "Discover", operation: "sendRoseEmail" });
+      const message = err instanceof Error ? err.message : "Failed to send. Please try again.";
+      setRoseError(message);
+    } finally {
+      setRoseSending(false);
+    }
+  };
+
   // Scroll to top when profile changes so user sees top of new card (photo, name)
   useEffect(() => {
-    const topId = displayQueue[0]?.id;
+    const topId = currentDisplayProfile?.id;
     if (!topId) return;
     const main = document.getElementById("app-main");
     if (!main) return;
     main.scrollTop = 0;
     main.scrollTo({ top: 0, behavior: "instant" });
-  }, [displayQueue[0]?.id]);
+  }, [currentDisplayProfile?.id]);
 
   const handleWithdrawConfirm = async (data: WithdrawFormData) => {
     if (!pendingOutgoingRequest?.id) return;
@@ -494,9 +530,16 @@ export default function Discover() {
       <div className="relative z-10 flex flex-col w-full max-w-[500px] mx-auto min-h-dvh">
         {/* Fixed header */}
         <header className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/50 shrink-0">
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            {pendingOutgoingRequest ? "Your Prom Invite ✨" : "Discover"}
-          </h1>
+          <div className="flex flex-col gap-0.5">
+            <h1 className="font-display text-3xl font-bold text-foreground">
+              {pendingOutgoingRequest ? "Your Prom Invite ✨" : "Discover"}
+            </h1>
+            {dailyLikeInfo.hasLimit && !pendingOutgoingRequest && (
+              <p className="text-xs text-muted-foreground">
+                {dailyLikeInfo.count ?? 0}/{dailyLikeInfo.limit ?? 10} likes used today
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <ShareWhatsAppButton
               variant="outline"
@@ -571,11 +614,16 @@ export default function Discover() {
           ) : (
             <DiscoverFeed
               profiles={displayQueue}
-              onSwipe={handleSwipe}
+              currentIndex={currentIndex}
               onNext={handleNext}
+              onSwipe={handleSwipe}
+              dailyLikeInfo={dailyLikeInfo}
               onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
               onProfileChange={handleProfileChange}
               scrollToTop={scrollToTop}
+              onReportClick={currentDisplayProfile ? () => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: currentDisplayProfile.id } }); setReportOpen(true); } : undefined}
+              onRoseClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
+              showRoseButton={showRoseButton}
             />
           )}
         </div>
@@ -588,18 +636,70 @@ export default function Discover() {
         onSave={setFilters}
       />
 
-      {!loading && displayQueue.length > 0 && displayQueue[0] && (
+      {!loading && displayQueue.length > 0 && currentDisplayProfile && (
         <>
-          <ReportFloatingButton onClick={() => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: displayQueue[0]?.id } }); setReportOpen(true); }} />
           <ReportModal
             open={reportOpen}
             onOpenChange={setReportOpen}
-            personName={displayQueue[0].name}
-            personId={displayQueue[0].id}
+            personName={currentDisplayProfile.name}
+            personId={currentDisplayProfile.id}
             context="Discover"
           />
         </>
       )}
+
+      <Dialog open={showRoseModal} onOpenChange={(open) => { if (!open) setRoseError(null); setShowRoseModal(open); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700">
+              <Flower2 className="h-5 w-5" />
+              Send a rose
+            </DialogTitle>
+            <DialogDescription>
+              Send an anonymous email from Starlit by the Brick. They’ll see that someone wants to go to Prom with them and get a link to join. They’ll never know who sent it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <label htmlFor="rose-email" className="text-sm font-medium text-foreground">
+              Their email
+            </label>
+            <Input
+              id="rose-email"
+              type="email"
+              placeholder="name@iima.ac.in"
+              value={roseEmail}
+              onChange={(e) => setRoseEmail(e.target.value)}
+              className="border-rose-200 focus-visible:ring-rose-400"
+              disabled={roseSending}
+            />
+            {roseError && (
+              <p className="text-sm text-destructive">{roseError}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRoseModal(false)} disabled={roseSending}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-rose-600 hover:bg-rose-700 text-white"
+              onClick={handleSendRose}
+              disabled={roseSending || !roseEmail.trim()}
+            >
+              {roseSending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Flower2 className="h-4 w-4 mr-2" />
+                  Send rose
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <MatchPopup
         open={matchPopupOpen}

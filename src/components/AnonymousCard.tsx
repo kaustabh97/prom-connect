@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Check, Sparkles } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface ProfileData {
   id: string;
@@ -40,16 +40,6 @@ const AnonymousCard = ({ profile, index, isSelected, onSelect }: AnonymousCardPr
           <Check className="w-5 h-5 text-primary-foreground" />
         </motion.div>
       )}
-
-      {/* Compatibility score */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/20">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
-          <span className="text-sm font-semibold text-primary">
-            {Math.round(profile.compatScore * 100)}% Match
-          </span>
-        </div>
-      </div>
 
       {/* Tags */}
       <div className="flex flex-wrap gap-2 mb-4">

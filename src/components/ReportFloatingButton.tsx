@@ -15,8 +15,8 @@ export default function ReportFloatingButton({ onClick, position = "bottom" }: R
   const positionClass = position === "inline"
     ? ""
     : position === "top-right"
-      ? "fixed top-20 right-4 z-40"
-      : "fixed bottom-20 right-4 z-40";
+      ? "fixed top-20 right-6 z-40"
+      : "fixed bottom-20 right-6 z-40";
 
   return (
     <Button

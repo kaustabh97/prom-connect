@@ -29,9 +29,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera } from "lucide-react";
+import { ArrowLeft, User, Mail, Heart, Tag, Coffee, Mountain, Utensils, Wine, Cigarette, MapPin, Sparkles, Share2, Loader2, Vote, LogOut, Camera, Trash2, Settings } from "lucide-react";
 import { handleReferralShare } from "@/utils/share";
+import { deleteUserProfile } from "@/utils/deleteProfile";
 import SparkleBackground from "@/components/SparkleBackground";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const client = generateClient<Schema>();
 
@@ -76,6 +87,7 @@ type UserProfileData = {
   pollBoredInRoom?: string | null;
   pollCasualOrDressed?: string | null;
   onboardingCompleted?: boolean | null;
+  partnerStatus?: string | null;
   profilePicKey?: string | null;
 };
 
@@ -135,6 +147,11 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showChangeFlowDialog, setShowChangeFlowDialog] = useState(false);
+  const [showAccountSheet, setShowAccountSheet] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const authMode = GOOGLE_LOGIN_CHECK ? undefined : ("apiKey" as const);
   const { promDate } = usePromDate({ currentUserId: profile?.id ?? "" });
@@ -166,6 +183,27 @@ export default function Profile() {
       navigate("/");
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!profile?.id || !profile?.email) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteUserProfile(profile.id, profile.email);
+      if (result.success) {
+        if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+        if (GOOGLE_LOGIN_CHECK) await signOut();
+        navigate("/", { replace: true });
+        return;
+      }
+      setDeleteError(result.error ?? "Failed to delete account.");
+    } catch (err) {
+      logError(err, { component: "Profile", operation: "deleteAccount" });
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -1124,12 +1162,56 @@ export default function Profile() {
               </Button>
             </motion.div>
 
+            {/* Change flow or delete account - one combined button above Log out */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.31 }}
+              className="pt-2"
+            >
+              <Sheet open={showAccountSheet} onOpenChange={setShowAccountSheet}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
+                  >
+                    Change flow or delete account
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="rounded-t-2xl">
+                  <SheetHeader>
+                    <SheetTitle>Change flow or delete account</SheetTitle>
+                  </SheetHeader>
+                  <div className="flex flex-col gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2"
+                      onClick={() => { setShowAccountSheet(false); setShowChangeFlowDialog(true); }}
+                    >
+                      <User className="w-4 h-4" />
+                      Change my flow
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
+                      disabled={isDeleting}
+                      onClick={() => { setShowAccountSheet(false); setDeleteError(null); setShowDeleteDialog(true); }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete my account
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </motion.div>
+
             {/* Log out at end of profile */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="pt-2 pb-6"
+              transition={{ delay: 0.33 }}
+              className="pt-1 pb-6"
             >
               <Button
                 variant="outline"
@@ -1148,6 +1230,58 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your profile, all your matches, and conversations.
+              Other users will no longer see you as a match. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleDeleteAccount}
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Delete account"
+              )}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showChangeFlowDialog} onOpenChange={setShowChangeFlowDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change your flow?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You&apos;ll choose whether you&apos;re still looking for a prom date or already have a plus one (IIMA or outside). You can change this later from your profile.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowChangeFlowDialog(false);
+                navigate("/onboarding?flow=choice");
+              }}
+            >
+              Continue
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

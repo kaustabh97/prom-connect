@@ -27,3 +27,6 @@ dist-ssr
 .amplify
 amplify_outputs.json
 amplifyconfiguration*
+
+# Local sample image (do not commit)
+sample-rose-email.png

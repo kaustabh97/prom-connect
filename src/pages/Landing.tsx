@@ -283,7 +283,7 @@ const Landing = () => {
           <p className="text-sm text-muted-foreground font-semibold leading-tight">Starlit by the Bricks, 2026 ©</p>
           <p className="text-sm text-muted-foreground leading-tight">Crafted on Campus, for Campus 💛</p>
           <p className="text-xs text-muted-foreground/60 mt-3">
-            brought to you by Dipak & Kaustabh
+            Brought to you by Dipak & Kaustabh
           </p>
         </div>
       </footer>

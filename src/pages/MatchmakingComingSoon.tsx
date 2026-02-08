@@ -6,6 +6,7 @@ import { Heart, User, Share2 } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import CountdownTimer from "@/components/CountdownTimer";
 import FomoCounter from "@/components/FomoCounter";
+import { MATCHMAKING_GO_LIVE_DATE } from "@/config";
 import { useRegisteredCount } from "@/hooks/useRegisteredCount";
 import { handleReferralShare } from "@/utils/share";
 import { logInfo } from "@/utils/logger";
@@ -41,7 +42,7 @@ export default function MatchmakingComingSoon() {
           </p>
           {count !== null && <FomoCounter count={count} hasMore={hasMore} animate delay={0} />}
           <div className="mb-8">
-            <CountdownTimer targetDate="2026-02-08T21:00:00" label="Matchmaking begins in" />
+            <CountdownTimer targetDate={MATCHMAKING_GO_LIVE_DATE} label="Matchmaking begins in" />
           </div>
           <Button
             variant="gold"

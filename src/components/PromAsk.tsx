@@ -9,12 +9,11 @@ import { Heart, Sparkles, PartyPopper, X } from "lucide-react";
 interface PromAskProps {
   matchId: string;
   otherUserId: string;
-  matchCompatScore: number;
   onClose: () => void;
   onSend: (message?: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: PromAskProps) => {
+const PromAsk = ({ matchId, otherUserId, onClose, onSend }: PromAskProps) => {
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
@@ -122,10 +121,7 @@ const PromAsk = ({ matchId, otherUserId, matchCompatScore, onClose, onSend }: Pr
                   Ask to Prom? 💃
                 </h3>
                 <p className="text-muted-foreground">
-                  Send a special invitation to your{" "}
-                  <span className="text-primary font-semibold">
-                    {Math.round(matchCompatScore * 100)}% match
-                  </span>
+                  Send a special invitation to your match
                 </p>
               </div>
 

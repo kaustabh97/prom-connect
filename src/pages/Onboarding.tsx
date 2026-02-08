@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +19,14 @@ import { signOut } from "aws-amplify/auth";
 import { uploadData } from "aws-amplify/storage";
 import { getUserProfileFromCognito, hasCompletedOnboarding, clearTestUser } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
+import { getCohortDisplayLabel } from "@/lib/dating";
 import { getPromDateRedirectPath } from "@/lib/promDateRedirect";
 import { getInviteFrom, clearInviteFrom } from "@/utils/invite";
+import { resetProfileForDiscovery, unmatchUsers } from "@/utils/unmatch";
 import { logError, logInfo } from "@/utils/logger";
 import WhatsAppInviteDialog from "@/components/WhatsAppInviteDialog";
 import { ArrowRight, ArrowLeft, AlertTriangle, Bell, Check, Heart, LogOut, Mail, Image as ImageIcon, X, MessageCircle } from "lucide-react";
-import { GOOGLE_LOGIN_CHECK, MATCHMAKING_ENABLED } from "@/config";
+import { GOOGLE_LOGIN_CHECK, getMatchmakingEnabled } from "@/config";
 import {
   Dialog,
   DialogContent,
@@ -136,6 +138,7 @@ const intentions = [
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   // Auth state
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -152,6 +155,10 @@ const Onboarding = () => {
   useEffect(() => {
     logInfo("Onboarding step changed", { component: "Onboarding", operation: "stepChange", extra: { step } });
   }, [step]);
+  /** True when user landed with ?flow=choice to change flow (already has profile) */
+  const [isFlowChoiceOnly, setIsFlowChoiceOnly] = useState(false);
+  /** True when we sent user to fill missing DOB/cohort/photo before showing flow choice */
+  const [completingProfileForFlowChange, setCompletingProfileForFlowChange] = useState(false);
   const [inviteRequest, setInviteRequest] = useState<{
     id: string;
     fromUserId: string;
@@ -245,11 +252,56 @@ const Onboarding = () => {
           // Check if user has already completed onboarding
           const completed = await hasCompletedOnboarding();
           if (completed) {
+            // Allow changing flow: show choice step when URL has ?flow=choice (set by Profile "I already have a plus one", PromDate "Change my flow", or Matches Unmatch)
+            if (searchParams.get("flow") === "choice") {
+              const profileId = getIdFromEmail(authProfile.email!.trim());
+              const { data: existingProfile } = await client.models.UserProfile.get(
+                { id: profileId },
+                { authMode: "apiKey" }
+              );
+              if (existingProfile) {
+                const p = existingProfile as Record<string, unknown>;
+                setProfile((prev) => ({
+                  ...prev,
+                  email: (p.email as string) ?? prev.email,
+                  name: (p.name as string) ?? prev.name,
+                  dateOfBirth: (p.dateOfBirth as string) ?? prev.dateOfBirth,
+                  age: (p.age as number) ?? prev.age,
+                  cohort: (p.cohort as string) ?? prev.cohort,
+                  gender: (p.gender as string) ?? prev.gender,
+                  profilePicKey: (p.profilePicKey as string) ?? prev.profilePicKey,
+                  partnerStatus: (p.partnerStatus as string) ?? "",
+                  partnerEmail: (p.partnerEmail as string) ?? "",
+                  partnerName: (Array.isArray(p.partnerName) ? p.partnerName[0] : p.partnerName) ?? "",
+                }));
+                const hasDob = !!(p.dateOfBirth || p.age);
+                const hasCohortGender = !!(p.cohort && p.gender);
+                const hasPhoto = !!(p.profilePicKey);
+                if (!hasDob) {
+                  setStep("dateOfBirth");
+                  setCompletingProfileForFlowChange(true);
+                } else if (!hasPhoto) {
+                  setStep("photoUpload");
+                  setCompletingProfileForFlowChange(true);
+                } else if (!hasCohortGender) {
+                  setStep("ageCohortGender");
+                  setCompletingProfileForFlowChange(true);
+                } else {
+                  setStep("choice");
+                  setIsFlowChoiceOnly(true);
+                }
+              } else {
+                setStep("choice");
+                setIsFlowChoiceOnly(true);
+              }
+              setIsCheckingAuth(false);
+              return;
+            }
             const promDatePath = await getPromDateRedirectPath();
             if (promDatePath) {
               navigate(promDatePath);
             } else {
-              navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+              navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
             }
             return;
           }
@@ -452,18 +504,129 @@ const Onboarding = () => {
     return () => { cancelled = true; };
   }, [step, userEmail]);
 
+  /** When switching to "Still looking" from flow choice, clear any existing Match/MatchRequest so backend reflects new flow (fixes logout→login showing old flow). */
+  const clearExistingMatchIfSwitchingToDiscovery = async (profileId: string): Promise<void> => {
+    const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+    const [as1, as2] = await Promise.all([
+      client.models.Match.listMatchByUser1Id({ user1Id: profileId }, opts),
+      client.models.Match.listMatchByUser2Id({ user2Id: profileId }, opts),
+    ]);
+    const all = [...(as1.data ?? []), ...(as2.data ?? [])];
+    const promMatch = all.find((m) => m.status === "active" && m.isPromDate);
+    if (promMatch?.id) {
+      const otherUserId = promMatch.user1Id === profileId ? promMatch.user2Id : promMatch.user1Id;
+      if (otherUserId) {
+        await unmatchUsers({
+          matchId: promMatch.id,
+          currentUserId: profileId,
+          otherUserId,
+          isPromDate: true,
+          currentUserFormData: undefined,
+        });
+      }
+    }
+    const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+      { fromUserId: profileId },
+      opts
+    );
+    const pending = (outgoing ?? []).filter((r) => r.status === "pending");
+    if (pending.length > 0) {
+      await resetProfileForDiscovery(profileId);
+      for (const r of pending) {
+        if (r.id) await client.models.MatchRequest.update({ id: r.id, status: "withdrawn" }, opts);
+      }
+    }
+  };
+
+  /** When switching to "Already have plus one" from flow choice, clear any existing Match and withdraw outgoing MatchRequests so backend is clean for new partner flow. */
+  const clearExistingDiscoveryStateWhenSwitchingToPartnerFlow = async (profileId: string): Promise<void> => {
+    const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+    const [as1, as2] = await Promise.all([
+      client.models.Match.listMatchByUser1Id({ user1Id: profileId }, opts),
+      client.models.Match.listMatchByUser2Id({ user2Id: profileId }, opts),
+    ]);
+    const all = [...(as1.data ?? []), ...(as2.data ?? [])];
+    const activeMatches = all.filter((m) => m.status === "active");
+    for (const match of activeMatches) {
+      if (!match.id) continue;
+      const otherUserId = match.user1Id === profileId ? match.user2Id : match.user1Id;
+      if (otherUserId) {
+        await unmatchUsers({
+          matchId: match.id,
+          currentUserId: profileId,
+          otherUserId,
+          isPromDate: !!match.isPromDate,
+          currentUserFormData: undefined,
+        });
+      }
+    }
+    const { data: outgoing } = await client.models.MatchRequest.listMatchRequestByFromUserId(
+      { fromUserId: profileId },
+      opts
+    );
+    const pending = (outgoing ?? []).filter((r) => r.status === "pending");
+    for (const r of pending) {
+      if (r.id) await client.models.MatchRequest.update({ id: r.id, status: "withdrawn" }, opts);
+    }
+  };
+
   // When user picks "Looking for a date", "Already a couple", or "You have a request from X" at the choice step
-  const handleChoice = (option: (typeof partnerStatusOptions)[number] | "request") => {
+  const handleChoice = async (option: (typeof partnerStatusOptions)[number] | "request") => {
     if (option === "request") {
-      setFlowChoice("invite");
-      setStep("partnerRequest");
+      setSaveError(null);
+      try {
+        await saveInitialProfileToBackend();
+        setFlowChoice("invite");
+        setStep("partnerRequest");
+      } catch {
+        // saveInitialProfileToBackend already sets setSaveError and setIsSaving
+      }
       return;
     }
     setProfile(prev => ({ ...prev, partnerStatus: option }));
     if (option === "Still looking for my prom date 💫") {
+      if (isFlowChoiceOnly) {
+        const profileId = getIdFromEmail(userEmail.trim());
+        setSaveError(null);
+        setIsSaving(true);
+        (async () => {
+          try {
+            await clearExistingMatchIfSwitchingToDiscovery(profileId);
+            setIsFlowChoiceOnly(false);
+            setFlowChoice("full");
+            setStep("notifications");
+          } catch (err) {
+            logError(err, { component: "Onboarding", operation: "clearExistingMatchIfSwitchingToDiscovery" });
+            setSaveError("Could not switch flow. Please try again.");
+          } finally {
+            setIsSaving(false);
+          }
+        })();
+        return;
+      }
       setFlowChoice("full");
       setStep("notifications");
     } else {
+      if (isFlowChoiceOnly) {
+        const profileId = getIdFromEmail(userEmail.trim());
+        setSaveError(null);
+        setIsSaving(true);
+        (async () => {
+          try {
+            await clearExistingDiscoveryStateWhenSwitchingToPartnerFlow(profileId);
+            setIsFlowChoiceOnly(false);
+            setFlowChoice("couple");
+            setStep("couplePartnerType");
+          } catch (err) {
+            logError(err, { component: "Onboarding", operation: "clearExistingDiscoveryStateWhenSwitchingToPartnerFlow" });
+            setSaveError("Could not switch flow. Please try again.");
+          } finally {
+            setIsSaving(false);
+          }
+        })();
+        return;
+      }
+      setIsFlowChoiceOnly(false);
       setFlowChoice("couple");
       setStep("couplePartnerType");
     }
@@ -600,7 +763,19 @@ const Onboarding = () => {
 
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < effectiveSteps.length) {
-      setStep(effectiveSteps[nextIndex]);
+      const nextStepValue = effectiveSteps[nextIndex];
+      if (step === "ageCohortGender" && nextStepValue === "choice" && completingProfileForFlowChange) {
+        try {
+          await saveInitialProfileToBackend();
+          setCompletingProfileForFlowChange(false);
+          setIsFlowChoiceOnly(true);
+          setStep("choice");
+        } catch {
+          // saveInitialProfileToBackend already sets setSaveError
+        }
+        return;
+      }
+      setStep(nextStepValue);
     }
   };
 
@@ -639,7 +814,7 @@ const Onboarding = () => {
             : undefined;
 
         // Only include fields that exist on the deployed CreateUserProfileInput.
-        const profileData = {
+        const profileData: Record<string, unknown> = {
           email: profile.email,
           name: profile.name,
           dateOfBirth: profile.dateOfBirth,
@@ -661,6 +836,15 @@ const Onboarding = () => {
           bio: profile.bio || undefined,
           onboardingCompleted: true,
         };
+        // Full flow = discovery: clear partner fields and ensure they appear in discover
+        if (flowChoice === "full") {
+          profileData.partnerStatus = "Still looking for my prom date 💫";
+          profileData.partnerEmail = "";
+          profileData.excludeFromDiscovery = false;
+          if (typeof profileData.bio === "string" && profileData.bio.trim().startsWith("Partner:")) {
+            profileData.bio = "";
+          }
+        }
 
         if (existingProfile) {
           // Update existing profile
@@ -668,27 +852,8 @@ const Onboarding = () => {
           const { data: updatedProfile, errors: updateErrors } = await client.models.UserProfile.update(
             {
               id: existingProfile.id,
-              email: profileData.email,
-              name: profileData.name,
-              dateOfBirth: profileData.dateOfBirth,
-              age: profileData.age,
-              height: profileData.height,
-              cohort: profileData.cohort,
-              gender: profileData.gender,
-              sexualOrientation: profileData.sexualOrientation,
-              intention: profileData.intention,
-              hometown: profileData.hometown,
-              notificationsEnabled: profileData.notificationsEnabled,
-              profilePicKey: profileData.profilePicKey,
-              alcoholPreference: profileData.alcoholPreference,
-              smokingPreference: profileData.smokingPreference,
-              foodPreference: profileData.foodPreference,
-              favouritePlace: profileData.favouritePlace,
-              teaOrCoffee: profileData.teaOrCoffee,
-              mountainOrBeach: profileData.mountainOrBeach,
-              bio: profileData.bio,
-              onboardingCompleted: profileData.onboardingCompleted,
-            },
+              ...profileData,
+            } as Parameters<typeof client.models.UserProfile.update>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
 
@@ -700,28 +865,9 @@ const Onboarding = () => {
           // @ts-ignore - TypeScript types don't match runtime behavior for create arguments
           const { data: createdProfile, errors: createErrors } = await client.models.UserProfile.create(
             {
-              id: getIdFromEmail(profileData.email),
-              email: profileData.email,
-              name: profileData.name,
-              dateOfBirth: profileData.dateOfBirth,
-              age: profileData.age,
-              height: profileData.height,
-              cohort: profileData.cohort,
-              gender: profileData.gender,
-              sexualOrientation: profileData.sexualOrientation,
-              intention: profileData.intention,
-              hometown: profileData.hometown,
-              notificationsEnabled: profileData.notificationsEnabled,
-              profilePicKey: profileData.profilePicKey,
-              alcoholPreference: profileData.alcoholPreference,
-              smokingPreference: profileData.smokingPreference,
-              foodPreference: profileData.foodPreference,
-              favouritePlace: profileData.favouritePlace,
-              teaOrCoffee: profileData.teaOrCoffee,
-              mountainOrBeach: profileData.mountainOrBeach,
-              bio: profileData.bio,
-              onboardingCompleted: profileData.onboardingCompleted,
-            },
+              id: getIdFromEmail(profile.email),
+              ...profileData,
+            } as Parameters<typeof client.models.UserProfile.create>[0],
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
 
@@ -736,7 +882,7 @@ const Onboarding = () => {
             { authMode: authMode as 'userPool' | 'apiKey' }
           );
           const hasPending = (requestsToMe ?? []).some((r) => r.status === "pending");
-          if (hasPending && MATCHMAKING_ENABLED) {
+          if (hasPending && getMatchmakingEnabled()) {
             navigate("/matches");
             setIsSaving(false);
             return;
@@ -745,12 +891,68 @@ const Onboarding = () => {
           logError(err, { component: "Onboarding", operation: "sendPartnerInvite" });
         }
         logInfo("Onboarding: profile saved, navigating", { component: "Onboarding", operation: "saveProfile", extra: { flow: "full" } });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+        navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       } catch (error) {
         logError(error, { component: "Onboarding", operation: "saveProfile" });
         setSaveError(error instanceof Error ? error.message : "Failed to save profile. Please try again.");
         setIsSaving(false);
       }
+  };
+
+  /** Save initial onboarding data (DOB, cohort, gender, photo) without setting onboardingCompleted. Used before "request from X" and when completing missing data on flow change. */
+  const saveInitialProfileToBackend = async (): Promise<void> => {
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const { fetchAuthSession } = await import("aws-amplify/auth");
+      const session = await fetchAuthSession();
+      const isAuthenticated = !!session.tokens;
+      const authMode = isAuthenticated ? "userPool" : "apiKey";
+      const opts = { authMode: authMode as "userPool" | "apiKey" };
+      const profileId = getIdFromEmail(profile.email.trim());
+      const { data: existingProfile, errors: getErrors } = await client.models.UserProfile.get(
+        { id: profileId },
+        opts
+      );
+      if (getErrors) throw new Error(getErrors[0]?.message || "Failed to check profile");
+      const heightStr =
+        profile.heightFeet != null && profile.heightInches != null
+          ? `${profile.heightFeet}'${profile.heightInches}"`
+          : undefined;
+      const initialData: Record<string, unknown> = {
+        email: profile.email,
+        name: profile.name,
+        dateOfBirth: profile.dateOfBirth || undefined,
+        age: profile.age ?? undefined,
+        height: heightStr,
+        cohort: profile.cohort || undefined,
+        gender: profile.gender || undefined,
+        profilePicKey: profile.profilePicKey || undefined,
+      };
+      if (existingProfile?.id) {
+        await client.models.UserProfile.update(
+          { id: existingProfile.id, ...initialData } as Parameters<typeof client.models.UserProfile.update>[0],
+          opts
+        );
+      } else {
+        const currentUser = await getUserProfileFromCognito();
+        await client.models.UserProfile.create(
+          {
+            id: profileId,
+            userId: currentUser?.userId ?? "",
+            ...initialData,
+          } as Parameters<typeof client.models.UserProfile.create>[0],
+          opts
+        );
+      }
+      logInfo("Onboarding: initial profile saved", { component: "Onboarding", operation: "saveInitialProfileToBackend" });
+    } catch (err) {
+      logError(err, { component: "Onboarding", operation: "saveInitialProfileToBackend" });
+      setSaveError(err instanceof Error ? err.message : "Failed to save. Please try again.");
+      throw err;
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const saveCoupleOutside = async () => {
@@ -902,11 +1104,11 @@ const Onboarding = () => {
           // Navigation to /request-pending will happen after popup is closed
         } else {
           // Partner exists - they'll see the request in Matches
-          navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+          navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
         }
       } catch (err) {
         logError(err, { component: "Onboarding", operation: "createMatchRequest" });
-        navigate(MATCHMAKING_ENABLED ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
+        navigate(getMatchmakingEnabled() ? "/discover/profile?openFilters=1" : "/matchmaking-soon");
       }
     } catch (error) {
       logError(error, { component: "Onboarding", operation: "saveCoupleIIMA" });
@@ -968,14 +1170,24 @@ const Onboarding = () => {
           opts
         );
       } else {
+        const heightStr =
+          profile.heightFeet != null && profile.heightInches != null
+            ? `${profile.heightFeet}'${profile.heightInches}"`
+            : undefined;
         const { data: created } = await client.models.UserProfile.create(
           {
             id: getIdFromEmail(profile.email),
             email: profile.email,
             name: profile.name || userName || undefined,
             userId: (await getUserProfileFromCognito())?.userId ?? "",
+            dateOfBirth: profile.dateOfBirth || undefined,
+            age: profile.age ?? undefined,
+            height: heightStr,
+            cohort: profile.cohort || undefined,
+            gender: profile.gender || undefined,
+            profilePicKey: profile.profilePicKey || undefined,
             onboardingCompleted: true,
-          },
+          } as Parameters<typeof client.models.UserProfile.create>[0],
           opts
         );
         partnerProfileId = created?.id ?? "";
@@ -1158,6 +1370,7 @@ const Onboarding = () => {
                     <Button
                       key={option}
                       variant={isSelected ? "default" : "outline"}
+                      disabled={isSaving}
                       className={`w-full h-auto min-h-[56px] sm:min-h-[64px] text-base sm:text-lg justify-center px-4 sm:px-6 py-4 sm:py-5 ${
                         isSelected
                           ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20"
@@ -1165,7 +1378,22 @@ const Onboarding = () => {
                       }`}
                       onClick={() => handleChoice(isRequestOption ? "request" : option)}
                     >
-                      {isSelected ? (
+                      {isSaving && isRequestOption ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Saving...
+                        </>
+                      ) : isSaving && option === "Still looking for my prom date 💫" ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Switching...
+                        </>
+                      ) : isSaving && option === "Already found my plus-one ✨" ? (
+                        <>
+                          <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                          Switching...
+                        </>
+                      ) : isSelected ? (
                         <>
                           <Check className="w-5 h-5 sm:w-6 sm:h-6 mr-2 shrink-0" />
                           <span>{option}</span>
@@ -1435,7 +1663,7 @@ const Onboarding = () => {
                 <SelectContent>
                   {cohorts.map((cohort) => (
                     <SelectItem key={cohort} value={cohort}>
-                      {cohort}
+                      {getCohortDisplayLabel(cohort)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -2093,7 +2321,7 @@ const Onboarding = () => {
           <div className="px-4 pt-4 pb-4">
             {/* Single row: Back | Step counter | Log out */}
             <div className="flex items-center justify-between gap-3 mb-3">
-              {(currentStepIndex > 0 || step === "couplePartnerType") ? (
+              {(currentStepIndex > 0 || step === "couplePartnerType") && !(step === "choice" && isFlowChoiceOnly) ? (
                 <Button
                   variant="outline"
                   size="sm"

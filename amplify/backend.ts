@@ -6,6 +6,7 @@ import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { sendPartnerInvite } from './functions/send-partner-invite/resource';
 import { sendReportEmail } from './functions/send-report-email/resource';
+import { sendRoseEmail } from './functions/send-rose-email/resource';
 import { frontendLogger } from './functions/frontend-logger/resource';
 
 const backend = defineBackend({
@@ -14,6 +15,7 @@ const backend = defineBackend({
   storage,
   sendPartnerInvite,
   sendReportEmail,
+  sendRoseEmail,
   frontendLogger,
 });
 
@@ -45,6 +47,19 @@ sendPartnerInviteLambda.addToRolePolicy(
     resources: ['*'],
   })
 );
+
+// Grant SES send email permission for anonymous rose emails (from cultcomm@iima.ac.in)
+const sendRoseEmailLambda = backend.sendRoseEmail.resources.lambda;
+sendRoseEmailLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    sid: 'AllowSesSendEmail',
+    actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+    resources: ['*'],
+  })
+);
+// SES identities are per-region. Default ap-south-1 (Mumbai) where cultcomm@iima.ac.in is verified.
+(sendRoseEmailLambda as unknown as LambdaWithEnv).addEnvironment('SES_REGION', process.env.SES_REGION ?? 'ap-south-1');
+(sendRoseEmailLambda as unknown as LambdaWithEnv).addEnvironment('SES_FROM_EMAIL', process.env.SES_FROM_EMAIL ?? '');
 
 // Report emails use Resend API (no SES). RESEND_API_KEY from env when running sandbox.
 const sendReportEmailLambda = backend.sendReportEmail.resources.lambda as unknown as LambdaWithEnv;

@@ -1,6 +1,7 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
 import { sendReportEmail as sendReportEmailFn } from '../functions/send-report-email/resource';
+import { sendRoseEmail } from '../functions/send-rose-email/resource';
 import { frontendLogger } from '../functions/frontend-logger/resource';
 
 /*== STEP 1 ===============================================================
@@ -26,6 +27,7 @@ const schema = a.schema({
       sexualOrientation: a.string(),
       intention: a.string(), // Date for Prom, Long Term, Not Sure
       hometown: a.string(),
+      // Optional: may be null for existing users before flow-choice; app uses ?? or optional chaining
       partnerStatus: a.string(), // Looking for partner, Already have partner
       partnerEmail: a.string(), // Partner's IIMA email when both have partners; for direct matching
       bio: a.string(),
@@ -72,10 +74,12 @@ const schema = a.schema({
       pollBoredInRoom: a.string(),         // Walk & Talk | Sit and vibe
       pollCasualOrDressed: a.string(),     // Casual outfit | Dressed up
       
-      // Profile completion status
+      // Profile completion status (optional: may be null for existing users; app uses ?? or !== true)
       onboardingCompleted: a.boolean(),
       // When true, user is in a confirmed partner match and should not appear in discovery
       excludeFromDiscovery: a.boolean(),
+      // Anonymous rose emails: max 2 per user (enforced in send-rose-email Lambda)
+      rosesSentCount: a.integer(),
     })
     .authorization((allow) => [
       allow.publicApiKey(),      // Allow API key for public access
@@ -202,6 +206,18 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
     .handler(a.handler.function(sendReportEmailFn)),
 
+  // Anonymous rose email: send "someone wants to go to Prom with you" (max 2 per user; no sender stored)
+  sendRoseEmail: a
+    .query()
+    .arguments({
+      currentUserId: a.string().required(),
+      toEmail: a.string().required(),
+      appUrl: a.string().required(),
+    })
+    .returns(a.json())
+    .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
+    .handler(a.handler.function(sendRoseEmail)),
+
   // Custom mutation to receive frontend logs and write to CloudWatch (separate dev/prod streams)
   logFrontendEvent: a
     .mutation()
@@ -232,7 +248,8 @@ const schema = a.schema({
       allow.publicApiKey(),                     // Allow public access for development (TEMP)
       allow.authenticated(),                    // Authenticated users can access
     ]),
-});
+})
+  .authorization((allow) => [allow.resource(sendRoseEmail)]);
 
 export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({

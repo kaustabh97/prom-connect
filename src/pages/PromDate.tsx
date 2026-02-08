@@ -4,17 +4,35 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import SparkleBackground from "@/components/SparkleBackground";
 import { usePromDate } from "@/hooks/usePromDate";
-import { getUserProfileFromCognito } from "@/utils/auth";
+import { getUserProfileFromCognito, clearTestUser } from "@/utils/auth";
+import { deleteUserProfile } from "@/utils/deleteProfile";
+import { unmatchUsers, resetProfileForDiscovery } from "@/utils/unmatch";
 import { logError, logInfo } from "@/utils/logger";
 import { getUrl } from "aws-amplify/storage";
 import { getIdFromEmail } from "@/utils/userId";
 import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
-import { Loader2, LogOut, MessageCircle, Sparkles, User } from "lucide-react";
+import { Loader2, LogOut, MessageCircle, Sparkles, User, Trash2 } from "lucide-react";
 import CountdownTimer from "@/components/CountdownTimer";
 import { signOut } from "aws-amplify/auth";
-import { clearTestUser } from "@/utils/auth";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 
 const client = generateClient<Schema>();
 
@@ -107,6 +125,73 @@ export default function PromDate() {
   const showOutsideView = isOutsidePartner && partnerNameFromUrl;
   const showBothView = promDate && !showOutsideView;
 
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isChangingFlow, setIsChangingFlow] = useState(false);
+  const [changeFlowError, setChangeFlowError] = useState<string | null>(null);
+
+  /** Change flow: unmatch / reset without asking withdraw details; user chooses flow on next screen. */
+  const handleChangeFlowClick = async () => {
+    setIsChangingFlow(true);
+    setChangeFlowError(null);
+    setOptionsOpen(false);
+    try {
+      if (showOutsideView) {
+        await resetProfileForDiscovery(currentUserId);
+        navigate("/onboarding?flow=choice", { replace: true });
+        return;
+      }
+      if (!promDate?.match?.id || !currentUserId || !promDate.otherUserId) {
+        setChangeFlowError("Missing match info");
+        return;
+      }
+      const result = await unmatchUsers({
+        matchId: promDate.match.id,
+        currentUserId,
+        otherUserId: promDate.otherUserId,
+        isPromDate: !!promDate.match.isPromDate,
+        currentUserFormData: undefined,
+      });
+      if (result.success) {
+        navigate("/onboarding?flow=choice", { replace: true });
+      } else {
+        setChangeFlowError(result.error ?? "Failed to change flow");
+      }
+    } catch (err) {
+      logError(err, { component: "PromDate", operation: "changeFlow" });
+      setChangeFlowError(err instanceof Error ? err.message : "Failed to change flow");
+    } finally {
+      setIsChangingFlow(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const p = await getUserProfileFromCognito();
+    if (!p?.email) return;
+    const profileId = getIdFromEmail(p.email.trim());
+    const { data: myProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
+    if (!myProfile?.id || !myProfile.email) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const result = await deleteUserProfile(myProfile.id, myProfile.email);
+      if (result.success) {
+        if (!GOOGLE_LOGIN_CHECK) clearTestUser();
+        if (GOOGLE_LOGIN_CHECK) await signOut();
+        navigate("/", { replace: true });
+      } else {
+        setDeleteError(result.error ?? "Failed to delete account");
+      }
+    } catch (err) {
+      logError(err, { component: "PromDate", operation: "deleteAccount" });
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleLogout = async () => {
     logInfo("PromDate: logout clicked", { component: "PromDate", operation: "logout" });
     try {
@@ -186,8 +271,9 @@ export default function PromDate() {
           </p>
         </motion.div>
 
-        {/* Outside partner: single card with me + partner name */}
+        {/* Outside partner: single card + Change flow or delete account */}
         {showOutsideView && (
+          <>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -207,6 +293,51 @@ export default function PromDate() {
             <p className="text-sm text-muted-foreground mt-2">+</p>
             <p className="font-playfair text-lg font-medium text-foreground mt-1">{theirName}</p>
           </motion.div>
+          <motion.div
+            data-share-hide
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mt-6 w-full max-w-xs flex flex-col gap-2"
+          >
+            <Sheet open={optionsOpen} onOpenChange={setOptionsOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
+                >
+                  Change flow or delete account
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl">
+                <SheetHeader>
+                  <SheetTitle>Change flow or delete account</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    disabled={isChangingFlow}
+                    onClick={handleChangeFlowClick}
+                  >
+                    <User className="w-4 h-4" />
+                    Change my flow
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
+                    disabled={isDeleting}
+                    onClick={() => { setOptionsOpen(false); setDeleteError(null); setShowDeleteDialog(true); }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete my account
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </motion.div>
+          </>
         )}
 
         {/* Both IIMA: two cards with photos in V-shape */}
@@ -280,14 +411,14 @@ export default function PromDate() {
           <CountdownTimer targetDate="2026-02-15T20:00:00" />
         </motion.div>
 
-        {/* Chat button - always for IIMA couples (hidden in share image) */}
+        {/* Chat button + Change flow or delete account - always for IIMA couples (hidden in share image) */}
         {showBothView && (
           <motion.div
             data-share-hide
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.9 }}
-            className="mt-6 w-full max-w-xs"
+            className="mt-6 w-full max-w-xs flex flex-col gap-3"
           >
             <Button
               variant="outline"
@@ -297,6 +428,42 @@ export default function PromDate() {
               <MessageCircle className="w-5 h-5" />
               Chat with {theirName}
             </Button>
+            <Sheet open={optionsOpen} onOpenChange={setOptionsOpen}>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="w-full gap-2 border-slate-400/80 bg-slate-500/10 hover:bg-slate-500/20 text-foreground"
+                >
+                  Change flow or delete account
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="rounded-t-2xl">
+                <SheetHeader>
+                  <SheetTitle>Change flow or delete account</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2"
+                    disabled={isChangingFlow}
+                    onClick={handleChangeFlowClick}
+                  >
+                    <User className="w-4 h-4" />
+                    Change my flow
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-destructive border-destructive/50 hover:bg-destructive/10"
+                    disabled={isDeleting}
+                    onClick={() => { setOptionsOpen(false); setDeleteError(null); setShowDeleteDialog(true); }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete my account
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </motion.div>
         )}
 
@@ -310,6 +477,24 @@ export default function PromDate() {
         </motion.p>
       </div>
 
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your profile, all your matches, and conversations.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" disabled={isDeleting} onClick={handleDeleteAccount}>
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete account"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
