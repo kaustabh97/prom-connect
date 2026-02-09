@@ -3,6 +3,7 @@ import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
 import { sendReportEmail as sendReportEmailFn } from '../functions/send-report-email/resource';
 import { sendRoseEmail } from '../functions/send-rose-email/resource';
 import { computeDiscoveryScores } from '../functions/compute-discovery-scores/resource';
+import { ensureMutualMatches } from '../functions/ensure-mutual-matches/resource';
 import { frontendLogger } from '../functions/frontend-logger/resource';
 
 /*== STEP 1 ===============================================================
@@ -242,6 +243,13 @@ const schema = a.schema({
     .authorization((allow) => [allow.publicApiKey()])
     .handler(a.handler.function(computeDiscoveryScores)),
 
+  // Cron: ensure mutual likes are converted into Match records. Call manually or via EventBridge.
+  ensureMutualMatches: a
+    .query()
+    .returns(a.json())
+    .authorization((allow) => [allow.publicApiKey()])
+    .handler(a.handler.function(ensureMutualMatches)),
+
   // Custom mutation to receive frontend logs and write to CloudWatch (separate dev/prod streams)
   logFrontendEvent: a
     .mutation()
@@ -273,7 +281,7 @@ const schema = a.schema({
       allow.authenticated(),                    // Authenticated users can access
     ]),
 })
-  .authorization((allow) => [allow.resource(sendRoseEmail), allow.resource(computeDiscoveryScores)]);
+  .authorization((allow) => [allow.resource(sendRoseEmail), allow.resource(computeDiscoveryScores), allow.resource(ensureMutualMatches)]);
 
 export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
