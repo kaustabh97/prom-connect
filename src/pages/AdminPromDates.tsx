@@ -13,9 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Users, Heart, MessageCircle, TrendingUp, UserCheck, Home, Shield } from "lucide-react";
+import { Loader2, RefreshCw, Users, Heart, MessageCircle, TrendingUp, UserCheck, Home, Shield, AlertTriangle } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import { useNavigate } from "react-router-dom";
+import { getUserProfileFromCognito } from "@/utils/auth";
 
 const client = generateClient<Schema>();
 
@@ -118,13 +119,22 @@ const isThisWeek = (dateString?: string | null): boolean => {
   }
 };
 
+// Admin emails allowed to access the dashboard
+const ALLOWED_ADMIN_EMAILS = [
+  "p24kaustabh@iima.ac.in",
+  "p24dipak@iima.ac.in",
+  "p24sushruti@iima.ac.in",
+];
+
 export default function AdminPromDates() {
+  const navigate = useNavigate();
   const [matches, setMatches] = useState<MatchWithUserDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [computingScores, setComputingScores] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const fetchAllStats = async () => {
     try {
@@ -400,12 +410,45 @@ export default function AdminPromDates() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchMatches(), fetchAllStats()]);
-      setLoading(false);
+    const checkAccess = async () => {
+      try {
+        const userProfile = await getUserProfileFromCognito();
+        const userEmail = userProfile?.email?.toLowerCase().trim();
+        
+        if (!userEmail) {
+          setIsAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
+        const isAllowed = ALLOWED_ADMIN_EMAILS.some(
+          (email) => email.toLowerCase().trim() === userEmail
+        );
+
+        if (!isAllowed) {
+          logError(new Error("Unauthorized access attempt"), {
+            component: "AdminPromDates",
+            operation: "checkAccess",
+            extra: { email: userEmail },
+          });
+          setIsAuthorized(false);
+          setLoading(false);
+          return;
+        }
+
+        setIsAuthorized(true);
+        // Load data only if authorized
+        setLoading(true);
+        await Promise.all([fetchMatches(), fetchAllStats()]);
+        setLoading(false);
+      } catch (err) {
+        logError(err, { component: "AdminPromDates", operation: "checkAccess" });
+        setIsAuthorized(false);
+        setLoading(false);
+      }
     };
-    loadData();
+
+    checkAccess();
   }, []);
 
   const handleRefresh = async () => {
@@ -414,10 +457,31 @@ export default function AdminPromDates() {
     setRefreshing(false);
   };
 
-  if (loading) {
+  if (loading || isAuthorized === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isAuthorized === false) {
+    return (
+      <div className="min-h-screen relative">
+        <SparkleBackground />
+        <div className="relative z-10 flex items-center justify-center min-h-screen">
+          <div className="glass rounded-2xl p-8 max-w-md text-center">
+            <AlertTriangle className="w-16 h-16 text-destructive mx-auto mb-4" />
+            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+            <p className="text-muted-foreground mb-6">
+              You do not have permission to access this admin dashboard.
+            </p>
+            <Button onClick={() => navigate("/")} variant="outline">
+              <Home className="w-4 h-4 mr-2" />
+              Return to Home
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
