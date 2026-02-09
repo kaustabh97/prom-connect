@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import PromDate from "./pages/PromDate";
 import RequestPending from "./pages/RequestPending";
 import MatchmakingComingSoon from "./pages/MatchmakingComingSoon";
+import AdminPromDates from "./pages/AdminPromDates";
 import NotFound from "./pages/NotFound";
 import { useMatchmakingEnabled } from "@/hooks/useMatchmakingEnabled";
 
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="/prom-date" element={<PromDate />} />
         <Route path="/request-pending" element={<RequestPending />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/admin/prom-dates" element={<AdminPromDates />} />
       </Route>
       <Route path="/test-chat" element={<TestChat />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

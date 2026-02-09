@@ -7,6 +7,9 @@
  */
 
 export const handler = async (): Promise<{ created: number; error?: string }> => {
+  const startTime = new Date().toISOString();
+  console.log("[ensure-mutual-matches] Starting cron job at", startTime);
+  
   try {
     const { getAmplifyDataClientConfig } = await import("@aws-amplify/backend/function/runtime");
     const { Amplify } = await import("aws-amplify");
@@ -103,7 +106,13 @@ export const handler = async (): Promise<{ created: number; error?: string }> =>
     console.log("[ensure-mutual-matches] created", created, "matches");
     return { created };
   } catch (err) {
-    console.error("[ensure-mutual-matches] error", err);
+    const endTime = new Date().toISOString();
+    console.error("[ensure-mutual-matches] Failed:", {
+      error: err,
+      startTime,
+      endTime,
+      durationMs: new Date(endTime).getTime() - new Date(startTime).getTime(),
+    });
     const message = err instanceof Error ? err.message : String(err);
     return { created: 0, error: message };
   }

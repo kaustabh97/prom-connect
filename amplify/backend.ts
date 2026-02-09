@@ -79,10 +79,26 @@ sendReportEmailLambda.addEnvironment(
 // Discovery score: run on schedule (every 3 hours) and once on every deploy
 const computeDiscoveryScoresLambda = backend.computeDiscoveryScores.resources.lambda;
 const computeStack = backend.computeDiscoveryScores.resources.lambda.stack;
+
+// Grant S3 read permission for model introspection schema
+// The Lambda needs to read the schema from S3 to initialize the Amplify Data client
+// Amplify creates buckets with pattern: amplify-{appId}-ma-modelintrospectionschema-{random}
+// Since the exact bucket name is generated at deploy time, we grant access to all Amplify buckets
+// This is safe as they're all Amplify-managed resources
+computeDiscoveryScoresLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    sid: 'AllowS3ReadModelIntrospectionSchema',
+    actions: ['s3:GetObject'],
+    resources: [
+      `arn:aws:s3:::amplify-*/*`,
+    ],
+  })
+);
+
 new events.Rule(computeStack, 'ComputeDiscoveryScoresSchedule', {
-  schedule: events.Schedule.rate(Duration.hours(3)),
+  schedule: events.Schedule.rate(Duration.hours(1)),
   targets: [new targets.LambdaFunction(computeDiscoveryScoresLambda)],
-  description: 'Run discovery score computation every 3 hours',
+  description: 'Run discovery score computation every 1 hour',
 });
 
 // Invoke discovery score Lambda once on deploy (so DB has scores right after deploy, not only after first schedule run)
@@ -116,6 +132,18 @@ new cr.AwsCustomResource(computeStack, 'ComputeDiscoveryScoresOnDeploy', {
 // Ensure mutual likes are turned into Matches every hour (backfill safety net)
 const ensureMutualMatchesLambda = backend.ensureMutualMatches.resources.lambda;
 const ensureStack = ensureMutualMatchesLambda.stack;
+
+// Grant S3 read permission for model introspection schema
+ensureMutualMatchesLambda.addToRolePolicy(
+  new iam.PolicyStatement({
+    sid: 'AllowS3ReadModelIntrospectionSchema',
+    actions: ['s3:GetObject'],
+    resources: [
+      `arn:aws:s3:::amplify-*/*`,
+    ],
+  })
+);
+
 new events.Rule(ensureStack, 'EnsureMutualMatchesSchedule', {
   schedule: events.Schedule.rate(Duration.hours(1)),
   targets: [new targets.LambdaFunction(ensureMutualMatchesLambda)],
