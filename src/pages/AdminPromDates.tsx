@@ -253,9 +253,11 @@ export default function AdminPromDates() {
   const fetchAllStats = async () => {
     try {
       setError(null);
+      console.log("[AdminPromDates] Starting fetchAllStats...");
       const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
 
       // Fetch all data with pagination
+      console.log("[AdminPromDates] Fetching data with pagination...");
       const [allProfiles, allMatches, allLikes, allConversations, allMessages, allMatchRequests, allPromAsks, allReports] = await Promise.all([
         fetchAllWithPagination(client.models.UserProfile.list.bind(client.models.UserProfile), opts),
         fetchAllWithPagination((client.models.Match as any).list.bind(client.models.Match), opts),
@@ -266,6 +268,13 @@ export default function AdminPromDates() {
         fetchAllWithPagination((client.models.PromAskRequest as any).list.bind(client.models.PromAskRequest), opts),
         fetchAllWithPagination((client.models.Report as any).list.bind(client.models.Report), opts),
       ]);
+      console.log("[AdminPromDates] Data fetched:", {
+        profiles: allProfiles.length,
+        matches: allMatches.length,
+        likes: allLikes.length,
+        conversations: allConversations.length,
+        messages: allMessages.length,
+      });
 
       // Calculate user stats
       const totalUsers = allProfiles.length;
@@ -371,7 +380,7 @@ export default function AdminPromDates() {
         noId: allProfiles.filter(p => !p.id).length,
       };
 
-      setStats({
+      const statsData = {
         totalUsers,
         usersLookingFlow,
         usersPartnerFlow,
@@ -407,7 +416,9 @@ export default function AdminPromDates() {
           lastScoreUpdate,
           profilesWithoutScoreReasons,
         },
-      });
+      };
+      
+      setStats(statsData);
 
       // Calculate Advanced Metrics
       calculateAdvancedMetrics(
@@ -425,10 +436,17 @@ export default function AdminPromDates() {
         promDatesCount
       );
 
-      logInfo("Fetched all stats", { component: "AdminPromDates", operation: "fetchAllStats" });
+      console.log("[AdminPromDates] Stats set successfully:", {
+        totalUsers: statsData.totalUsers,
+        totalMatches: statsData.totalMatches,
+      });
+      logInfo("Fetched all stats", { component: "AdminPromDates", operation: "fetchAllStats", extra: { totalUsers: statsData.totalUsers } });
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "fetchAllStats" });
       setError(err instanceof Error ? err.message : "Failed to fetch stats");
+      // Ensure stats is set to null on error so loading state shows
+      setStats(null);
+      setAdvancedMetrics(null);
     }
   };
 
@@ -1430,7 +1448,16 @@ export default function AdminPromDates() {
           </div>
 
           {/* Overview Tab */}
-          {activeTab === "overview" && stats && (
+          {activeTab === "overview" && (
+            !stats ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading dashboard data...</p>
+                {error && (
+                  <p className="text-destructive mt-2">Error: {error}</p>
+                )}
+              </div>
+            ) : (
             <>
               {/* Overview Stats - Key Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -1872,7 +1899,16 @@ export default function AdminPromDates() {
           )}
 
           {/* Advanced Metrics Tab */}
-          {activeTab === "metrics" && advancedMetrics && (
+          {activeTab === "metrics" && (
+            !advancedMetrics ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading advanced metrics...</p>
+                {error && (
+                  <p className="text-destructive mt-2">Error: {error}</p>
+                )}
+              </div>
+            ) : (
             <div className="space-y-6">
               {/* Conversion Funnel Metrics */}
               <div className="p-4 bg-muted/50 rounded-lg">
@@ -2167,6 +2203,7 @@ export default function AdminPromDates() {
                 </div>
               </div>
             </div>
+            )
           )}
         </div>
       </div>
