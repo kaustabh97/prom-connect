@@ -507,6 +507,13 @@ const Onboarding = () => {
   /** When switching to "Still looking" from flow choice, clear any existing Match/MatchRequest so backend reflects new flow (fixes logout→login showing old flow). */
   const clearExistingMatchIfSwitchingToDiscovery = async (profileId: string): Promise<void> => {
     const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+    
+    // Get current profile to check for non-IIMA partner flow (partnerEmail set but no Match)
+    const { data: currentProfile } = await client.models.UserProfile.get({ id: profileId }, opts);
+    const hasNonIIMAPartner = currentProfile && 
+      (currentProfile.partnerEmail ?? "").trim() !== "" &&
+      !(currentProfile.partnerEmail ?? "").endsWith("@iima.ac.in");
+    
     const [as1, as2] = await Promise.all([
       client.models.Match.listMatchByUser1Id({ user1Id: profileId }, opts),
       client.models.Match.listMatchByUser2Id({ user2Id: profileId }, opts),
@@ -530,7 +537,9 @@ const Onboarding = () => {
       opts
     );
     const pending = (outgoing ?? []).filter((r) => r.status === "pending");
-    if (pending.length > 0) {
+    
+    // Reset profile if there are pending requests OR if switching from non-IIMA partner flow (no Match record)
+    if (pending.length > 0 || hasNonIIMAPartner) {
       await resetProfileForDiscovery(profileId);
       for (const r of pending) {
         if (r.id) await client.models.MatchRequest.update({ id: r.id, status: "withdrawn" }, opts);
@@ -591,7 +600,16 @@ const Onboarding = () => {
         setIsSaving(true);
         (async () => {
           try {
+            // Clear matches and reset profile BEFORE proceeding
             await clearExistingMatchIfSwitchingToDiscovery(profileId);
+            // Also ensure profile fields are cleared in local state
+            setProfile(prev => ({
+              ...prev,
+              partnerStatus: "Still looking for my prom date 💫",
+              partnerEmail: "",
+              partnerName: "",
+              bio: prev.bio?.startsWith("Partner:") ? "" : prev.bio,
+            }));
             setIsFlowChoiceOnly(false);
             setFlowChoice("full");
             setStep("notifications");
