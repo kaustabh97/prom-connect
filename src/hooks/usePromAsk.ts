@@ -34,19 +34,34 @@ export function usePromAsk({ currentUserId }: UsePromAskOptions): UsePromAskRetu
     if (!currentUserId) return;
     setIsLoading(true);
     try {
-      // Use list with filter (works with or without secondary indexes)
-      const [toMeRes, fromMeRes] = await Promise.all([
-        client.models.PromAskRequest.list(
-          { filter: { toUserId: { eq: currentUserId } } },
+      // Paginate to get all PromAsk requests
+      let allToMe: PromAskItem[] = [];
+      let allFromMe: PromAskItem[] = [];
+      
+      // Fetch all "to me" requests with pagination
+      let toMeNextToken: string | undefined;
+      do {
+        const toMeRes = await client.models.PromAskRequest.list(
+          { filter: { toUserId: { eq: currentUserId } }, nextToken: toMeNextToken },
           opts
-        ),
-        client.models.PromAskRequest.list(
-          { filter: { fromUserId: { eq: currentUserId } } },
+        );
+        allToMe = allToMe.concat(toMeRes.data ?? []);
+        toMeNextToken = toMeRes.nextToken ?? undefined;
+      } while (toMeNextToken);
+      
+      // Fetch all "from me" requests with pagination
+      let fromMeNextToken: string | undefined;
+      do {
+        const fromMeRes = await client.models.PromAskRequest.list(
+          { filter: { fromUserId: { eq: currentUserId } }, nextToken: fromMeNextToken },
           opts
-        ),
-      ]);
-      const toMe = (toMeRes.data ?? []).filter((r) => r.status === "pending");
-      const fromMe = (fromMeRes.data ?? []).filter((r) => r.status === "pending");
+        );
+        allFromMe = allFromMe.concat(fromMeRes.data ?? []);
+        fromMeNextToken = fromMeRes.nextToken ?? undefined;
+      } while (fromMeNextToken);
+      
+      const toMe = allToMe.filter((r) => r.status === "pending");
+      const fromMe = allFromMe.filter((r) => r.status === "pending");
       setPendingToMe(toMe);
       setPendingFromMe(fromMe);
       logInfo("PromAsk requests loaded", { component: "usePromAsk", operation: "load", extra: { pendingToMe: toMe.length, pendingFromMe: fromMe.length } });

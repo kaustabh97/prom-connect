@@ -298,13 +298,21 @@ export default function Discover() {
         }
 
         // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
+        // Paginate to get all match requests
         let requestPendingUserIds = new Set<string>();
         try {
-          // @ts-ignore - list(options) second arg for authMode
-        const { data: matchRequests } = await client.models.MatchRequest.list({}, opts);
-          (matchRequests ?? [])
-            .filter((r) => r.status === "pending" && r.fromUserId)
-            .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
+          let matchRequestsNextToken: string | undefined;
+          do {
+            // @ts-ignore - list(options) second arg for authMode
+            const { data: matchRequests, nextToken } = await client.models.MatchRequest.list(
+              { nextToken: matchRequestsNextToken },
+              opts
+            );
+            (matchRequests ?? [])
+              .filter((r) => r.status === "pending" && r.fromUserId)
+              .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
+            matchRequestsNextToken = nextToken ?? undefined;
+          } while (matchRequestsNextToken);
         } catch (err) {
           logError(err, { component: "Discover", operation: "fetchMatchRequests" });
         }

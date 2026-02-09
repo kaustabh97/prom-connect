@@ -99,13 +99,21 @@ export function useMatch() {
 
               // Check if the other person has already liked us (mutual like → match)
               // Query: likes FROM profileId (people they liked), filter for toUserId = us
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const { data: theirLikes } = await (client.models.Like as any).list(
-                { filter: { fromUserId: { eq: profileId } } },
-                opts
-              );
-              const mutualLike =
-                theirLikes?.some((like) => like.toUserId === fromUserId) ?? false;
+              // Paginate to check all their likes
+              let mutualLike = false;
+              let likeNextToken: string | undefined;
+              do {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const { data: theirLikes, nextToken } = await (client.models.Like as any).list(
+                  { filter: { fromUserId: { eq: profileId } }, nextToken: likeNextToken },
+                  opts
+                );
+                if (theirLikes?.some((like) => like.toUserId === fromUserId)) {
+                  mutualLike = true;
+                  break; // Found mutual like, no need to continue
+                }
+                likeNextToken = nextToken ?? undefined;
+              } while (likeNextToken && !mutualLike);
               if (mutualLike) {
                 logInfo("Mutual like - creating match", { component: "useMatch", operation: "recordSwipe", extra: { profileId } });
                 result.isMatch = true;
