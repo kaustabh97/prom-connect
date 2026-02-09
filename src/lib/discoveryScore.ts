@@ -10,7 +10,11 @@
 import type { DiscoveryProfileFull, DiscoveryFilters } from "./dating";
 
 /** Weight for global discovery score vs preference match (0–1). Higher = preference match matters more. */
-const PREFERENCE_MATCH_WEIGHT = 0.35;
+/** Default: 0.25 (25% preference, 75% global quality). Can be tuned based on user data. */
+const DEFAULT_PREFERENCE_MATCH_WEIGHT = 0.25;
+
+/** Minimum exploration probability for fair exposure (epsilon-greedy style). */
+const EXPLORATION_EPSILON = 0.1; // 10% chance to explore lower-scored profiles
 
 /** Age above this is considered unrealistic for discovery (down-rank or exclude from score). */
 export const MAX_REALISTIC_AGE = 60;
@@ -26,6 +30,7 @@ function normalizeGender(g: string): string {
 /**
  * Preference match score 0–1: how well the profile matches the viewer's preferences (cohort, intention).
  * Gender is already enforced by filters; this ranks within the filtered set.
+ * Returns 1.0 if no preferences are set (neutral, doesn't affect ranking).
  */
 export function preferenceMatchScore(
   profile: DiscoveryProfileFull,
@@ -48,8 +53,19 @@ export function preferenceMatchScore(
     }
   }
 
-  if (factors === 0) return 1;
-  return score / factors;
+  // If no preferences set, return neutral score (1.0) so it doesn't affect ranking
+  if (factors === 0) return 1.0;
+  
+  // Normalize to [0, 1] range
+  const normalized = score / factors;
+  
+  // Validate: ensure result is in valid range
+  if (normalized < 0 || normalized > 1 || !isFinite(normalized)) {
+    console.warn("[discoveryScore] Invalid preferenceMatchScore:", { score, factors, normalized });
+    return 1.0; // Fallback to neutral
+  }
+  
+  return normalized;
 }
 
 /**
@@ -73,14 +89,41 @@ function explorationSeed(profileId: string, viewerId?: string): number {
  * Combined score (0–1) for the logged-in viewer: blends global discoveryScore with
  * how well the profile matches the viewer's preferences (cohort, intention).
  * Used so the feed is personalized at runtime for the current user.
+ * 
+ * @param preferenceWeight - Weight for preference match (0-1). Default: DEFAULT_PREFERENCE_MATCH_WEIGHT.
+ *                            Lower values prioritize global quality, higher values prioritize preferences.
  */
 export function effectiveDiscoveryScore(
   profile: DiscoveryProfileFull,
-  filters: DiscoveryFilters
+  filters: DiscoveryFilters,
+  preferenceWeight: number = DEFAULT_PREFERENCE_MATCH_WEIGHT
 ): number {
-  const global = Math.max(0, Math.min(1, profile.discoveryScore ?? 0));
+  // Validate and clamp global score to [0, 1]
+  const rawGlobal = profile.discoveryScore ?? 0;
+  const global = Math.max(0, Math.min(1, rawGlobal));
+  
+  // Validate global score
+  if (!isFinite(global)) {
+    console.warn("[discoveryScore] Invalid global discoveryScore:", rawGlobal);
+    return 0; // Fallback to minimum
+  }
+  
+  // Get preference match score (already validated in preferenceMatchScore)
   const pref = preferenceMatchScore(profile, filters);
-  return global * (1 - PREFERENCE_MATCH_WEIGHT) + pref * PREFERENCE_MATCH_WEIGHT;
+  
+  // Clamp preference weight to valid range
+  const weight = Math.max(0, Math.min(1, preferenceWeight));
+  
+  // Weighted blend: global * (1 - weight) + preference * weight
+  const blended = global * (1 - weight) + pref * weight;
+  
+  // Final validation
+  if (!isFinite(blended) || blended < 0 || blended > 1) {
+    console.warn("[discoveryScore] Invalid effectiveDiscoveryScore:", { global, pref, weight, blended });
+    return global; // Fallback to global score only
+  }
+  
+  return blended;
 }
 
 /**
@@ -88,22 +131,69 @@ export function effectiveDiscoveryScore(
  * - effectiveScore blends global discoveryScore with this viewer's preference match (cohort, intention)
  * - liked-me boost is per viewer
  * - exploration tie-breaker uses viewerId so different users see different order even with same prefs
- * Pass viewerId (current user's profile id) so the feed order is never identical for everyone.
+ * - Optional exposure tracking for fair distribution
+ * 
+ * @param profiles - Profiles to sort
+ * @param filters - Viewer's discovery filters
+ * @param options - Sorting options
+ * @param options.likedMeIds - Set of profile IDs that liked the viewer (for boost)
+ * @param options.viewerId - Current viewer's profile ID (for personalization)
+ * @param options.preferenceWeight - Weight for preference match (0-1). Default: DEFAULT_PREFERENCE_MATCH_WEIGHT
+ * @param options.exposureMap - Map tracking profile exposure for fair distribution
+ * @param options.enableExploration - Whether to apply exploration boost (epsilon-greedy). Default: true
  */
 export function sortDiscoveryProfiles(
   profiles: DiscoveryProfileFull[],
   filters: DiscoveryFilters,
-  options?: { likedMeIds?: Set<string>; viewerId?: string }
+  options?: {
+    likedMeIds?: Set<string>;
+    viewerId?: string;
+    preferenceWeight?: number;
+    exposureMap?: Map<string, ProfileExposure>;
+    enableExploration?: boolean;
+  }
 ): DiscoveryProfileFull[] {
   const likedMe = options?.likedMeIds ?? new Set<string>();
   const viewerId = options?.viewerId ?? "";
-  return [...profiles].sort((a, b) => {
-    const scoreA = effectiveDiscoveryScore(a, filters);
-    const scoreB = effectiveDiscoveryScore(b, filters);
-    if (scoreA !== scoreB) return scoreB - scoreA;
+  const preferenceWeight = options?.preferenceWeight ?? DEFAULT_PREFERENCE_MATCH_WEIGHT;
+  const exposureMap = options?.exposureMap;
+  const enableExploration = options?.enableExploration ?? true;
+  
+  // Create a copy to avoid mutating the original array
+  const sorted = [...profiles].sort((a, b) => {
+    // Calculate base effective scores
+    const baseScoreA = effectiveDiscoveryScore(a, filters, preferenceWeight);
+    const baseScoreB = effectiveDiscoveryScore(b, filters, preferenceWeight);
+    
+    // Apply liked-me boost (significant boost for reciprocity)
+    const likedBoostA = likedMe.has(a.id) ? 0.15 : 0;
+    const likedBoostB = likedMe.has(b.id) ? 0.15 : 0;
+    
+    // Apply exposure boost for fair distribution (if enabled)
+    const exposureBoostA = enableExploration ? getExposureBoost(a.id, exposureMap) : 0;
+    const exposureBoostB = enableExploration ? getExposureBoost(b.id, exposureMap) : 0;
+    
+    // Final scores with boosts
+    const scoreA = Math.min(1, baseScoreA + likedBoostA + exposureBoostA);
+    const scoreB = Math.min(1, baseScoreB + likedBoostB + exposureBoostB);
+    
+    // Primary sort: by effective score (with boosts)
+    if (Math.abs(scoreA - scoreB) > 0.001) {
+      return scoreB - scoreA;
+    }
+    
+    // Secondary sort: liked-me (if scores are very close)
     const likedA = likedMe.has(a.id) ? 1 : 0;
     const likedB = likedMe.has(b.id) ? 1 : 0;
-    if (likedA !== likedB) return likedB - likedA;
-    return explorationSeed(b.id, viewerId) - explorationSeed(a.id, viewerId);
+    if (likedA !== likedB) {
+      return likedB - likedA;
+    }
+    
+    // Tertiary sort: exploration seed (deterministic but per-user-per-day)
+    const seedA = explorationSeed(a.id, viewerId);
+    const seedB = explorationSeed(b.id, viewerId);
+    return seedB - seedA;
   });
+  
+  return sorted;
 }

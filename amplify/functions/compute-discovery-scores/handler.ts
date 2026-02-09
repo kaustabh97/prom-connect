@@ -149,10 +149,26 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
       updated += 1;
     }
 
-    console.log("[compute-discovery-scores] updated", updated, "profiles");
+    const endTime = new Date().toISOString();
+    const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime();
+    console.log("[compute-discovery-scores] Completed successfully:", {
+      updated,
+      totalProfiles: allProfiles.length,
+      eligibleProfiles: discoveryEligible.length,
+      startTime,
+      endTime,
+      durationMs,
+    });
     return { updated };
   } catch (err) {
-    console.error("[compute-discovery-scores] error", err);
+    const endTime = new Date().toISOString();
+    const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime();
+    console.error("[compute-discovery-scores] Failed:", {
+      error: err,
+      startTime,
+      endTime,
+      durationMs,
+    });
     const message = err instanceof Error ? err.message : String(err);
     return { updated: 0, error: message };
   }

@@ -394,12 +394,32 @@ export default function Discover() {
     fetchProfiles();
   }, [refreshKey]); // Fetch on mount and when nav requests refresh
 
+  // Create stable filter dependencies to avoid unnecessary re-sorting
+  // Serialize filter values that affect sorting (not the entire object reference)
+  const filterSortKey = useMemo(() => {
+    return JSON.stringify({
+      preferredCohorts: filters.preferredCohorts?.sort() || [],
+      preferredIntention: filters.preferredIntention || null,
+    });
+  }, [filters.preferredCohorts, filters.preferredIntention]);
+
+  // Stable likedMeIds key to avoid re-sorting when Set reference changes but contents don't
+  const likedMeIdsKey = useMemo(() => {
+    return Array.from(likedMeIds).sort().join(',');
+  }, [likedMeIds]);
+
   // Apply filters then sort per viewer: combined score (global + their prefs), liked-me, per-viewer tie-breaker
+  // Use stable dependencies to avoid re-sorting on every render
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return [];
     const filtered = applyFilters(profiles, filters);
-    return sortDiscoveryProfiles(filtered, filters, { likedMeIds, viewerId: currentProfileId });
-  }, [profiles, filters, likedMeIds, currentProfileId]);
+    // Use lower preference weight (0.25) for better balance between global quality and preferences
+    return sortDiscoveryProfiles(filtered, filters, {
+      likedMeIds,
+      viewerId: currentProfileId,
+      preferenceWeight: 0.25, // 25% preference, 75% global quality (tunable)
+    });
+  }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
   // Include 'tick' in dependencies so queue recomputes when swipes are recorded
