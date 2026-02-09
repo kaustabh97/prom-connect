@@ -110,16 +110,11 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
 
             {/* Content sections - same scroll */}
             <div className="px-4 pb-4 pt-3 space-y-4">
-              {/* Basic info: Gender, Sexual Orientation, Cohort, Hometown, Intention */}
+              {/* Basic info: Gender, Cohort, Hometown, Intention */}
               <div className="flex flex-wrap gap-2">
                 {profile.gender && (
                   <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
                     {profile.gender}
-                  </span>
-                )}
-                {profile.sexualOrientation && (
-                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                    {profile.sexualOrientation}
                   </span>
                 )}
                 {profile.cohort && (
