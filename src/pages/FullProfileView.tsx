@@ -213,19 +213,14 @@ export default function FullProfileView() {
             </h1>
           </section>
 
-          {/* Basic info: Gender, Sexual Orientation, Cohort, Hometown, Dating Intention */}
-          {(profile.gender || profile.sexualOrientation || profile.cohort || profile.hometown || profile.intention) && (
+          {/* Basic info: Gender, Cohort, Hometown, Dating Intention */}
+          {(profile.gender || profile.cohort || profile.hometown || profile.intention) && (
             <section>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2">About</h2>
               <div className="flex flex-wrap gap-2">
                 {profile.gender && (
                   <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
                     {profile.gender}
-                  </span>
-                )}
-                {profile.sexualOrientation && (
-                  <span className="px-3 py-1.5 rounded-full bg-muted/80 text-foreground text-sm border border-border/50">
-                    {profile.sexualOrientation}
                   </span>
                 )}
                 {profile.cohort && (
