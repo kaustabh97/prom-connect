@@ -86,6 +86,35 @@ function explorationSeed(profileId: string, viewerId?: string): number {
 }
 
 /**
+ * Profile exposure tracking for fair distribution (exploration/exploitation).
+ */
+export type ProfileExposure = {
+  profileId: string;
+  timesShown: number;
+  lastShownAt?: number;
+};
+
+/**
+ * Get exposure boost for a profile (0–0.05).
+ * Profiles shown fewer times get a small boost to ensure fair visibility.
+ * 
+ * @param profileId - Profile ID to check
+ * @param exposureMap - Map tracking exposure counts (optional)
+ * @returns Boost value between 0 and 0.05
+ */
+function getExposureBoost(
+  profileId: string,
+  exposureMap?: Map<string, ProfileExposure>
+): number {
+  if (!exposureMap) return 0;
+  const exposure = exposureMap.get(profileId);
+  if (!exposure) return 0.05; // Small boost for never-seen profiles
+  // Decrease boost as exposure increases (max 0.05, decreases by 0.01 per view)
+  const boost = Math.max(0, 0.05 - exposure.timesShown * 0.01);
+  return boost;
+}
+
+/**
  * Combined score (0–1) for the logged-in viewer: blends global discoveryScore with
  * how well the profile matches the viewer's preferences (cohort, intention).
  * Used so the feed is personalized at runtime for the current user.
