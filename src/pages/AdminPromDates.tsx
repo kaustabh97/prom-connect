@@ -25,6 +25,7 @@ type MatchWithUserDetails = {
   user1Profile?: Schema["UserProfile"]["type"];
   user2Profile?: Schema["UserProfile"]["type"];
   promDateType?: "looking-flow" | "partner-iima" | "partner-outside";
+  hasPromAsk?: boolean; // For active matches: whether a prom ask request exists
 };
 
 type DashboardStats = {
@@ -88,17 +89,26 @@ const getFlowType = (profile?: Schema["UserProfile"]["type"]): string => {
   return hasPartner ? "Partner Flow" : "Looking Flow";
 };
 
-const getPromDateTypeLabel = (type?: "looking-flow" | "partner-iima" | "partner-outside"): string => {
-  switch (type) {
-    case "looking-flow":
-      return "Looking Flow";
-    case "partner-iima":
-      return "Partner Flow (IIMA)";
-    case "partner-outside":
-      return "Partner Flow (Non-IIMA)";
-    default:
-      return "Unknown";
+const isIIMACouple = (
+  match: Schema["Match"]["type"],
+  user1Profile?: Schema["UserProfile"]["type"],
+  user2Profile?: Schema["UserProfile"]["type"],
+  promDateType?: "looking-flow" | "partner-iima" | "partner-outside"
+): boolean => {
+  // If it's partner-outside, it's not IIMA
+  if (promDateType === "partner-outside") return false;
+  
+  // Check if both users have IIMA emails
+  if (user1Profile && user2Profile) {
+    const user1IsIIMA = (user1Profile.email ?? "").endsWith("@iima.ac.in");
+    const user2IsIIMA = (user2Profile.email ?? "").endsWith("@iima.ac.in");
+    return user1IsIIMA && user2IsIIMA;
   }
+  
+  // Fallback: check emails from match record
+  const user1IsIIMA = (match.user1Email ?? "").endsWith("@iima.ac.in");
+  const user2IsIIMA = (match.user2Email ?? "").endsWith("@iima.ac.in");
+  return user1IsIIMA && user2IsIIMA;
 };
 
 const formatDate = (dateString?: string | null): string => {
@@ -364,6 +374,14 @@ export default function AdminPromDates() {
           .map((ask) => ask.matchId!)
       );
 
+      // Create a map of matchIds to prom ask status (for active matches table)
+      const matchIdToPromAskStatus = new Map<string, boolean>();
+      allPromAsks.forEach((ask) => {
+        if (ask.matchId) {
+          matchIdToPromAskStatus.set(ask.matchId, true); // Any prom ask (pending/accepted/declined) means "Asked"
+        }
+      });
+
       // Fetch all UserProfiles to find partner flow non-IIMA prom dates (have partnerEmail but no Match)
       const allProfiles: Schema["UserProfile"]["type"][] = [];
       let profileNextToken: string | undefined;
@@ -440,11 +458,15 @@ export default function AdminPromDates() {
           }
         }
 
+        // Check if prom ask exists for this match (for active matches)
+        const hasPromAsk = matchIdToPromAskStatus.has(match.id!) || false;
+
         matchesWithDetails.push({
           match,
           user1Profile,
           user2Profile,
           promDateType,
+          hasPromAsk,
         });
       }
 
@@ -956,7 +978,7 @@ export default function AdminPromDates() {
                   <TableRow>
                     <TableHead>User 1</TableHead>
                     <TableHead>User 2</TableHead>
-                    <TableHead>Prom Date Type</TableHead>
+                    <TableHead>IIMA Couple</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                   </TableRow>
@@ -980,7 +1002,7 @@ export default function AdminPromDates() {
                         ? (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A")
                         : (item.match.user2Email || item.user2Profile?.email || "N/A");
                       const status = item.match.status || "active";
-                      const promDateType = getPromDateTypeLabel(item.promDateType);
+                      const isIIMA = isIIMACouple(item.match, item.user1Profile, item.user2Profile, item.promDateType);
 
                       return (
                         <TableRow key={item.match.id || idx}>
@@ -997,9 +1019,15 @@ export default function AdminPromDates() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-primary/20 text-primary">
-                              {promDateType}
-                            </span>
+                            {isIIMA ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+                                Yes
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-400">
+                                No
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <span
@@ -1040,9 +1068,8 @@ export default function AdminPromDates() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>User 1</TableHead>
-                    <TableHead>User 1 Flow</TableHead>
                     <TableHead>User 2</TableHead>
-                    <TableHead>User 2 Flow</TableHead>
+                    <TableHead>Prom Ask</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created At</TableHead>
                   </TableRow>
@@ -1050,7 +1077,7 @@ export default function AdminPromDates() {
                 <TableBody>
                   {activeMatches.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         No active matches found
                       </TableCell>
                     </TableRow>
@@ -1060,9 +1087,8 @@ export default function AdminPromDates() {
                       const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
                       const user2Name = item.user2Profile?.name || item.match.user2Email || "Unknown";
                       const user2Email = item.match.user2Email || item.user2Profile?.email || "N/A";
-                      const user1Flow = getFlowType(item.user1Profile);
-                      const user2Flow = getFlowType(item.user2Profile);
                       const status = item.match.status || "active";
+                      const hasPromAsk = item.hasPromAsk ?? false;
 
                       return (
                         <TableRow key={item.match.id || idx}>
@@ -1072,14 +1098,23 @@ export default function AdminPromDates() {
                               <div className="text-sm text-muted-foreground">{user1Email}</div>
                             </div>
                           </TableCell>
-                          <TableCell>{user1Flow}</TableCell>
                           <TableCell>
                             <div>
                               <div className="font-medium">{user2Name}</div>
                               <div className="text-sm text-muted-foreground">{user2Email}</div>
                             </div>
                           </TableCell>
-                          <TableCell>{user2Flow}</TableCell>
+                          <TableCell>
+                            {hasPromAsk ? (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                                Asked
+                              </span>
+                            ) : (
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-400">
+                                Not Asked
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
