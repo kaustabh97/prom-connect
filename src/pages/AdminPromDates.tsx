@@ -24,6 +24,7 @@ type MatchWithUserDetails = {
   match: Schema["Match"]["type"];
   user1Profile?: Schema["UserProfile"]["type"];
   user2Profile?: Schema["UserProfile"]["type"];
+  promDateType?: "looking-flow" | "partner-iima" | "partner-outside";
 };
 
 type DashboardStats = {
@@ -87,6 +88,19 @@ const getFlowType = (profile?: Schema["UserProfile"]["type"]): string => {
   return hasPartner ? "Partner Flow" : "Looking Flow";
 };
 
+const getPromDateTypeLabel = (type?: "looking-flow" | "partner-iima" | "partner-outside"): string => {
+  switch (type) {
+    case "looking-flow":
+      return "Looking Flow";
+    case "partner-iima":
+      return "Partner Flow (IIMA)";
+    case "partner-outside":
+      return "Partner Flow (Non-IIMA)";
+    default:
+      return "Unknown";
+  }
+};
+
 const formatDate = (dateString?: string | null): string => {
   if (!dateString) return "N/A";
   try {
@@ -128,7 +142,8 @@ const ALLOWED_ADMIN_EMAILS = [
 
 export default function AdminPromDates() {
   const navigate = useNavigate();
-  const [matches, setMatches] = useState<MatchWithUserDetails[]>([]);
+  const [promDates, setPromDates] = useState<MatchWithUserDetails[]>([]);
+  const [activeMatches, setActiveMatches] = useState<MatchWithUserDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -330,12 +345,59 @@ export default function AdminPromDates() {
         nextToken = res.nextToken ?? undefined;
       } while (nextToken);
 
-      logInfo("Fetched matches", { component: "AdminPromDates", operation: "fetchMatches", extra: { count: allMatches.length } });
+      // Fetch all PromAskRequests to identify looking-flow prom dates
+      const allPromAsks: Schema["PromAskRequest"]["type"][] = [];
+      let promAskNextToken: string | undefined;
+      do {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const res = await (client.models.PromAskRequest as any).list({ nextToken: promAskNextToken, limit: 100 }, opts);
+        if (res.data) {
+          allPromAsks.push(...(res.data as Schema["PromAskRequest"]["type"][]));
+        }
+        promAskNextToken = res.nextToken ?? undefined;
+      } while (promAskNextToken);
 
-      // Fetch user profiles for each match (limit to first 100 for performance)
+      // Create a set of matchIds that have accepted PromAskRequests (looking-flow prom dates)
+      const lookingFlowPromDateMatchIds = new Set(
+        allPromAsks
+          .filter((ask) => ask.status === "accepted" && ask.matchId)
+          .map((ask) => ask.matchId!)
+      );
+
+      // Fetch all UserProfiles to find partner flow non-IIMA prom dates (have partnerEmail but no Match)
+      const allProfiles: Schema["UserProfile"]["type"][] = [];
+      let profileNextToken: string | undefined;
+      do {
+        const res = await client.models.UserProfile.list({ nextToken: profileNextToken }, opts);
+        if (res.data) {
+          allProfiles.push(...res.data);
+        }
+        profileNextToken = res.nextToken ?? undefined;
+      } while (profileNextToken);
+
+      // Find profiles with partnerEmail set (non-IIMA partner flow prom dates)
+      // These don't have Match records, so we'll create virtual entries for them
+      const outsidePartnerProfiles = allProfiles.filter(
+        (p) =>
+          (p.partnerEmail ?? "").trim() !== "" &&
+          !(p.partnerEmail ?? "").endsWith("@iima.ac.in") &&
+          (p.partnerStatus ?? "").includes("Already found")
+      );
+
+      logInfo("Fetched matches", { 
+        component: "AdminPromDates", 
+        operation: "fetchMatches", 
+        extra: { 
+          totalMatches: allMatches.length,
+          promDates: allMatches.filter(m => m.isPromDate === true).length,
+          activeMatches: allMatches.filter(m => m.status === "active" && m.isPromDate !== true).length,
+          lookingFlowPromDates: lookingFlowPromDateMatchIds.size
+        } 
+      });
+
+      // Fetch user profiles for each match
       const matchesWithDetails: MatchWithUserDetails[] = [];
-      const matchesToProcess = allMatches.slice(0, 100); // Limit to first 100 for performance
-      for (const match of matchesToProcess) {
+      for (const match of allMatches) {
         const user1Id = match.user1Id ?? undefined;
         const user2Id = match.user2Id ?? undefined;
 
@@ -360,21 +422,76 @@ export default function AdminPromDates() {
           }
         }
 
+        // Determine prom date type
+        let promDateType: "looking-flow" | "partner-iima" | "partner-outside" | undefined;
+        if (match.isPromDate === true) {
+          if (lookingFlowPromDateMatchIds.has(match.id!)) {
+            promDateType = "looking-flow";
+          } else if (user1Profile && user2Profile) {
+            // Check if both are IIMA (have @iima.ac.in emails)
+            const user1IsIIMA = (user1Profile.email ?? "").endsWith("@iima.ac.in");
+            const user2IsIIMA = (user2Profile.email ?? "").endsWith("@iima.ac.in");
+            promDateType = user1IsIIMA && user2IsIIMA ? "partner-iima" : "partner-outside";
+          } else {
+            // Fallback: check emails from match record
+            const user1IsIIMA = (match.user1Email ?? "").endsWith("@iima.ac.in");
+            const user2IsIIMA = (match.user2Email ?? "").endsWith("@iima.ac.in");
+            promDateType = user1IsIIMA && user2IsIIMA ? "partner-iima" : "partner-outside";
+          }
+        }
+
         matchesWithDetails.push({
           match,
           user1Profile,
           user2Profile,
+          promDateType,
         });
       }
 
+      // Add outside partner prom dates (no Match record, just UserProfile with partnerEmail)
+      for (const profile of outsidePartnerProfiles) {
+        // Check if this profile already has a Match record (shouldn't happen, but check anyway)
+        const existingMatch = matchesWithDetails.find(
+          (m) => m.match.user1Id === profile.id || m.match.user2Id === profile.id
+        );
+        if (!existingMatch) {
+          // Create a virtual match entry for display purposes
+          matchesWithDetails.push({
+            match: {
+              id: `outside-${profile.id}`,
+              user1Id: profile.id!,
+              user2Id: "", // No second user in Match record
+              user1Email: profile.email ?? "",
+              user2Email: profile.partnerEmail ?? "",
+              status: "active",
+              isPromDate: true,
+              createdAt: profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+            } as Schema["Match"]["type"],
+            user1Profile: profile,
+            user2Profile: undefined, // Partner is outside, no profile record
+            promDateType: "partner-outside",
+          });
+        }
+      }
+
+      // Separate into prom dates and active matches
+      const promDatesList = matchesWithDetails.filter((m) => m.match.isPromDate === true);
+      const activeMatchesList = matchesWithDetails.filter(
+        (m) => m.match.status === "active" && m.match.isPromDate !== true
+      );
+
       // Sort by createdAt descending (newest first)
-      matchesWithDetails.sort((a, b) => {
+      const sortByDate = (a: MatchWithUserDetails, b: MatchWithUserDetails) => {
         const dateA = a.match.createdAt ? new Date(a.match.createdAt).getTime() : 0;
         const dateB = b.match.createdAt ? new Date(b.match.createdAt).getTime() : 0;
         return dateB - dateA;
-      });
+      };
 
-      setMatches(matchesWithDetails);
+      promDatesList.sort(sortByDate);
+      activeMatchesList.sort(sortByDate);
+
+      setPromDates(promDatesList);
+      setActiveMatches(activeMatchesList);
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "fetchMatches" });
       setError(err instanceof Error ? err.message : "Failed to fetch matches");
@@ -827,9 +944,97 @@ export default function AdminPromDates() {
             </>
           )}
 
-          {/* Matches Table */}
+          {/* Prom Dates Table */}
           <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">All Prom Dates (Latest 100)</h2>
+            <h2 className="text-xl font-semibold mb-4">Prom Dates</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Confirmed prom dates from all flows: Looking Flow (prom ask accepted), Partner Flow IIMA, and Partner Flow Non-IIMA
+            </p>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User 1</TableHead>
+                    <TableHead>User 2</TableHead>
+                    <TableHead>Prom Date Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created At</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {promDates.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No prom dates found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    promDates.map((item, idx) => {
+                      const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
+                      const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
+                      // For outside partners, user2Profile is undefined, use partnerEmail/partnerName from user1Profile
+                      const user2Name = item.promDateType === "partner-outside"
+                        ? (item.user1Profile?.partnerName || item.match.user2Email || "Unknown")
+                        : (item.user2Profile?.name || item.match.user2Email || "Unknown");
+                      const user2Email = item.promDateType === "partner-outside"
+                        ? (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A")
+                        : (item.match.user2Email || item.user2Profile?.email || "N/A");
+                      const status = item.match.status || "active";
+                      const promDateType = getPromDateTypeLabel(item.promDateType);
+
+                      return (
+                        <TableRow key={item.match.id || idx}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{user1Name}</div>
+                              <div className="text-sm text-muted-foreground">{user1Email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{user2Name}</div>
+                              <div className="text-sm text-muted-foreground">{user2Email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-primary/20 text-primary">
+                              {promDateType}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-medium ${
+                                status === "active"
+                                  ? "bg-green-500/20 text-green-700 dark:text-green-400"
+                                  : status === "unmatched"
+                                  ? "bg-gray-500/20 text-gray-700 dark:text-gray-400"
+                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
+                              }`}
+                            >
+                              {status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(item.match.createdAt)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="mt-4 text-sm text-muted-foreground">
+              Total prom dates: {promDates.length}
+            </div>
+          </div>
+
+          {/* Active Matches Table */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4">Active Matches</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Active matches that are not yet confirmed as prom dates
+            </p>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -839,19 +1044,18 @@ export default function AdminPromDates() {
                     <TableHead>User 2</TableHead>
                     <TableHead>User 2 Flow</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Prom Date</TableHead>
                     <TableHead>Created At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {matches.length === 0 ? (
+                  {activeMatches.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No matches found
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No active matches found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    matches.map((item, idx) => {
+                    activeMatches.map((item, idx) => {
                       const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
                       const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
                       const user2Name = item.user2Profile?.name || item.match.user2Email || "Unknown";
@@ -859,7 +1063,6 @@ export default function AdminPromDates() {
                       const user1Flow = getFlowType(item.user1Profile);
                       const user2Flow = getFlowType(item.user2Profile);
                       const status = item.match.status || "active";
-                      const isPromDate = item.match.isPromDate ?? false;
 
                       return (
                         <TableRow key={item.match.id || idx}>
@@ -890,15 +1093,6 @@ export default function AdminPromDates() {
                               {status}
                             </span>
                           </TableCell>
-                          <TableCell>
-                            {isPromDate ? (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-primary/20 text-primary">
-                                Yes
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">No</span>
-                            )}
-                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {formatDate(item.match.createdAt)}
                           </TableCell>
@@ -910,7 +1104,7 @@ export default function AdminPromDates() {
               </Table>
             </div>
             <div className="mt-4 text-sm text-muted-foreground">
-              Showing {matches.length} matches (latest 100)
+              Total active matches: {activeMatches.length}
             </div>
           </div>
         </div>
