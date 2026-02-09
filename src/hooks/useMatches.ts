@@ -25,7 +25,7 @@ interface UseMatchesReturn {
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
-  createMatch: (otherUserId: string, otherUserEmail?: string, compatScore?: number) => Promise<Match | null>;
+  createMatch: (otherUserId: string, otherUserEmail?: string) => Promise<Match | null>;
   updateMatchConversation: (matchId: string, conversationId: string) => Promise<void>;
 }
 
@@ -123,8 +123,7 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
   // Create a new match (for testing or admin purposes)
   const createMatch = useCallback(async (
     otherUserId: string,
-    otherUserEmail?: string,
-    compatScore: number = 0.8
+    otherUserEmail?: string
   ): Promise<Match | null> => {
     if (!currentUserId) {
       setError("No current user");
@@ -142,7 +141,6 @@ export function useMatches({ currentUserId, currentUserEmail }: UseMatchesOption
             user2Id: otherUserId,
             user1Email: currentUserEmail,
             user2Email: otherUserEmail,
-            compatScore,
             status: "active",
             createdAt: new Date().toISOString(),
           },

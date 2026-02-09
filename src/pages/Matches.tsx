@@ -28,18 +28,11 @@ import {
   MessageCircle, 
   X,
   Send,
-  ChevronDown,
   Flag,
   Trash2,
   Loader2,
   AlertTriangle,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -956,43 +949,37 @@ const ChatView = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {showAskToProm && onAskToProm && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => { logInfo("Matches: Ask to Prom clicked", { component: "Matches", operation: "askToProm", extra: { otherUserId: match.otherUserId } }); onAskToProm?.(); }}
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Heart className="w-4 h-4 mr-2" />
-              Ask to Prom
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5">
-                Unmatch
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setReportOpen(true)}>
-                <Flag className="w-4 h-4 mr-2" />
-                Report
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={() => onUnmatch?.()}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Unmatch
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-destructive border-2 border-destructive hover:text-destructive hover:bg-destructive/10 rounded-md"
+            onClick={() => onUnmatch?.()}
+          >
+            <Trash2 className="w-4 h-4" />
+            Unmatch
+          </Button>
         </div>
       </header>
 
       {/* Messages area - ONLY scrollable section, takes remaining space */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden basis-0">
-      {/* Prom Ask request from them - Accept / Decline */}
-      {promAskFromThem && onAcceptPromAsk && onDeclinePromAsk && (
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden basis-0 relative">
+        {/* Floating Ask to Prom - top-left below header, does not obstruct chat */}
+        {showAskToProm && onAskToProm && (
+          <div className="absolute top-3 left-3 z-10">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => { logInfo("Matches: Ask to Prom clicked", { component: "Matches", operation: "askToProm", extra: { otherUserId: match.otherUserId } }); onAskToProm?.(); }}
+              className="bg-primary hover:bg-primary/90 shadow-md"
+            >
+              <Heart className="w-4 h-4 mr-2" />
+              Ask to Prom
+            </Button>
+          </div>
+        )}
+        {/* Prom Ask request from them - Accept / Decline */}
+        {promAskFromThem && onAcceptPromAsk && onDeclinePromAsk && (
         <div className="px-4 py-3 bg-primary/10 border-b border-primary/20 shrink-0">
           <p className="text-sm font-medium text-foreground mb-1">
             {displayName} wants to go to Prom with you!

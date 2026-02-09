@@ -97,7 +97,6 @@ export function useMatchRequests({
             user2Id: currentUserId,
             user1Email: fromEmail,
             user2Email: currentUserEmail,
-            compatScore: 1,
             status: "active",
             isPromDate: true,
             createdAt: new Date().toISOString(),

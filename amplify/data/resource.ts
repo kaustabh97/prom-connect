@@ -2,6 +2,8 @@ import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
 import { sendPartnerInvite } from '../functions/send-partner-invite/resource';
 import { sendReportEmail as sendReportEmailFn } from '../functions/send-report-email/resource';
 import { sendRoseEmail } from '../functions/send-rose-email/resource';
+import { computeDiscoveryScores } from '../functions/compute-discovery-scores/resource';
+import { ensureMutualMatches } from '../functions/ensure-mutual-matches/resource';
 import { frontendLogger } from '../functions/frontend-logger/resource';
 
 /*== STEP 1 ===============================================================
@@ -80,6 +82,11 @@ const schema = a.schema({
       excludeFromDiscovery: a.boolean(),
       // Anonymous rose emails: max 2 per user (enforced in send-rose-email Lambda)
       rosesSentCount: a.integer(),
+      // Discovery feed ranking: 0–1 score (email-name match, age sanity, popularity, completeness, recency). Updated by cron.
+      discoveryScore: a.float(),
+      lastDiscoveryScoreAt: a.datetime(),
+      // Set when user last updated their profile; used for recency boost in discovery score
+      updatedAt: a.datetime(),
     })
     .authorization((allow) => [
       allow.publicApiKey(),      // Allow API key for public access
@@ -138,6 +145,18 @@ const schema = a.schema({
     ])
     .authorization((allow) => [allow.publicApiKey()]),
 
+  /** Report: user A (reporterUserId) reported user B (reportedProfileId). Used to exclude from discovery. */
+  Report: a
+    .model({
+      reporterUserId: a.string().required(),
+      reportedProfileId: a.string().required(),
+      createdAt: a.datetime(),
+    })
+    .secondaryIndexes((index) => [
+      index("reporterUserId"),   // Query "profiles I have reported" for Discover exclusion
+    ])
+    .authorization((allow) => [allow.publicApiKey(), allow.authenticated()]),
+
   /** Match: mutual like between two users. user1Id/user2Id are UserProfile ids. */
   Match: a
     .model({
@@ -145,7 +164,6 @@ const schema = a.schema({
       user2Id: a.string().required(),           // Second user's UserProfile id
       user1Email: a.string(),                   // First user's email (for display)
       user2Email: a.string(),                   // Second user's email (for display)
-      compatScore: a.float(),                   // Compatibility score (0-1)
       status: a.string().default("active"),     // active, unmatched, blocked
       conversationId: a.string(),               // Link to conversation when created
       isPromDate: a.boolean(),                  // true = confirmed prom date, both out of discovery
@@ -218,6 +236,20 @@ const schema = a.schema({
     .authorization((allow) => [allow.authenticated(), allow.publicApiKey()])
     .handler(a.handler.function(sendRoseEmail)),
 
+  // Cron: compute discovery scores (email match, age sanity, popularity). Call manually or via EventBridge.
+  computeDiscoveryScores: a
+    .query()
+    .returns(a.json())
+    .authorization((allow) => [allow.publicApiKey()])
+    .handler(a.handler.function(computeDiscoveryScores)),
+
+  // Cron: ensure mutual likes are converted into Match records. Call manually or via EventBridge.
+  ensureMutualMatches: a
+    .query()
+    .returns(a.json())
+    .authorization((allow) => [allow.publicApiKey()])
+    .handler(a.handler.function(ensureMutualMatches)),
+
   // Custom mutation to receive frontend logs and write to CloudWatch (separate dev/prod streams)
   logFrontendEvent: a
     .mutation()
@@ -249,7 +281,7 @@ const schema = a.schema({
       allow.authenticated(),                    // Authenticated users can access
     ]),
 })
-  .authorization((allow) => [allow.resource(sendRoseEmail)]);
+  .authorization((allow) => [allow.resource(sendRoseEmail), allow.resource(computeDiscoveryScores), allow.resource(ensureMutualMatches)]);
 
 export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
