@@ -287,8 +287,8 @@ export default function AdminPromDates() {
 
       // Calculate match stats
       const totalMatches = allMatches.length;
-      const activeMatches = allMatches.filter(m => m.status === "active").length;
-      const promDates = allMatches.filter(m => m.isPromDate === true).length;
+      const activeMatchesCount = allMatches.filter(m => m.status === "active").length;
+      const promDatesCount = allMatches.filter(m => m.isPromDate === true).length;
       const unmatchedMatches = allMatches.filter(m => m.status === "unmatched").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const matchesToday = allMatches.filter((m: any) => isToday(m.createdAt)).length;
@@ -379,8 +379,8 @@ export default function AdminPromDates() {
         usersByGender,
         usersByCohort,
         totalMatches,
-        activeMatches,
-        promDates,
+        activeMatches: activeMatchesCount,
+        promDates: promDatesCount,
         unmatchedMatches,
         matchesToday,
         matchesThisWeek,
@@ -421,7 +421,8 @@ export default function AdminPromDates() {
         likedBy,
         mutualLikes,
         unmatchedMatches,
-        usersByCohort
+        usersByCohort,
+        promDatesCount
       );
 
       logInfo("Fetched all stats", { component: "AdminPromDates", operation: "fetchAllStats" });
@@ -442,19 +443,19 @@ export default function AdminPromDates() {
     likedBy: Record<string, Set<string>>,
     mutualLikes: number,
     unmatchedMatches: number,
-    usersByCohort: Record<string, number>
+    usersByCohort: Record<string, number>,
+    promDatesCount: number
   ) => {
     try {
       // 1. Conversion Funnel Metrics
       const totalLikesCount = allLikes.length;
       const totalMatchesCount = allMatches.length;
-      const promDatesCount = allMatches.filter(m => m.isPromDate === true).length;
+      // promDatesCount passed as parameter from fetchAllStats
       const likeToMatchRate = totalLikesCount > 0 ? (mutualLikes / totalLikesCount) * 100 : 0;
       const matchToPromDateRate = totalMatchesCount > 0 ? (promDatesCount / totalMatchesCount) * 100 : 0;
       
-      const promAsksAccepted = allPromAsks.filter(a => a.status === "accepted").length;
+      // Prom ask acceptance rate (will use promAsksAccepted from Prom Ask Metrics section below)
       const promAsksTotal = allPromAsks.length;
-      const promAskAcceptanceRate = promAsksTotal > 0 ? (promAsksAccepted / promAsksTotal) * 100 : 0;
       
       const matchRequestAccepted = allMatchRequests.filter(r => r.status === "accepted").length;
       const matchRequestTotal = allMatchRequests.length;
@@ -681,6 +682,9 @@ export default function AdminPromDates() {
       const promAsksAccepted = allPromAsks.filter((a: any) => a.status === "accepted").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const promAsksDeclined = allPromAsks.filter((a: any) => a.status === "declined").length;
+      
+      // Calculate prom ask acceptance rate (using promAsksAccepted declared above)
+      const promAskAcceptanceRate = totalPromAsksSent > 0 ? (promAsksAccepted / totalPromAsksSent) * 100 : 0;
 
       // 9. Discovery Feed Metrics
       const scoresWithValues = allProfiles
