@@ -67,7 +67,7 @@ function emailNameMatchesDisplayName(email: string, displayName: string): boolea
   return false;
 }
 
-export const handler = async (): Promise<{ updated: number; error?: string }> => {
+export const handler = async (): Promise<{ updated: number; cleared?: number; error?: string }> => {
   const startTime = new Date().toISOString();
   console.log("[compute-discovery-scores] Starting cron job at", startTime);
   
