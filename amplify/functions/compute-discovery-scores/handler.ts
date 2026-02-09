@@ -68,6 +68,9 @@ function emailNameMatchesDisplayName(email: string, displayName: string): boolea
 }
 
 export const handler = async (): Promise<{ updated: number; error?: string }> => {
+  const startTime = new Date().toISOString();
+  console.log("[compute-discovery-scores] Starting cron job at", startTime);
+  
   try {
     const { getAmplifyDataClientConfig } = await import("@aws-amplify/backend/function/runtime");
     const { Amplify } = await import("aws-amplify");
