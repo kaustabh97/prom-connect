@@ -309,10 +309,12 @@ export default function Discover() {
           logError(err, { component: "Discover", operation: "fetchMatchRequests" });
         }
 
-        // Fetch all profiles with pagination; filter for completed onboarding client-side
+        // Fetch ALL profiles with pagination (ensures we get complete dataset)
+        // Pagination loop: continue fetching until nextToken is undefined
         const listOpts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
         const allProfiles: NonNullable<Awaited<ReturnType<typeof client.models.UserProfile.list>>["data"]> = [];
         let nextToken: string | undefined;
+        let pageCount = 0;
         do {
           // @ts-ignore - list(options) second arg for authMode
           const res = await client.models.UserProfile.list({ nextToken }, listOpts);
@@ -324,7 +326,14 @@ export default function Discover() {
           }
           allProfiles.push(...(res.data ?? []));
           nextToken = res.nextToken ?? undefined;
+          pageCount += 1;
         } while (nextToken);
+        
+        logInfo("Fetched all profiles with pagination", { 
+          component: "Discover", 
+          operation: "fetchProfiles", 
+          extra: { totalProfiles: allProfiles.length, pagesFetched: pageCount } 
+        });
 
         const backendProfiles = allProfiles;
 
@@ -409,9 +418,14 @@ export default function Discover() {
   }, [likedMeIds]);
 
   // Apply filters then sort per viewer: combined score (global + their prefs), liked-me, per-viewer tie-breaker
+  // Filters applied: gender (based on user's sexual orientation), age range, cohort/intention preferences
+  // Gender filtering: Women see Men (if straight), Men see Women (if straight), etc.
+  // All applicable profiles are shown after filtering by user's preferences
   // Use stable dependencies to avoid re-sorting on every render
   const filteredProfiles = useMemo(() => {
     if (profiles.length === 0) return [];
+    // applyFilters filters by gendersInterestedIn (set from user's sexual orientation + gender)
+    // This ensures: Straight women see men, Straight men see women, Gay/Lesbian see same gender, Bisexual/Queer see all
     const filtered = applyFilters(profiles, filters);
     // Use lower preference weight (0.25) for better balance between global quality and preferences
     return sortDiscoveryProfiles(filtered, filters, {

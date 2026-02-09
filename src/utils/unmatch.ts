@@ -42,22 +42,31 @@ async function deleteConversationAndMessages(conversationId: string): Promise<vo
 /**
  * Reset a user's profile for discovery (clear partner fields, set excludeFromDiscovery false).
  * If formData is provided (for current user only), also set sexualOrientation, intention, hometown, foodPreference.
+ * This allows users to switch from partner flow back to discovery flow - can be done multiple times.
  */
 export async function resetProfileForDiscovery(
   profileId: string,
   formData?: WithdrawFormData
 ): Promise<void> {
   const { data: profile } = await client.models.UserProfile.get({ id: profileId }, opts);
-  if (!profile?.id || !profile.email) return;
+  if (!profile?.id || !profile.email) {
+    logError(new Error("Profile not found"), { 
+      component: "unmatch", 
+      operation: "resetProfileForDiscovery",
+      extra: { profileId } 
+    });
+    return;
+  }
   const updatePayload: Record<string, unknown> = {
     id: profile.id,
     email: profile.email,
     bio: "", // clear "Partner: X" when switching back to discovery
-    partnerStatus: "Still looking for my prom date 💫",
-    partnerEmail: "",
-    partnerName: "",
-    excludeFromDiscovery: false,
+    partnerStatus: "Still looking for my prom date 💫", // Reset to looking flow
+    partnerEmail: "", // Clear partner email
+    partnerName: "", // Clear partner name
+    excludeFromDiscovery: false, // Re-enable discovery
     onboardingCompleted: true,
+    updatedAt: new Date().toISOString(), // Update timestamp for recency scoring
   };
   if (formData) {
     updatePayload.sexualOrientation = formData.sexualOrientation;
@@ -66,6 +75,11 @@ export async function resetProfileForDiscovery(
     updatePayload.foodPreference = "Flexible";
   }
   await client.models.UserProfile.update(updatePayload as Parameters<typeof client.models.UserProfile.update>[0], opts);
+  logInfo("Profile reset for discovery", { 
+    component: "unmatch", 
+    operation: "resetProfileForDiscovery",
+    extra: { profileId } 
+  });
 }
 
 /**
