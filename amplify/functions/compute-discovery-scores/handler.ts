@@ -98,6 +98,27 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
         !(typeof p.bio === "string" && p.bio.trim().startsWith("Partner:"))
     );
 
+    // Clear discovery scores for profiles that are no longer eligible
+    const now = new Date().toISOString();
+    let cleared = 0;
+    for (const profile of allProfiles) {
+      const isEligible = profile.id &&
+        profile.onboardingCompleted === true &&
+        profile.excludeFromDiscovery !== true &&
+        !(typeof profile.bio === "string" && profile.bio.trim().startsWith("Partner:"));
+      
+      // If profile has a score but is no longer eligible, clear it
+      if (!isEligible && profile.discoveryScore != null) {
+        await client.models.UserProfile.update({
+          id: profile.id!,
+          email: profile.email ?? undefined,
+          discoveryScore: null,
+          lastDiscoveryScoreAt: now,
+        } as Parameters<typeof client.models.UserProfile.update>[0]);
+        cleared += 1;
+      }
+    }
+
     const likeCountByToUserId: Record<string, number> = {};
     let likeNextToken: string | undefined;
     do {
@@ -114,7 +135,6 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
 
     const maxLikes = Math.max(1, ...Object.values(likeCountByToUserId));
 
-    const now = new Date().toISOString();
     let updated = 0;
     for (const profile of discoveryEligible) {
       const id = profile.id!;
@@ -156,13 +176,14 @@ export const handler = async (): Promise<{ updated: number; error?: string }> =>
     const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime();
     console.log("[compute-discovery-scores] Completed successfully:", {
       updated,
+      cleared,
       totalProfiles: allProfiles.length,
       eligibleProfiles: discoveryEligible.length,
       startTime,
       endTime,
       durationMs,
     });
-    return { updated };
+    return { updated, cleared };
   } catch (err) {
     const endTime = new Date().toISOString();
     const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime();

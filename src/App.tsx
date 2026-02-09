@@ -73,8 +73,9 @@ function AppRoutes() {
         <Route path="/prom-date" element={<PromDate />} />
         <Route path="/request-pending" element={<RequestPending />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/admin/prom-dates" element={<AdminPromDates />} />
       </Route>
+      {/* Admin routes - separate from AppLayout, no navigation links */}
+      <Route path="/admin/prom-dates" element={<AdminPromDates />} />
       <Route path="/test-chat" element={<TestChat />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />

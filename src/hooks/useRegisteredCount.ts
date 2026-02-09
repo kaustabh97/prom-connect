@@ -13,14 +13,21 @@ export function useRegisteredCount(component: string) {
     const fetchCount = async () => {
       logInfo("Fetching registered user count", { component, operation: "fetchRegisteredCount" });
       try {
-        const { data, nextToken } = await client.models.UserProfile.list(
-          { filter: { onboardingCompleted: { eq: true } }, limit: 1000 },
-          { authMode: "apiKey" }
-        );
-        const n = data?.length ?? 0;
-        setCount(n);
-        setHasMore(!!nextToken);
-        logInfo("Registered count loaded", { component, operation: "fetchRegisteredCount", extra: { count: n, hasMore: !!nextToken } });
+        // Paginate to get all users with completed onboarding
+        let totalCount = 0;
+        let nextToken: string | undefined;
+        do {
+          const { data, nextToken: token } = await client.models.UserProfile.list(
+            { filter: { onboardingCompleted: { eq: true } }, nextToken, limit: 100 },
+            { authMode: "apiKey" }
+          );
+          totalCount += data?.length ?? 0;
+          nextToken = token ?? undefined;
+        } while (nextToken);
+        
+        setCount(totalCount);
+        setHasMore(false); // All pages fetched
+        logInfo("Registered count loaded", { component, operation: "fetchRegisteredCount", extra: { count: totalCount } });
       } catch (err) {
         logError(err, { component, operation: "fetchRegisteredCount" });
         setCount(null);
