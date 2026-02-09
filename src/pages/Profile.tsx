@@ -1251,7 +1251,7 @@ export default function Profile() {
           <AlertDialogHeader>
             <AlertDialogTitle>Switch it up?</AlertDialogTitle>
             <AlertDialogDescription>
-              No worries — we&apos;ll take you back to pick your vibe: still on the hunt for your plus-one, or already found them? You can change this anytime from your profile.
+              No worries — we&apos;ll take you back to pick your vibe: still on the hunt for your plus-one, or already found them? You can change this as many times as you want from your profile.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1260,7 +1260,8 @@ export default function Profile() {
               variant="default"
               onClick={() => {
                 setShowChangeFlowDialog(false);
-                navigate("/onboarding?flow=choice");
+                // Navigate to flow choice - users can change flows unlimited times
+                navigate("/onboarding?flow=choice", { replace: true });
               }}
             >
               Continue

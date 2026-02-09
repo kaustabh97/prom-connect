@@ -125,18 +125,34 @@ export default function PromDate() {
   const [isChangingFlow, setIsChangingFlow] = useState(false);
   const [changeFlowError, setChangeFlowError] = useState<string | null>(null);
 
-  /** Change flow: unmatch / reset without asking withdraw details; user chooses flow on next screen. */
+  /** Change flow: unmatch / reset without asking withdraw details; user chooses flow on next screen.
+   * Users can change flows as many times as they want - no restrictions.
+   */
   const handleChangeFlowClick = async () => {
     setIsChangingFlow(true);
     setChangeFlowError(null);
     try {
       if (showOutsideView) {
+        // Outside partner flow: just reset profile fields, no match to delete
         await resetProfileForDiscovery(currentUserId);
+        logInfo("Reset profile for discovery (outside partner)", { 
+          component: "PromDate", 
+          operation: "changeFlow",
+          extra: { currentUserId } 
+        });
         navigate("/onboarding?flow=choice", { replace: true });
         return;
       }
+      // IIMA match: unmatch and reset both profiles
       if (!promDate?.match?.id || !currentUserId || !promDate.otherUserId) {
-        setChangeFlowError("Missing match info");
+        // If no match but user is on prom-date page, just reset their profile
+        logInfo("No match found, resetting profile for discovery", { 
+          component: "PromDate", 
+          operation: "changeFlow",
+          extra: { currentUserId } 
+        });
+        await resetProfileForDiscovery(currentUserId);
+        navigate("/onboarding?flow=choice", { replace: true });
         return;
       }
       const result = await unmatchUsers({
@@ -147,6 +163,11 @@ export default function PromDate() {
         currentUserFormData: undefined,
       });
       if (result.success) {
+        logInfo("Unmatched and reset profile for discovery", { 
+          component: "PromDate", 
+          operation: "changeFlow",
+          extra: { matchId: promDate.match.id, currentUserId } 
+        });
         navigate("/onboarding?flow=choice", { replace: true });
       } else {
         setChangeFlowError(result.error ?? "Failed to change flow");
