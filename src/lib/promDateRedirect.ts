@@ -48,15 +48,27 @@ export async function getPromDateRedirectPath(): Promise<string | null> {
       return "/request-pending";
     }
 
-    // 3. Outside partner (bio "Partner: X" with no MatchRequest - partner from outside campus)
+    // 3. Outside partner (bio "Partner: X" OR partnerEmail set with no MatchRequest - partner from outside campus)
     // If we had MatchRequests from me (declined/withdrawn), don't treat as outside - go to discover
     const hasAnyOutgoingRequest = (outgoingRequests ?? []).length > 0;
     if (hasAnyOutgoingRequest) {
       return null; // IIMA flow but request was declined/withdrawn
     }
+    
+    // Check for outside partner: bio starts with "Partner:" OR partnerEmail is set (non-IIMA)
+    const partnerEmail = userProfile.partnerEmail ?? "";
+    const hasNonIIMAPartnerEmail = partnerEmail.trim() !== "" && !partnerEmail.endsWith("@iima.ac.in");
     const partnerMatch = bio?.match(/^Partner:\s*(.+)/);
-    if (partnerMatch) {
-      const partnerName = partnerMatch[1].trim();
+    
+    // Only redirect to prom-date if:
+    // - Bio starts with "Partner:" AND partnerStatus indicates they have a partner
+    // - OR partnerEmail is set (non-IIMA) AND partnerStatus indicates they have a partner
+    // But NOT if partnerStatus is "Still looking" (user switched back to discovery)
+    const partnerStatus = userProfile.partnerStatus ?? "";
+    const hasPartner = partnerStatus.includes("Already found") || partnerStatus.includes("plus-one");
+    
+    if (hasPartner && (partnerMatch || hasNonIIMAPartnerEmail)) {
+      const partnerName = partnerMatch?.[1]?.trim() || userProfile.partnerName || "Partner";
       return `/prom-date?partnerName=${encodeURIComponent(partnerName)}&outside=1`;
     }
 
