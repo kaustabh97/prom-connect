@@ -1744,6 +1744,7 @@ export default function AdminPromDates() {
                 </div>
               </div>
             </>
+            )
           )}
 
           {/* Tables Tab */}
