@@ -38,7 +38,6 @@ import {
 import PendingPartnerRequestView from "@/components/PendingPartnerRequestView";
 import WithdrawModal, { type WithdrawFormData } from "@/components/WithdrawModal";
 import { usePromDate } from "@/hooks/usePromDate";
-import { useDailyLikeCount } from "@/hooks/useDailyLikeCount";
 import { useToast } from "@/hooks/use-toast";
 
 const client = generateClient<Schema>();
@@ -116,12 +115,10 @@ export default function Discover() {
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
-  const [currentUserGender, setCurrentUserGender] = useState<string | undefined>(undefined);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedMeIds, setLikedMeIds] = useState<Set<string>>(new Set());
 
   const { toast } = useToast();
-  const dailyLikeInfo = useDailyLikeCount(currentProfileId, currentUserGender, tick);
 
   const [reportOpen, setReportOpen] = useState(false);
   const [pendingOutgoingRequest, setPendingOutgoingRequest] = useState<{
@@ -264,7 +261,6 @@ export default function Discover() {
           : { data: null };
         const resolvedMyProfileId = myProfile?.id ?? "";
         setCurrentProfileId(resolvedMyProfileId);
-        setCurrentUserGender(myProfile?.gender ?? undefined);
         if (resolvedMyProfileId) {
           try {
             const { data: outgoing } =
@@ -421,14 +417,6 @@ export default function Discover() {
 
   const handleSwipe = async (profileId: string, action: "like" | "pass") => {
     logInfo("Discover: swipe", { component: "Discover", operation: "handleSwipe", extra: { profileId, action } });
-    if (action === "like" && dailyLikeInfo.hasLimit && dailyLikeInfo.atLimit) {
-      toast({
-        title: "Daily likes used",
-        description: "You have finished likes for today. You can still browse profiles but you need to come back tomorrow for more likes.",
-        variant: "destructive",
-      });
-      return;
-    }
     const profile = displayQueue.find((p) => p.id === profileId);
     const result = await recordSwipe(profileId, action);
     if (result.isMatch && profile) {
@@ -563,11 +551,7 @@ export default function Discover() {
             <h1 className="font-display text-3xl font-bold text-foreground">
               {pendingOutgoingRequest ? "Your Prom Invite ✨" : "Discover"}
             </h1>
-            {dailyLikeInfo.hasLimit && !pendingOutgoingRequest && (
-              <p className="text-xs text-muted-foreground">
-                {dailyLikeInfo.count ?? 0}/{dailyLikeInfo.limit ?? 10} likes used today
-              </p>
-            )}
+            {/* No like counter anymore */}
           </div>
           <div className="flex items-center gap-2">
             <ShareWhatsAppButton
@@ -641,19 +625,18 @@ export default function Discover() {
               </div>
             </div>
           ) : (
-            <DiscoverFeed
-              profiles={displayQueue}
-              currentIndex={currentIndex}
-              onNext={handleNext}
-              onSwipe={handleSwipe}
-              dailyLikeInfo={dailyLikeInfo}
-              onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
-              onProfileChange={handleProfileChange}
-              scrollToTop={scrollToTop}
-              onReportClick={currentDisplayProfile ? () => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: currentDisplayProfile.id } }); setReportOpen(true); } : undefined}
-              onRoseClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
-              showRoseButton={false}
-            />
+              <DiscoverFeed
+                profiles={displayQueue}
+                currentIndex={currentIndex}
+                onNext={handleNext}
+                onSwipe={handleSwipe}
+                onOpenFilters={() => { logInfo("Discover: filters opened from feed", { component: "Discover", operation: "openFilters" }); setFiltersOpen(true); }}
+                onProfileChange={handleProfileChange}
+                scrollToTop={scrollToTop}
+                onReportClick={currentDisplayProfile ? () => { logInfo("Discover: report opened", { component: "Discover", operation: "openReport", extra: { profileId: currentDisplayProfile.id } }); setReportOpen(true); } : undefined}
+                onRoseClick={() => { setRoseError(null); setRoseEmail(""); setShowRoseModal(true); }}
+                showRoseButton={false}
+              />
           )}
         </div>
       </div>
