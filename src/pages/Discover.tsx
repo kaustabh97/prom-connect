@@ -436,7 +436,6 @@ export default function Discover() {
       setMatchedMatchId(result.matchId || null);
       setMatchPopupOpen(true);
     }
-    setCurrentIndex(0);
   };
 
   const currentDisplayProfile = displayQueue[currentIndex] ?? displayQueue[0] ?? null;

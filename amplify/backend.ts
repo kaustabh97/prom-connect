@@ -12,6 +12,7 @@ import { sendPartnerInvite } from './functions/send-partner-invite/resource';
 import { sendReportEmail } from './functions/send-report-email/resource';
 import { sendRoseEmail } from './functions/send-rose-email/resource';
 import { computeDiscoveryScores } from './functions/compute-discovery-scores/resource';
+import { ensureMutualMatches } from './functions/ensure-mutual-matches/resource';
 import { frontendLogger } from './functions/frontend-logger/resource';
 
 const backend = defineBackend({
@@ -22,6 +23,7 @@ const backend = defineBackend({
   sendReportEmail,
   sendRoseEmail,
   computeDiscoveryScores,
+  ensureMutualMatches,
   frontendLogger,
 });
 
@@ -109,5 +111,14 @@ new cr.AwsCustomResource(computeStack, 'ComputeDiscoveryScoresOnDeploy', {
       resources: [computeDiscoveryScoresLambda.functionArn],
     }),
   ]),
+});
+
+// Ensure mutual likes are turned into Matches every hour (backfill safety net)
+const ensureMutualMatchesLambda = backend.ensureMutualMatches.resources.lambda;
+const ensureStack = ensureMutualMatchesLambda.stack;
+new events.Rule(ensureStack, 'EnsureMutualMatchesSchedule', {
+  schedule: events.Schedule.rate(Duration.hours(1)),
+  targets: [new targets.LambdaFunction(ensureMutualMatchesLambda)],
+  description: 'Ensure mutual likes become matches every hour',
 });
 
