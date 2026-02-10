@@ -6,6 +6,8 @@
  * if there is no Match between A and B, create an active Match.
  */
 
+import { fetchAllUserProfiles } from "../compute-discovery-scores/utils";
+
 export const handler = async (): Promise<{ created: number; error?: string }> => {
   const startTime = new Date().toISOString();
   console.log("[ensure-mutual-matches] Starting cron job at", startTime);
@@ -21,17 +23,13 @@ export const handler = async (): Promise<{ created: number; error?: string }> =>
     const client = generateClient<Schema>();
 
     // Build email map: UserProfile id -> email (for Match metadata)
+    const allProfiles = await fetchAllUserProfiles(client);
     const emailById: Record<string, string | undefined> = {};
-    let profileNextToken: string | undefined;
-    do {
-      const res = await client.models.UserProfile.list({ nextToken: profileNextToken });
-      (res.data ?? []).forEach((p) => {
-        if (p.id) {
-          emailById[p.id] = p.email ?? undefined;
-        }
-      });
-      profileNextToken = res.nextToken ?? undefined;
-    } while (profileNextToken);
+    allProfiles.forEach((p) => {
+      if (p.id) {
+        emailById[p.id] = p.email ?? undefined;
+      }
+    });
 
     // List all Likes
     const likedBy: Record<string, Set<string>> = {};
