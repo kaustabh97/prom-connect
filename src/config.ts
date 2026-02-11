@@ -77,3 +77,14 @@ export function getMatchmakingEnabled(): boolean {
   if (AMPLIFY_BRANCH !== "main") return true;
   return Date.now() >= new Date(MATCHMAKING_GO_LIVE_DATE).getTime();
 }
+
+/**
+ * Admin profile emails: these users are hidden from the discovery feed
+ * (other users will not see them when browsing Discover).
+ * Add or remove emails here to control who is excluded from discovery.
+ */
+export const DISCOVERY_HIDDEN_PROFILE_EMAILS: string[] = [
+  "p24kaustabh@iima.ac.in",
+  "p24dipak@iima.ac.in",
+  "p24sushruti@iima.ac.in",
+];

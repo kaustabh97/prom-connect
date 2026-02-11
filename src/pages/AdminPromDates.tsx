@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import { getUserProfileById } from "@/lib/dataAccess";
-import { GOOGLE_LOGIN_CHECK } from "@/config";
 import { logError, logInfo } from "@/utils/logger";
 import {
   Table,
@@ -17,8 +16,12 @@ import { Loader2, RefreshCw, Users, Heart, MessageCircle, TrendingUp, UserCheck,
 import SparkleBackground from "@/components/SparkleBackground";
 import { useNavigate } from "react-router-dom";
 import { getUserProfileFromCognito } from "@/utils/auth";
+import { GOOGLE_LOGIN_CHECK, DISCOVERY_HIDDEN_PROFILE_EMAILS } from "@/config";
 
 const client = generateClient<Schema>();
+
+// Admin dashboard access: same list as profiles hidden from discovery
+const ALLOWED_ADMIN_EMAILS = DISCOVERY_HIDDEN_PROFILE_EMAILS;
 
 type MatchWithUserDetails = {
   match: Schema["Match"]["type"];
@@ -118,13 +121,6 @@ const isThisWeek = (dateString?: string | null): boolean => {
     return false;
   }
 };
-
-// Admin emails allowed to access the dashboard
-const ALLOWED_ADMIN_EMAILS = [
-  "p24kaustabh@iima.ac.in",
-  "p24dipak@iima.ac.in",
-  "p24sushruti@iima.ac.in",
-];
 
 export default function AdminPromDates() {
   const navigate = useNavigate();

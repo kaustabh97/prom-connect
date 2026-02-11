@@ -11,7 +11,7 @@ import { getUrl } from "aws-amplify/storage";
 import { getUserProfileFromCognito } from "@/utils/auth";
 import { getIdFromEmail } from "@/utils/userId";
 import { logError, logInfo, logWarn } from "@/utils/logger";
-import { GOOGLE_LOGIN_CHECK, APP_URL } from "@/config";
+import { GOOGLE_LOGIN_CHECK, APP_URL, DISCOVERY_HIDDEN_PROFILE_EMAILS } from "@/config";
 
 import {
   applyFilters,
@@ -394,6 +394,7 @@ export default function Discover() {
             p.email === currentUserEmail ||
             p.onboardingCompleted !== true ||
             p.excludeFromDiscovery === true ||
+            (p.email != null && DISCOVERY_HIDDEN_PROFILE_EMAILS.includes(p.email.trim())) ||
             p.bio?.trim().startsWith("Partner:") ||
             matchRequestPendingIds.has(p.id ?? "") ||
             reportedIds.has(p.id ?? "")
