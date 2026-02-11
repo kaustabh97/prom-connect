@@ -55,6 +55,8 @@ export interface DiscoveryProfileFull {
   pollCasualOrDressed?: string;
   /** Backend-computed discovery score 0–1 (email match, age sanity, popularity). Updated by cron. */
   discoveryScore?: number | null;
+  /** S3 key for profile photo — used for deferred/progressive photo loading. */
+  profilePicKey?: string;
 }
 
 // ============================================================================

@@ -146,6 +146,11 @@ export default {
           "70%": { transform: "scale(1)" },
           "100%": { transform: "scale(1)" },
         },
+        "heart-fill": {
+          "0%": { clipPath: "inset(100% 0 0 0)" },
+          "50%": { clipPath: "inset(0% 0 0 0)" },
+          "100%": { clipPath: "inset(100% 0 0 0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -158,6 +163,7 @@ export default {
         "float": "float 6s ease-in-out infinite",
         "sparkle": "sparkle 2s ease-in-out infinite",
         "heartbeat": "heartbeat 1.2s ease-in-out infinite",
+        "heart-fill": "heart-fill 2.4s ease-in-out infinite",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
