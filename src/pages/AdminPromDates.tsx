@@ -678,8 +678,6 @@ export default function AdminPromDates() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const promAsksPending = allPromAsks.filter((a: any) => a.status === "pending").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const promAsksAccepted = allPromAsks.filter((a: any) => a.status === "accepted").length;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const promAsksDeclined = allPromAsks.filter((a: any) => a.status === "declined").length;
 
       // 9. Discovery Feed Metrics

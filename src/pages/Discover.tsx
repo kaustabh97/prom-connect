@@ -639,7 +639,12 @@ export default function Discover() {
         <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
           {loading ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="flex flex-col items-center gap-3">
+                <Heart className="w-12 h-12 text-rose-400 animate-pulse drop-shadow-[0_0_18px_rgba(244,63,94,0.7)]" />
+                <p className="text-sm text-muted-foreground">
+                  Matching you with someone special...
+                </p>
+              </div>
             </div>
           ) : error ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">
