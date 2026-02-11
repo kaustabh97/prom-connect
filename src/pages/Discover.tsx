@@ -18,6 +18,7 @@ import {
   type DiscoveryProfileFull,
   mapSexualOrientationToGenders,
   FILTER_STORAGE_KEY,
+  areSexualPreferencesMutuallyCompatible,
 } from "@/lib/dating";
 import { sortDiscoveryProfiles } from "@/lib/discoveryScore";
 import { getUserProfileById } from "@/lib/dataAccess";
@@ -367,15 +368,32 @@ export default function Discover() {
         }
 
         // Filter: exclude current user, only completed onboarding, exclude prom date, request pending, reported
-        const filteredBackend = backendProfiles.filter(
-          (p) =>
-            p.email !== currentUserEmail &&
-            p.onboardingCompleted === true &&
-            p.excludeFromDiscovery !== true &&
-            !p.bio?.trim().startsWith("Partner:") &&
-            !requestPendingUserIds.has(p.id ?? "") &&
-            !reportedProfileIds.has(p.id ?? "")
-        );
+        const filteredBackend = backendProfiles.filter((p) => {
+          // Basic eligibility checks
+          if (
+            p.email === currentUserEmail ||
+            p.onboardingCompleted !== true ||
+            p.excludeFromDiscovery === true ||
+            p.bio?.trim().startsWith("Partner:") ||
+            requestPendingUserIds.has(p.id ?? "") ||
+            reportedProfileIds.has(p.id ?? "")
+          ) {
+            return false;
+          }
+
+          // If we don't have the viewer's profile (edge case), don't apply sexual-orientation filter
+          if (!myProfile) return true;
+
+          // Enforce mutual sexual-preference compatibility:
+          // - The viewer should be interested in the profile's gender
+          // - The profile should be interested in the viewer's gender
+          return areSexualPreferencesMutuallyCompatible(
+            myProfile.gender ?? null,
+            myProfile.sexualOrientation ?? null,
+            p.gender ?? null,
+            p.sexualOrientation ?? null
+          );
+        });
 
         // Transform to DiscoveryProfileFull format (same length as filteredBackend)
         const transformedProfiles = filteredBackend.map(transformBackendProfile);
