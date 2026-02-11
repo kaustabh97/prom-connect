@@ -16,6 +16,7 @@ import PromDate from "./pages/PromDate";
 import RequestPending from "./pages/RequestPending";
 import MatchmakingComingSoon from "./pages/MatchmakingComingSoon";
 import AdminPromDates from "./pages/AdminPromDates";
+import PublicStats from "./pages/PublicStats";
 import NotFound from "./pages/NotFound";
 import { useMatchmakingEnabled } from "@/hooks/useMatchmakingEnabled";
 
@@ -61,6 +62,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/stats" element={<PublicStats />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/couple-complete" element={<CoupleCompleteRedirect />} />

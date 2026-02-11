@@ -132,6 +132,27 @@ const Landing = () => {
 
           {count !== null && <FomoCounter count={count} hasMore={hasMore} animate delay={0.65} />}
 
+          {count !== null && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.72, duration: 0.5 }}
+              className="mb-6"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  logInfo("Landing: See more statistics clicked", { component: "Landing", operation: "seeStatsClick" });
+                  navigate("/stats");
+                }}
+                className="text-muted-foreground hover:text-primary hover:bg-primary/10"
+              >
+                See more statistics
+              </Button>
+            </motion.div>
+          )}
+
           {/* CTA Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
