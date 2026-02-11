@@ -295,7 +295,9 @@ export default function AdminPromDates() {
     }
   };
 
-  const calculateAdvancedMetrics = (
+  // Advanced admin analytics for Prom dates and engagement.
+  // Note: function name intentionally unique to avoid clashes with any earlier helpers.
+  const computeAdvancedMetrics = (
     allProfiles: Schema["UserProfile"]["type"][],
     allMatches: Schema["Match"]["type"][],
     allLikes: Schema["Like"]["type"][],
@@ -628,7 +630,7 @@ export default function AdminPromDates() {
         partnerInviteSuccessRate,
       });
     } catch (err) {
-      logError(err, { component: "AdminPromDates", operation: "calculateAdvancedMetrics" });
+      logError(err, { component: "AdminPromDates", operation: "computeAdvancedMetrics" });
     }
   };
 
