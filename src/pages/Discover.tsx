@@ -642,9 +642,13 @@ export default function Discover() {
         <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
           {loading ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12">
-              <div className="flex flex-col items-center gap-3">
-                <Heart className="w-12 h-12 text-rose-400 animate-pulse drop-shadow-[0_0_18px_rgba(244,63,94,0.7)]" />
-                <p className="text-sm text-muted-foreground">
+              <div className="flex flex-col items-center gap-4">
+                <Heart
+                  className="w-16 h-16 text-rose-500 animate-heartbeat drop-shadow-[0_0_24px_rgba(244,63,94,0.6)]"
+                  fill="currentColor"
+                  strokeWidth={1.5}
+                />
+                <p className="text-sm text-muted-foreground animate-pulse">
                   Matching you with someone special...
                 </p>
               </div>

@@ -138,6 +138,14 @@ export default {
           "0%, 100%": { opacity: "0", transform: "scale(0)" },
           "50%": { opacity: "1", transform: "scale(1)" },
         },
+        "heartbeat": {
+          "0%": { transform: "scale(1)" },
+          "14%": { transform: "scale(1.3)" },
+          "28%": { transform: "scale(1)" },
+          "42%": { transform: "scale(1.3)" },
+          "70%": { transform: "scale(1)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -149,6 +157,7 @@ export default {
         "pulse-glow": "pulse-glow 3s ease-in-out infinite",
         "float": "float 6s ease-in-out infinite",
         "sparkle": "sparkle 2s ease-in-out infinite",
+        "heartbeat": "heartbeat 1.2s ease-in-out infinite",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
