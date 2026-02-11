@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Users, Heart, MessageCircle, TrendingUp, UserCheck, Home, Shield, AlertTriangle } from "lucide-react";
+import { Loader2, RefreshCw, Users, Heart, MessageCircle, TrendingUp, UserCheck, Home, Shield, AlertTriangle, BarChart3, Table2, LayoutDashboard, Play, Download, CheckCircle2, Zap } from "lucide-react";
 import SparkleBackground from "@/components/SparkleBackground";
 import { useNavigate } from "react-router-dom";
 import { getUserProfileFromCognito } from "@/utils/auth";
@@ -27,6 +27,8 @@ type MatchWithUserDetails = {
   match: Schema["Match"]["type"];
   user1Profile?: Schema["UserProfile"]["type"];
   user2Profile?: Schema["UserProfile"]["type"];
+  promDateType?: "looking-flow" | "partner-iima" | "partner-outside";
+  hasPromAsk?: boolean; // For active matches: whether a prom ask request exists
 };
 
 type DashboardStats = {
@@ -83,11 +85,91 @@ type DashboardStats = {
   };
 };
 
+type AdvancedMetrics = {
+  // Conversion Funnel Metrics
+  likeToMatchRate: number; // %
+  matchToPromDateRate: number; // %
+  promAskAcceptanceRate: number; // %
+  matchRequestAcceptanceRate: number; // %
+  
+  // Engagement Metrics
+  activeUsersLast7Days: number;
+  dailyActiveUsers: number;
+  weeklyActiveUsers: number;
+  usersWithPhotos: number;
+  usersWhoSentMessages: number;
+  
+  // Time-based Metrics
+  avgTimeToMatchHours: number; // Average hours from first like to match
+  avgTimeToPromDateHours: number; // Average hours from match to prom date
+  newUsersToday: number;
+  newUsersThisWeek: number;
+  recentActivity24h: number; // Users active in last 24 hours
+  
+  // Quality Metrics
+  matchesWithConversations: number;
+  matchesWithConversationsPercent: number;
+  promDatesFromLookingFlow: number;
+  unmatchRate: number; // %
+  avgProfileCompleteness: number; // %
+  
+  // Cohort-specific Metrics
+  matchesByCohort: Record<string, number>;
+  promDatesByCohort: Record<string, number>;
+  mostActiveCohorts: Array<{ cohort: string; likes: number; matches: number }>;
+  
+  // Prom Ask Metrics
+  totalPromAsksSent: number;
+  promAsksPending: number;
+  promAsksAccepted: number;
+  promAsksDeclined: number;
+  
+  // Discovery Feed Metrics
+  avgDiscoveryScore: number;
+  discoveryScoreDistribution: {
+    high: number; // > 0.7
+    medium: number; // 0.4 - 0.7
+    low: number; // < 0.4
+  };
+  profilesNeverShown: number;
+  
+  // Flow Distribution Metrics
+  usersByFlowType: {
+    looking: number;
+    partnerIIMA: number;
+    partnerOutside: number;
+  };
+  flowChanges: number; // Users who changed flows
+  partnerInviteSuccessRate: number; // %
+};
+
 const getFlowType = (profile?: Schema["UserProfile"]["type"]): string => {
   if (!profile) return "Unknown";
   const hasPartner = (profile.partnerStatus ?? "").includes("Already found") || 
                      (profile.partnerEmail ?? "").trim() !== "";
   return hasPartner ? "Partner Flow" : "Looking Flow";
+};
+
+const isIIMACouple = (
+  match: Schema["Match"]["type"],
+  user1Profile?: Schema["UserProfile"]["type"],
+  user2Profile?: Schema["UserProfile"]["type"],
+  promDateType?: "looking-flow" | "partner-iima" | "partner-outside"
+): boolean => {
+  // If it's partner-outside, it's not IIMA
+  if (promDateType === "partner-outside") return false;
+  
+  // Check if both users have IIMA emails
+  if (user1Profile && user2Profile) {
+    const user1IsIIMA = (user1Profile.email ?? "").endsWith("@iima.ac.in");
+    const user2IsIIMA = (user2Profile.email ?? "").endsWith("@iima.ac.in");
+    return user1IsIIMA && user2IsIIMA;
+  }
+  
+  // Fallback: check emails from match record
+  const user1IsIIMA = (match.user1Email ?? "").endsWith("@iima.ac.in");
+  const user2IsIIMA = (match.user2Email ?? "").endsWith("@iima.ac.in");
+  return user1IsIIMA && user2IsIIMA;
 };
 
 const formatDate = (dateString?: string | null): string => {
@@ -122,31 +204,81 @@ const isThisWeek = (dateString?: string | null): boolean => {
   }
 };
 
+const isLast7Days = (dateString?: string | null): boolean => {
+  if (!dateString) return false;
+  try {
+    const date = new Date(dateString);
+    const today = new Date();
+    const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return date >= sevenDaysAgo;
+  } catch {
+    return false;
+  }
+};
+
+const isLast24Hours = (dateString?: string | null): boolean => {
+  if (!dateString) return false;
+  try {
+    const date = new Date(dateString);
+    const today = new Date();
+    const oneDayAgo = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    return date >= oneDayAgo;
+  } catch {
+    return false;
+  }
+};
+
+// Admin emails allowed to access the dashboard
+const ALLOWED_ADMIN_EMAILS = [
+  "p24kaustabh@iima.ac.in",
+  "p24dipak@iima.ac.in",
+  "p24sushruti@iima.ac.in",
+];
+
+type TabType = "overview" | "tables" | "metrics";
+
 export default function AdminPromDates() {
   const navigate = useNavigate();
-  const [matches, setMatches] = useState<MatchWithUserDetails[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [promDates, setPromDates] = useState<MatchWithUserDetails[]>([]);
+  const [activeMatches, setActiveMatches] = useState<MatchWithUserDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [matchesLoading, setMatchesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [advancedMetrics, setAdvancedMetrics] = useState<AdvancedMetrics | null>(null);
+  const [metricsLoadingSections, setMetricsLoadingSections] = useState<Set<string>>(new Set());
   const [computingScores, setComputingScores] = useState(false);
+  const [ensuringMatches, setEnsuringMatches] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
+  const [healthCheckResult, setHealthCheckResult] = useState<string | null>(null);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const fetchAllStats = async () => {
     try {
       setError(null);
+      console.log("[AdminPromDates] Starting fetchAllStats...");
       const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
 
       // Fetch all data with pagination
-      const [allProfiles, allMatches, allLikes, allConversations, allMessages, allMatchRequests] = await Promise.all([
+      console.log("[AdminPromDates] Fetching data with pagination...");
+      const [allProfiles, allMatches, allLikes, allConversations, allMessages, allMatchRequests, allPromAsks, allReports] = await Promise.all([
         fetchAllWithPagination(client.models.UserProfile.list.bind(client.models.UserProfile), opts),
         fetchAllWithPagination((client.models.Match as any).list.bind(client.models.Match), opts),
         fetchAllWithPagination((client.models.Like as any).list.bind(client.models.Like), opts),
         fetchAllWithPagination((client.models.Conversation as any).list.bind(client.models.Conversation), opts),
         fetchAllWithPagination((client.models.Message as any).list.bind(client.models.Message), opts),
         fetchAllWithPagination((client.models.MatchRequest as any).list.bind(client.models.MatchRequest), opts),
+        fetchAllWithPagination((client.models.PromAskRequest as any).list.bind(client.models.PromAskRequest), opts),
+        fetchAllWithPagination((client.models.Report as any).list.bind(client.models.Report), opts),
       ]);
+      console.log("[AdminPromDates] Data fetched:", {
+        profiles: allProfiles.length,
+        matches: allMatches.length,
+        likes: allLikes.length,
+        conversations: allConversations.length,
+        messages: allMessages.length,
+      });
 
       // Calculate user stats
       const totalUsers = allProfiles.length;
@@ -168,8 +300,8 @@ export default function AdminPromDates() {
 
       // Calculate match stats
       const totalMatches = allMatches.length;
-      const activeMatches = allMatches.filter(m => m.status === "active").length;
-      const promDates = allMatches.filter(m => m.isPromDate === true).length;
+      const activeMatchesCount = allMatches.filter(m => m.status === "active").length;
+      const promDatesCount = allMatches.filter(m => m.isPromDate === true).length;
       const unmatchedMatches = allMatches.filter(m => m.status === "unmatched").length;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const matchesToday = allMatches.filter((m: any) => isToday(m.createdAt)).length;
@@ -178,8 +310,10 @@ export default function AdminPromDates() {
 
       // Calculate like stats
       const totalLikes = allLikes.length;
-      const likesToday = allLikes.filter(l => isToday(l.createdAt)).length;
-      const likesThisWeek = allLikes.filter(l => isThisWeek(l.createdAt)).length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const likesToday = allLikes.filter((l: any) => isToday(l.createdAt)).length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const likesThisWeek = allLikes.filter((l: any) => isThisWeek(l.createdAt)).length;
       
       // Calculate mutual likes (pairs where A liked B and B liked A)
       const likedBy: Record<string, Set<string>> = {};
@@ -208,10 +342,13 @@ export default function AdminPromDates() {
 
       // Calculate chat stats
       const totalConversations = allConversations.length;
-      const conversationsWithMessages = new Set(allMessages.map(m => m.conversationId).filter(Boolean)).size;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const conversationsWithMessages = new Set(allMessages.map((m: any) => m.conversationId).filter(Boolean)).size;
       const totalMessages = allMessages.length;
-      const messagesToday = allMessages.filter(m => isToday(m.sentAt)).length;
-      const messagesThisWeek = allMessages.filter(m => isThisWeek(m.sentAt)).length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messagesToday = allMessages.filter((m: any) => isToday(m.sentAt)).length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messagesThisWeek = allMessages.filter((m: any) => isThisWeek(m.sentAt)).length;
       const avgMessagesPerConversation = totalConversations > 0 ? (totalMessages / totalConversations).toFixed(1) : "0";
 
       // Calculate match request stats
@@ -247,7 +384,7 @@ export default function AdminPromDates() {
         noId: allProfiles.filter(p => !p.id).length,
       };
 
-      setStats({
+      const statsData = {
         totalUsers,
         usersLookingFlow,
         usersPartnerFlow,
@@ -255,8 +392,8 @@ export default function AdminPromDates() {
         usersByGender,
         usersByCohort,
         totalMatches,
-        activeMatches,
-        promDates,
+        activeMatches: activeMatchesCount,
+        promDates: promDatesCount,
         unmatchedMatches,
         matchesToday,
         matchesThisWeek,
@@ -283,12 +420,458 @@ export default function AdminPromDates() {
           lastScoreUpdate,
           profilesWithoutScoreReasons,
         },
-      });
+      };
+      
+      setStats(statsData);
 
-      logInfo("Fetched all stats", { component: "AdminPromDates", operation: "fetchAllStats" });
+      // Calculate Advanced Metrics (incremental sections)
+      calculateAdvancedMetrics(
+        allProfiles,
+        allMatches,
+        allLikes,
+        allConversations,
+        allMessages,
+        allMatchRequests,
+        allPromAsks,
+        likedBy,
+        mutualLikes,
+        unmatchedMatches,
+        usersByCohort,
+        promDatesCount,
+        usersLookingFlow,
+        profilesInDiscovery
+      );
+
+      console.log("[AdminPromDates] Stats set successfully:", {
+        totalUsers: statsData.totalUsers,
+        totalMatches: statsData.totalMatches,
+      });
+      logInfo("Fetched all stats", { component: "AdminPromDates", operation: "fetchAllStats", extra: { totalUsers: statsData.totalUsers } });
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "fetchAllStats" });
       setError(err instanceof Error ? err.message : "Failed to fetch stats");
+      // Ensure stats is set to null on error so loading state shows
+      setStats(null);
+      setAdvancedMetrics(null);
+    }
+  };
+
+  const calculateAdvancedMetrics = (
+    allProfiles: Schema["UserProfile"]["type"][],
+    allMatches: Schema["Match"]["type"][],
+    allLikes: Schema["Like"]["type"][],
+    allConversations: Schema["Conversation"]["type"][],
+    allMessages: Schema["Message"]["type"][],
+    allMatchRequests: Schema["MatchRequest"]["type"][],
+    allPromAsks: Schema["PromAskRequest"]["type"][],
+    likedBy: Record<string, Set<string>>,
+    mutualLikes: number,
+    unmatchedMatches: number,
+    usersByCohort: Record<string, number>,
+    promDatesCount: number,
+    usersLookingFlow: number,
+    profilesInDiscovery: number
+  ) => {
+    // Initialize empty metrics object
+    const initialMetrics: AdvancedMetrics = {
+      likeToMatchRate: 0,
+      matchToPromDateRate: 0,
+      promAskAcceptanceRate: 0,
+      matchRequestAcceptanceRate: 0,
+      activeUsersLast7Days: 0,
+      dailyActiveUsers: 0,
+      weeklyActiveUsers: 0,
+      usersWithPhotos: 0,
+      usersWhoSentMessages: 0,
+      avgTimeToMatchHours: 0,
+      avgTimeToPromDateHours: 0,
+      newUsersToday: 0,
+      newUsersThisWeek: 0,
+      recentActivity24h: 0,
+      matchesWithConversations: 0,
+      matchesWithConversationsPercent: 0,
+      promDatesFromLookingFlow: 0,
+      unmatchRate: 0,
+      avgProfileCompleteness: 0,
+      matchesByCohort: {},
+      promDatesByCohort: {},
+      mostActiveCohorts: [],
+      totalPromAsksSent: 0,
+      promAsksPending: 0,
+      promAsksAccepted: 0,
+      promAsksDeclined: 0,
+      avgDiscoveryScore: 0,
+      discoveryScoreDistribution: { high: 0, medium: 0, low: 0 },
+      profilesNeverShown: 0,
+      usersByFlowType: { looking: 0, partnerIIMA: 0, partnerOutside: 0 },
+      flowChanges: 0,
+      partnerInviteSuccessRate: 0,
+    };
+    
+    setAdvancedMetrics(initialMetrics);
+    
+    // Calculate sections incrementally using setTimeout to avoid blocking
+    let sectionDelay = 0;
+    const calculateSection = (sectionName: string, calculateFn: () => Partial<AdvancedMetrics>) => {
+      const currentDelay = sectionDelay;
+      sectionDelay += 100; // Stagger sections by 100ms each
+      
+      setMetricsLoadingSections(prev => new Set(prev).add(sectionName));
+      
+      setTimeout(() => {
+        try {
+          const sectionMetrics = calculateFn();
+          setAdvancedMetrics(prev => prev ? { ...prev, ...sectionMetrics } : initialMetrics);
+          setMetricsLoadingSections(prev => {
+            const next = new Set(prev);
+            next.delete(sectionName);
+            return next;
+          });
+        } catch (err) {
+          logError(err, { component: "AdminPromDates", operation: `calculateSection-${sectionName}` });
+          setMetricsLoadingSections(prev => {
+            const next = new Set(prev);
+            next.delete(sectionName);
+            return next;
+          });
+        }
+      }, currentDelay);
+    };
+
+    try {
+      // Section 1: Conversion Funnel Metrics (fast - simple calculations)
+      calculateSection("conversion", () => {
+        const totalLikesCount = allLikes.length;
+        const totalMatchesCount = allMatches.length;
+        const likeToMatchRate = totalLikesCount > 0 ? (mutualLikes / totalLikesCount) * 100 : 0;
+        const matchToPromDateRate = totalMatchesCount > 0 ? (promDatesCount / totalMatchesCount) * 100 : 0;
+        const matchRequestAccepted = allMatchRequests.filter(r => r.status === "accepted").length;
+        const matchRequestTotal = allMatchRequests.length;
+        const matchRequestAcceptanceRate = matchRequestTotal > 0 ? (matchRequestAccepted / matchRequestTotal) * 100 : 0;
+        
+        return {
+          likeToMatchRate,
+          matchToPromDateRate,
+          matchRequestAcceptanceRate,
+        };
+      });
+
+      // Section 2: Engagement Metrics (medium - requires iteration)
+      calculateSection("engagement", () => {
+        const now = Date.now();
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+        
+        const activeUserIds = new Set<string>();
+        allProfiles.forEach(p => {
+          if (p.updatedAt && new Date(p.updatedAt).getTime() >= sevenDaysAgo) activeUserIds.add(p.id!);
+          if (p.createdAt && new Date(p.createdAt).getTime() >= sevenDaysAgo) activeUserIds.add(p.id!);
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allMessages.forEach((m: any) => {
+          if (m.senderId) activeUserIds.add(m.senderId);
+        });
+        const activeUsersLast7Days = activeUserIds.size;
+
+        const dauIds = new Set<string>();
+        allProfiles.forEach(p => {
+          if (p.updatedAt && isToday(p.updatedAt)) dauIds.add(p.id!);
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allMessages.forEach((m: any) => {
+          if (m.sentAt && isToday(m.sentAt) && m.senderId) dauIds.add(m.senderId);
+        });
+        const dailyActiveUsers = dauIds.size;
+
+        const wauIds = new Set<string>();
+        allProfiles.forEach(p => {
+          if (p.updatedAt && isThisWeek(p.updatedAt)) wauIds.add(p.id!);
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allMessages.forEach((m: any) => {
+          if (m.sentAt && isThisWeek(m.sentAt) && m.senderId) wauIds.add(m.senderId);
+        });
+        const weeklyActiveUsers = wauIds.size;
+
+        const usersWithPhotos = allProfiles.filter(p => p.profilePicKey && p.profilePicKey.trim() !== "").length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const usersWhoSentMessages = new Set(allMessages.map((m: any) => m.senderId).filter(Boolean)).size;
+        
+        return {
+          activeUsersLast7Days,
+          dailyActiveUsers,
+          weeklyActiveUsers,
+          usersWithPhotos,
+          usersWhoSentMessages,
+        };
+      });
+
+      // Section 3: Time-based Metrics (slow - complex calculations)
+      calculateSection("timebased", () => {
+        const matchTimes: number[] = [];
+        allMatches.forEach(match => {
+          if (!match.createdAt) return;
+          const matchTime = new Date(match.createdAt).getTime();
+          const user1Id = match.user1Id;
+          const user2Id = match.user2Id;
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const relevantLikes = allLikes.filter((l: any) => 
+            (l.fromUserId === user1Id && l.toUserId === user2Id) ||
+            (l.fromUserId === user2Id && l.toUserId === user1Id)
+          );
+          
+          if (relevantLikes.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const firstLikeTime = Math.min(...relevantLikes.map((l: any) => 
+              l.createdAt ? new Date(l.createdAt).getTime() : matchTime
+            ));
+            const hoursDiff = (matchTime - firstLikeTime) / (1000 * 60 * 60);
+            if (hoursDiff >= 0 && hoursDiff < 10000) {
+              matchTimes.push(hoursDiff);
+            }
+          }
+        });
+        const avgTimeToMatchHours = matchTimes.length > 0 
+          ? matchTimes.reduce((a, b) => a + b, 0) / matchTimes.length 
+          : 0;
+
+        const promDateTimes: number[] = [];
+        allMatches.filter(m => m.isPromDate === true).forEach(promMatch => {
+          if (!promMatch.createdAt) return;
+          const promDateTime = new Date(promMatch.createdAt).getTime();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const promAsk = allPromAsks.find((a: any) => 
+            a.matchId === promMatch.id && a.status === "accepted"
+          );
+          
+          if (promAsk && promAsk.createdAt) {
+            const matchCreatedTime = new Date(promAsk.createdAt).getTime();
+            const hoursDiff = (promDateTime - matchCreatedTime) / (1000 * 60 * 60);
+            if (hoursDiff >= 0 && hoursDiff < 10000) {
+              promDateTimes.push(hoursDiff);
+            }
+          } else {
+            promDateTimes.push(0);
+          }
+        });
+        const avgTimeToPromDateHours = promDateTimes.length > 0
+          ? promDateTimes.reduce((a, b) => a + b, 0) / promDateTimes.length
+          : 0;
+
+        const newUsersToday = allProfiles.filter(p => isToday(p.createdAt)).length;
+        const newUsersThisWeek = allProfiles.filter(p => isThisWeek(p.createdAt)).length;
+        
+        const recentActivityIds = new Set<string>();
+        allProfiles.forEach(p => {
+          if (p.updatedAt && isLast24Hours(p.updatedAt)) recentActivityIds.add(p.id!);
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allMessages.forEach((m: any) => {
+          if (m.sentAt && isLast24Hours(m.sentAt) && m.senderId) recentActivityIds.add(m.senderId);
+        });
+        const recentActivity24h = recentActivityIds.size;
+        
+        return {
+          avgTimeToMatchHours,
+          avgTimeToPromDateHours,
+          newUsersToday,
+          newUsersThisWeek,
+          recentActivity24h,
+        };
+      });
+
+      // Section 4: Quality Metrics (medium - requires iteration)
+      calculateSection("quality", () => {
+        const totalMatchesCount = allMatches.length;
+        const matchesWithConversations = allMatches.filter(m => {
+          const conv = allConversations.find(c => c.matchId === m.id);
+          return conv && allMessages.some(msg => msg.conversationId === conv.id);
+        }).length;
+        const matchesWithConversationsPercent = totalMatchesCount > 0 
+          ? (matchesWithConversations / totalMatchesCount) * 100 
+          : 0;
+
+        const lookingFlowPromDateIds = new Set(
+          allPromAsks
+            .filter(a => a.status === "accepted" && a.matchId)
+            .map(a => a.matchId!)
+        );
+        const promDatesFromLookingFlow = allMatches.filter(m => 
+          m.isPromDate === true && lookingFlowPromDateIds.has(m.id!)
+        ).length;
+
+        const unmatchRate = totalMatchesCount > 0 
+          ? (unmatchedMatches / totalMatchesCount) * 100 
+          : 0;
+
+        const completenessScores: number[] = [];
+        allProfiles.forEach(p => {
+          const fields = [
+            "bio", "cohort", "gender", "intention", "hometown",
+            "alcoholPreference", "smokingPreference", "foodPreference", 
+            "favouritePlace", "teaOrCoffee", "mountainOrBeach",
+            "profilePicKey"
+          ];
+          let filled = 0;
+          fields.forEach(field => {
+            const value = (p as any)[field];
+            if (value != null && typeof value === "string" && value.trim() !== "") filled++;
+          });
+          completenessScores.push(filled / fields.length);
+        });
+        const avgProfileCompleteness = completenessScores.length > 0
+          ? (completenessScores.reduce((a, b) => a + b, 0) / completenessScores.length) * 100
+          : 0;
+        
+        return {
+          matchesWithConversations,
+          matchesWithConversationsPercent,
+          promDatesFromLookingFlow,
+          unmatchRate,
+          avgProfileCompleteness,
+        };
+      });
+
+      // Section 6: Cohort-specific Metrics (slow - requires multiple iterations)
+      calculateSection("cohort", () => {
+        const userIdToCohort: Record<string, string> = {};
+        allProfiles.forEach(p => {
+          if (p.id) {
+            userIdToCohort[p.id] = p.cohort || "Unknown";
+          }
+        });
+
+        const matchesByCohort: Record<string, number> = {};
+        const promDatesByCohort: Record<string, number> = {};
+        const likesByCohort: Record<string, number> = {};
+        
+        allMatches.forEach(m => {
+          const user1Cohort = m.user1Id ? (userIdToCohort[m.user1Id] || "Unknown") : "Unknown";
+          const user2Cohort = m.user2Id ? (userIdToCohort[m.user2Id] || "Unknown") : "Unknown";
+          
+          matchesByCohort[user1Cohort] = (matchesByCohort[user1Cohort] || 0) + 1;
+          if (user1Cohort !== user2Cohort) {
+            matchesByCohort[user2Cohort] = (matchesByCohort[user2Cohort] || 0) + 1;
+          }
+          
+          if (m.isPromDate) {
+            promDatesByCohort[user1Cohort] = (promDatesByCohort[user1Cohort] || 0) + 1;
+            if (user1Cohort !== user2Cohort) {
+              promDatesByCohort[user2Cohort] = (promDatesByCohort[user2Cohort] || 0) + 1;
+            }
+          }
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        allLikes.forEach((l: any) => {
+          const fromCohort = l.fromUserId ? (userIdToCohort[l.fromUserId] || "Unknown") : "Unknown";
+          likesByCohort[fromCohort] = (likesByCohort[fromCohort] || 0) + 1;
+        });
+
+        const mostActiveCohorts: Array<{ cohort: string; likes: number; matches: number }> = [];
+        Object.entries(usersByCohort).forEach(([cohort, userCount]) => {
+          if (cohort !== "Unknown") {
+            mostActiveCohorts.push({
+              cohort,
+              likes: likesByCohort[cohort] || 0,
+              matches: matchesByCohort[cohort] || 0,
+            });
+          }
+        });
+        mostActiveCohorts.sort((a, b) => (b.likes + b.matches) - (a.likes + a.matches));
+        
+        return {
+          matchesByCohort,
+          promDatesByCohort,
+          mostActiveCohorts: mostActiveCohorts.slice(0, 5),
+        };
+      });
+
+      // Section 7: Prom Ask Metrics (fast - simple calculations)
+      calculateSection("promask", () => {
+        const totalPromAsksSent = allPromAsks.length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const promAsksPending = allPromAsks.filter((a: any) => a.status === "pending").length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const promAsksAccepted = allPromAsks.filter((a: any) => a.status === "accepted").length;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const promAsksDeclined = allPromAsks.filter((a: any) => a.status === "declined").length;
+        const promAskAcceptanceRate = totalPromAsksSent > 0 ? (promAsksAccepted / totalPromAsksSent) * 100 : 0;
+        
+        return {
+          totalPromAsksSent,
+          promAsksPending,
+          promAsksAccepted,
+          promAsksDeclined,
+          promAskAcceptanceRate,
+        };
+      });
+
+      // Section 9: Discovery Feed Metrics (fast - simple calculations)
+      calculateSection("discovery", () => {
+        const scoresWithValues = allProfiles
+          .map(p => p.discoveryScore)
+          .filter((s): s is number => s != null && typeof s === "number");
+        const avgDiscoveryScore = scoresWithValues.length > 0
+          ? scoresWithValues.reduce((a, b) => a + b, 0) / scoresWithValues.length
+          : 0;
+
+        const discoveryScoreDistribution = {
+          high: scoresWithValues.filter(s => s > 0.7).length,
+          medium: scoresWithValues.filter(s => s >= 0.4 && s <= 0.7).length,
+          low: scoresWithValues.filter(s => s < 0.4).length,
+        };
+
+        const profilesNeverShown = profilesInDiscovery - scoresWithValues.length;
+        
+        return {
+          avgDiscoveryScore,
+          discoveryScoreDistribution,
+          profilesNeverShown,
+        };
+      });
+
+      // Section 10: Flow Distribution Metrics (medium - requires iteration)
+      calculateSection("flow", () => {
+        const usersByFlowType = {
+          looking: usersLookingFlow,
+          partnerIIMA: allProfiles.filter(p => {
+            const hasPartner = (p.partnerStatus ?? "").includes("Already found");
+            const partnerEmail = (p.partnerEmail ?? "").trim();
+            return hasPartner && partnerEmail.endsWith("@iima.ac.in");
+          }).length,
+          partnerOutside: allProfiles.filter(p => {
+            const hasPartner = (p.partnerStatus ?? "").includes("Already found");
+            const partnerEmail = (p.partnerEmail ?? "").trim();
+            return hasPartner && partnerEmail !== "" && !partnerEmail.endsWith("@iima.ac.in");
+          }).length,
+        };
+
+        let flowChanges = 0;
+        allProfiles.forEach(p => {
+          if (p.createdAt && p.updatedAt) {
+            const created = new Date(p.createdAt).getTime();
+            const updated = new Date(p.updatedAt).getTime();
+            if (updated > created + 60 * 60 * 1000) {
+              flowChanges++;
+            }
+          }
+        });
+
+        const matchRequestAccepted = allMatchRequests.filter(r => r.status === "accepted").length;
+        const matchRequestTotal = allMatchRequests.length;
+        const partnerInviteSuccessRate = matchRequestTotal > 0
+          ? (matchRequestAccepted / matchRequestTotal) * 100
+          : 0;
+        
+        return {
+          usersByFlowType,
+          flowChanges,
+          partnerInviteSuccessRate,
+        };
+      });
+    } catch (err) {
+      logError(err, { component: "AdminPromDates", operation: "calculateAdvancedMetrics" });
     }
   };
 
@@ -631,7 +1214,7 @@ export default function AdminPromDates() {
     }
   };
 
-  // Helper function to fetch all records with pagination (larger page size = fewer round-trips)
+  // Helper function to fetch all records with pagination
   const fetchAllWithPagination = async <T,>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     listFn: (opts?: any) => Promise<{ data?: T[]; nextToken?: string }>,
@@ -639,9 +1222,8 @@ export default function AdminPromDates() {
   ): Promise<T[]> => {
     const all: T[] = [];
     let nextToken: string | undefined;
-    const limit = 500;
     do {
-      const res = await listFn({ nextToken, limit, ...opts });
+      const res = await listFn({ nextToken, limit: 100, ...opts });
       if (res.data) {
         all.push(...res.data);
       }
@@ -651,66 +1233,200 @@ export default function AdminPromDates() {
   };
 
   const fetchMatches = async () => {
-    setMatchesLoading(true);
     try {
       setError(null);
       const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
 
-      // Fetch all matches (paginated, larger pages)
-      const allMatches: Schema["Match"]["type"][] = [];
-      let nextToken: string | undefined;
-      do {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res = await (client.models.Match as any).list({ nextToken, limit: 500 }, opts);
-        if (res.data) {
-          allMatches.push(...(res.data as Schema["Match"]["type"][]));
+      // Fetch all matches with pagination
+      const allMatches = await fetchAllWithPagination(
+        (client.models.Match as any).list.bind(client.models.Match),
+        opts
+      ) as Schema["Match"]["type"][];
+
+      // Fetch all MatchRequests to identify partner flow (IIMA) prom dates (with pagination)
+      const allMatchRequests = await fetchAllWithPagination(
+        (client.models.MatchRequest as any).list.bind(client.models.MatchRequest),
+        opts
+      ) as Schema["MatchRequest"]["type"][];
+
+      // Fetch all PromAskRequests to identify looking-flow prom dates (with pagination)
+      const allPromAsks = await fetchAllWithPagination(
+        (client.models.PromAskRequest as any).list.bind(client.models.PromAskRequest),
+        opts
+      ) as Schema["PromAskRequest"]["type"][];
+
+      // Create a set of matchIds that have accepted PromAskRequests (looking-flow prom dates)
+      // These are matches where prom date was confirmed via PromAskRequest (looking flow)
+      const lookingFlowPromDateMatchIds = new Set(
+        allPromAsks
+          .filter((ask) => ask.status === "accepted" && ask.matchId)
+          .map((ask) => ask.matchId!)
+      );
+
+      // Create a set of user pairs that have accepted MatchRequests (partner flow IIMA prom dates)
+      // MatchRequest creates Match with isPromDate=true, so we identify these by checking
+      // if both users from an accepted MatchRequest match the Match's user1Id/user2Id
+      const partnerFlowPromDatePairs = new Set<string>();
+      allMatchRequests
+        .filter((req) => req.status === "accepted" && req.fromUserId && req.toUserId)
+        .forEach((req) => {
+          // Create a normalized pair key (sorted to handle both directions)
+          const pair = [req.fromUserId!, req.toUserId!].sort().join("|");
+          partnerFlowPromDatePairs.add(pair);
+        });
+
+      // Create a map of matchIds to prom ask status (for active matches table)
+      const matchIdToPromAskStatus = new Map<string, boolean>();
+      allPromAsks.forEach((ask) => {
+        if (ask.matchId) {
+          matchIdToPromAskStatus.set(ask.matchId, true); // Any prom ask (pending/accepted/declined) means "Asked"
         }
-        nextToken = res.nextToken ?? undefined;
-      } while (nextToken);
-
-      logInfo("Fetched matches", { component: "AdminPromDates", operation: "fetchMatches", extra: { count: allMatches.length } });
-
-      const matchesToProcess = allMatches.slice(0, 100);
-      const uniqueUserIds = new Set<string>();
-      matchesToProcess.forEach((m) => {
-        if (m.user1Id) uniqueUserIds.add(m.user1Id);
-        if (m.user2Id) uniqueUserIds.add(m.user2Id);
       });
 
-      // Fetch all profiles in parallel batches (avoids 200 sequential getProfileById calls)
-      const BATCH_SIZE = 25;
-      const userIds = Array.from(uniqueUserIds);
-      const profileMap = new Map<string, Schema["UserProfile"]["type"]>();
-      for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
-        const batch = userIds.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map((id) => getUserProfileById(id, opts).then((r) => ({ id, data: r.data })))
-        );
-        results.forEach((r) => {
-          if (r.status === "fulfilled" && r.value.data) {
-            profileMap.set(r.value.id, r.value.data);
+      // Fetch all UserProfiles to find partner flow non-IIMA prom dates (have partnerEmail but no Match) (with pagination)
+      const allProfiles = await fetchAllWithPagination(
+        client.models.UserProfile.list.bind(client.models.UserProfile),
+        opts
+      ) as Schema["UserProfile"]["type"][];
+
+      // Find profiles with partnerEmail set (non-IIMA partner flow prom dates)
+      // These don't have Match records, so we'll create virtual entries for them
+      const outsidePartnerProfiles = allProfiles.filter(
+        (p) =>
+          (p.partnerEmail ?? "").trim() !== "" &&
+          !(p.partnerEmail ?? "").endsWith("@iima.ac.in") &&
+          (p.partnerStatus ?? "").includes("Already found")
+      );
+
+      logInfo("Fetched matches", { 
+        component: "AdminPromDates", 
+        operation: "fetchMatches", 
+        extra: { 
+          totalMatches: allMatches.length,
+          promDates: allMatches.filter(m => m.isPromDate === true).length,
+          activeMatches: allMatches.filter(m => m.status === "active" && m.isPromDate !== true).length,
+          lookingFlowPromDates: lookingFlowPromDateMatchIds.size
+        } 
+      });
+
+      // Fetch user profiles for each match
+      const matchesWithDetails: MatchWithUserDetails[] = [];
+      for (const match of allMatches) {
+        const user1Id = match.user1Id ?? undefined;
+        const user2Id = match.user2Id ?? undefined;
+
+        let user1Profile: Schema["UserProfile"]["type"] | undefined;
+        let user2Profile: Schema["UserProfile"]["type"] | undefined;
+
+        if (user1Id) {
+          try {
+            const res = await getUserProfileById(user1Id, opts);
+            user1Profile = res.data ?? undefined;
+          } catch (err) {
+            logError(err, { component: "AdminPromDates", operation: "fetchUser1Profile", extra: { userId: user1Id } });
           }
+        }
+
+        if (user2Id) {
+          try {
+            const res = await getUserProfileById(user2Id, opts);
+            user2Profile = res.data ?? undefined;
+          } catch (err) {
+            logError(err, { component: "AdminPromDates", operation: "fetchUser2Profile", extra: { userId: user2Id } });
+          }
+        }
+
+        // Determine prom date type
+        let promDateType: "looking-flow" | "partner-iima" | "partner-outside" | undefined;
+        if (match.isPromDate === true) {
+          // Priority 1: Check if this match has an accepted PromAskRequest (looking flow)
+          if (lookingFlowPromDateMatchIds.has(match.id!)) {
+            promDateType = "looking-flow";
+          } else if (user1Id && user2Id) {
+            // Priority 2: Check if this match was created from an accepted MatchRequest (partner flow IIMA)
+            const matchPair = [user1Id, user2Id].sort().join("|");
+            if (partnerFlowPromDatePairs.has(matchPair)) {
+              promDateType = "partner-iima";
+            } else if (user1Profile && user2Profile) {
+              // Priority 3: Check if both are IIMA (fallback for partner flow IIMA)
+              const user1IsIIMA = (user1Profile.email ?? "").endsWith("@iima.ac.in");
+              const user2IsIIMA = (user2Profile.email ?? "").endsWith("@iima.ac.in");
+              promDateType = user1IsIIMA && user2IsIIMA ? "partner-iima" : "partner-outside";
+            } else {
+              // Fallback: check emails from match record
+              const user1IsIIMA = (match.user1Email ?? "").endsWith("@iima.ac.in");
+              const user2IsIIMA = (match.user2Email ?? "").endsWith("@iima.ac.in");
+              promDateType = user1IsIIMA && user2IsIIMA ? "partner-iima" : "partner-outside";
+            }
+          } else {
+            // Fallback: check emails from match record
+            const user1IsIIMA = (match.user1Email ?? "").endsWith("@iima.ac.in");
+            const user2IsIIMA = (match.user2Email ?? "").endsWith("@iima.ac.in");
+            promDateType = user1IsIIMA && user2IsIIMA ? "partner-iima" : "partner-outside";
+          }
+        }
+
+        // Check if prom ask exists for this match (for active matches)
+        const hasPromAsk = matchIdToPromAskStatus.has(match.id!) || false;
+
+        matchesWithDetails.push({
+          match,
+          user1Profile,
+          user2Profile,
+          promDateType,
+          hasPromAsk,
         });
       }
 
-      const matchesWithDetails: MatchWithUserDetails[] = matchesToProcess.map((match) => ({
-        match,
-        user1Profile: match.user1Id ? profileMap.get(match.user1Id) : undefined,
-        user2Profile: match.user2Id ? profileMap.get(match.user2Id) : undefined,
-      }));
+      // Add outside partner prom dates (no Match record, just UserProfile with partnerEmail)
+      for (const profile of outsidePartnerProfiles) {
+        // Check if this profile already has a Match record (shouldn't happen, but check anyway)
+        const existingMatch = matchesWithDetails.find(
+          (m) => m.match.user1Id === profile.id || m.match.user2Id === profile.id
+        );
+        if (!existingMatch) {
+          // Create a virtual match entry for display purposes
+          matchesWithDetails.push({
+            match: {
+              id: `outside-${profile.id}`,
+              user1Id: profile.id!,
+              user2Id: "", // No second user in Match record
+              user1Email: profile.email ?? "",
+              user2Email: profile.partnerEmail ?? "",
+              status: "active",
+              isPromDate: true,
+              createdAt: profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
+            } as Schema["Match"]["type"],
+            user1Profile: profile,
+            user2Profile: undefined, // Partner is outside, no profile record
+            promDateType: "partner-outside",
+          });
+        }
+      }
 
-      matchesWithDetails.sort((a, b) => {
+      // Separate into prom dates and active matches
+      const promDatesList = matchesWithDetails.filter((m) => m.match.isPromDate === true);
+      const activeMatchesList = matchesWithDetails.filter(
+        (m) => m.match.status === "active" && m.match.isPromDate !== true
+      );
+
+      // Sort by createdAt descending (newest first)
+      const sortByDate = (a: MatchWithUserDetails, b: MatchWithUserDetails) => {
         const dateA = a.match.createdAt ? new Date(a.match.createdAt).getTime() : 0;
         const dateB = b.match.createdAt ? new Date(b.match.createdAt).getTime() : 0;
         return dateB - dateA;
-      });
+      };
 
-      setMatches(matchesWithDetails);
+      promDatesList.sort(sortByDate);
+      activeMatchesList.sort(sortByDate);
+
+      setPromDates(promDatesList);
+      setActiveMatches(activeMatchesList);
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "fetchMatches" });
       setError(err instanceof Error ? err.message : "Failed to fetch matches");
     } finally {
-      setMatchesLoading(false);
+      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -732,11 +1448,188 @@ export default function AdminPromDates() {
       
       // Refresh stats after computation
       await fetchAllStats();
+      setHealthCheckResult("Discovery scores computed successfully!");
+      setTimeout(() => setHealthCheckResult(null), 5000);
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "computeDiscoveryScores" });
       setError(err instanceof Error ? err.message : "Failed to compute discovery scores");
     } finally {
       setComputingScores(false);
+    }
+  };
+
+  const handleEnsureMutualMatches = async () => {
+    try {
+      setEnsuringMatches(true);
+      setError(null);
+      const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+      
+      // Call the ensureMutualMatches query
+      const result = await client.queries.ensureMutualMatches({}, opts);
+      
+      logInfo("Mutual matches ensured", { 
+        component: "AdminPromDates", 
+        operation: "ensureMutualMatches",
+        extra: result.data 
+      });
+      
+      // Refresh matches and stats after operation
+      await Promise.all([fetchMatches(), fetchAllStats()]);
+      setHealthCheckResult("Mutual matches check completed successfully!");
+      setTimeout(() => setHealthCheckResult(null), 5000);
+    } catch (err) {
+      logError(err, { component: "AdminPromDates", operation: "ensureMutualMatches" });
+      setError(err instanceof Error ? err.message : "Failed to ensure mutual matches");
+    } finally {
+      setEnsuringMatches(false);
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      setExportingData(true);
+      setError(null);
+      
+      if (!stats || !advancedMetrics) {
+        setError("No data to export. Please refresh the dashboard first.");
+        return;
+      }
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        stats,
+        advancedMetrics,
+        promDates: promDates.map(pd => ({
+          user1Name: pd.user1Profile?.name || pd.match.user1Email || "Unknown",
+          user1Email: pd.match.user1Email || pd.user1Profile?.email || "N/A",
+          user2Name: pd.promDateType === "partner-outside"
+            ? (pd.user1Profile?.partnerName || pd.match.user2Email || "Unknown")
+            : (pd.user2Profile?.name || pd.match.user2Email || "Unknown"),
+          user2Email: pd.promDateType === "partner-outside"
+            ? (pd.user1Profile?.partnerEmail || pd.match.user2Email || "N/A")
+            : (pd.match.user2Email || pd.user2Profile?.email || "N/A"),
+          isIIMACouple: isIIMACouple(pd.match, pd.user1Profile, pd.user2Profile, pd.promDateType),
+          createdAt: pd.match.createdAt,
+        })),
+        activeMatches: activeMatches.map(am => ({
+          user1Name: am.user1Profile?.name || am.match.user1Email || "Unknown",
+          user1Email: am.match.user1Email || am.user1Profile?.email || "N/A",
+          user2Name: am.user2Profile?.name || am.match.user2Email || "Unknown",
+          user2Email: am.match.user2Email || am.user2Profile?.email || "N/A",
+          hasPromAsk: am.hasPromAsk ?? false,
+          createdAt: am.match.createdAt,
+        })),
+      };
+
+      // Create and download JSON file
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `admin-dashboard-export-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      logInfo("Data exported", { component: "AdminPromDates", operation: "exportData" });
+      setHealthCheckResult("Data exported successfully!");
+      setTimeout(() => setHealthCheckResult(null), 5000);
+    } catch (err) {
+      logError(err, { component: "AdminPromDates", operation: "exportData" });
+      setError(err instanceof Error ? err.message : "Failed to export data");
+    } finally {
+      setExportingData(false);
+    }
+  };
+
+  const handleSystemHealthCheck = async () => {
+    try {
+      setError(null);
+      setHealthCheckResult(null);
+      
+      const opts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
+      
+      // Fetch all data to check for inconsistencies
+      const [allProfiles, allMatches, allLikes, allConversations, allMessages] = await Promise.all([
+        fetchAllWithPagination(client.models.UserProfile.list.bind(client.models.UserProfile), opts),
+        fetchAllWithPagination((client.models.Match as any).list.bind(client.models.Match), opts),
+        fetchAllWithPagination((client.models.Like as any).list.bind(client.models.Like), opts),
+        fetchAllWithPagination((client.models.Conversation as any).list.bind(client.models.Conversation), opts),
+        fetchAllWithPagination((client.models.Message as any).list.bind(client.models.Message), opts),
+      ]);
+
+      const issues: string[] = [];
+
+      // Check for orphaned matches (users don't exist)
+      const profileIds = new Set(allProfiles.map(p => p.id).filter(Boolean));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orphanedMatches = allMatches.filter((m: any) => {
+        const user1Exists = !m.user1Id || profileIds.has(m.user1Id);
+        const user2Exists = !m.user2Id || profileIds.has(m.user2Id);
+        return !user1Exists || !user2Exists;
+      });
+      if (orphanedMatches.length > 0) {
+        issues.push(`Found ${orphanedMatches.length} orphaned match(es) with missing user profiles`);
+      }
+
+      // Check for conversations without matches
+      const matchIds = new Set(allMatches.map(m => m.id).filter(Boolean));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orphanedConversations = allConversations.filter((c: any) => 
+        c.matchId && !matchIds.has(c.matchId)
+      );
+      if (orphanedConversations.length > 0) {
+        issues.push(`Found ${orphanedConversations.length} conversation(s) without matching Match records`);
+      }
+
+      // Check for messages without conversations
+      const conversationIds = new Set(allConversations.map(c => c.id).filter(Boolean));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orphanedMessages = allMessages.filter((m: any) => 
+        m.conversationId && !conversationIds.has(m.conversationId)
+      );
+      if (orphanedMessages.length > 0) {
+        issues.push(`Found ${orphanedMessages.length} message(s) without matching Conversation records`);
+      }
+
+      // Check for likes from/to non-existent users
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orphanedLikes = allLikes.filter((l: any) => 
+        (l.fromUserId && !profileIds.has(l.fromUserId)) || 
+        (l.toUserId && !profileIds.has(l.toUserId))
+      );
+      if (orphanedLikes.length > 0) {
+        issues.push(`Found ${orphanedLikes.length} like(s) referencing non-existent user profiles`);
+      }
+
+      // Check for profiles with discovery scores but shouldn't have them
+      const profilesWithInvalidScores = allProfiles.filter(p => {
+        const hasScore = p.discoveryScore != null;
+        const shouldHaveScore = p.id &&
+          p.onboardingCompleted === true &&
+          p.excludeFromDiscovery !== true &&
+          !(typeof p.bio === "string" && p.bio.trim().startsWith("Partner:"));
+        return hasScore && !shouldHaveScore;
+      });
+      if (profilesWithInvalidScores.length > 0) {
+        issues.push(`Found ${profilesWithInvalidScores.length} profile(s) with discovery scores but shouldn't have them`);
+      }
+
+      if (issues.length === 0) {
+        setHealthCheckResult("✓ System health check passed! No issues found.");
+      } else {
+        setHealthCheckResult(`⚠ Found ${issues.length} issue(s):\n${issues.join("\n")}`);
+      }
+
+      logInfo("System health check completed", { 
+        component: "AdminPromDates", 
+        operation: "healthCheck",
+        extra: { issuesFound: issues.length, issues }
+      });
+    } catch (err) {
+      logError(err, { component: "AdminPromDates", operation: "healthCheck" });
+      setError(err instanceof Error ? err.message : "Failed to perform health check");
     }
   };
 
@@ -768,24 +1661,14 @@ export default function AdminPromDates() {
         }
 
         setIsAuthorized(true);
+        // Load data only if authorized
         setLoading(true);
-        setMatchesLoading(true);
-        try {
-          // Load stats first — dashboard becomes visible as soon as stats are ready
-          await fetchAllStats();
-          setLoading(false);
-          // Load matches in background (table shows spinner until done)
-          fetchMatches();
-        } catch (err) {
-          setLoading(false);
-          setMatchesLoading(false);
-          throw err;
-        }
+        await Promise.all([fetchMatches(), fetchAllStats()]);
+        setLoading(false);
       } catch (err) {
         logError(err, { component: "AdminPromDates", operation: "checkAccess" });
         setIsAuthorized(false);
         setLoading(false);
-        setMatchesLoading(false);
       }
     };
 
@@ -794,12 +1677,8 @@ export default function AdminPromDates() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setMatchesLoading(true);
-    try {
-      await Promise.all([fetchAllStats(), fetchMatches()]);
-    } finally {
-      setRefreshing(false);
-    }
+    await Promise.all([fetchMatches(), fetchAllStats()]);
+    setRefreshing(false);
   };
 
   if (loading || isAuthorized === null) {
@@ -858,6 +1737,53 @@ export default function AdminPromDates() {
         </div>
       </nav>
 
+      {/* Tab Navigation */}
+      <div className="sticky top-[73px] z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="container mx-auto px-4">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "overview"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <LayoutDashboard className="w-4 h-4" />
+                Overview
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("tables")}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "tables"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Table2 className="w-4 h-4" />
+                Tables
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab("metrics")}
+              className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "metrics"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4" />
+                Advanced Metrics
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div className="relative z-10 container mx-auto px-4 py-8">
         <div className="glass rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
@@ -883,7 +1809,108 @@ export default function AdminPromDates() {
             </div>
           )}
 
-          {stats && (
+          {healthCheckResult && (
+            <div className={`mb-4 p-4 rounded-lg border ${
+              healthCheckResult.startsWith("✓") 
+                ? "bg-green-500/10 border-green-500 text-green-700 dark:text-green-400"
+                : "bg-yellow-500/10 border-yellow-500 text-yellow-700 dark:text-yellow-400"
+            }`}>
+              <div className="whitespace-pre-line font-medium">{healthCheckResult}</div>
+            </div>
+          )}
+
+          {/* Admin Actions Section */}
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5" />
+              Admin Actions
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Button 
+                onClick={handleComputeDiscoveryScores} 
+                disabled={computingScores}
+                variant="outline"
+                className="justify-start"
+              >
+                {computingScores ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Computing...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Compute Discovery Scores
+                  </>
+                )}
+              </Button>
+
+              <Button 
+                onClick={handleEnsureMutualMatches} 
+                disabled={ensuringMatches}
+                variant="outline"
+                className="justify-start"
+              >
+                {ensuringMatches ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Heart className="w-4 h-4 mr-2" />
+                    Ensure Mutual Matches
+                  </>
+                )}
+              </Button>
+
+              <Button 
+                onClick={handleSystemHealthCheck} 
+                variant="outline"
+                className="justify-start"
+              >
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                System Health Check
+              </Button>
+
+              <Button 
+                onClick={handleExportData} 
+                disabled={exportingData || !stats || !advancedMetrics}
+                variant="outline"
+                className="justify-start"
+              >
+                {exportingData ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Data (JSON)
+                  </>
+                )}
+              </Button>
+            </div>
+            <div className="mt-3 text-xs text-muted-foreground">
+              <strong>Compute Discovery Scores:</strong> Manually trigger discovery score calculation for all eligible profiles.<br />
+              <strong>Ensure Mutual Matches:</strong> Check for mutual likes and create Match records if missing.<br />
+              <strong>System Health Check:</strong> Scan for data inconsistencies, orphaned records, and validation issues.<br />
+              <strong>Export Data:</strong> Download all dashboard data, stats, and tables as JSON file.
+            </div>
+          </div>
+
+          {/* Overview Tab */}
+          {activeTab === "overview" && (
+            !stats ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading dashboard data...</p>
+                {error && (
+                  <p className="text-destructive mt-2">Error: {error}</p>
+                )}
+              </div>
+            ) : (
             <>
               {/* Overview Stats - Key Metrics */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -1170,103 +2197,516 @@ export default function AdminPromDates() {
                 </div>
               </div>
             </>
+            )
           )}
 
-          {/* Matches Table — loads in background after stats */}
-          <div className="mt-6">
-            <h2 className="text-xl font-semibold mb-4">All Prom Dates (Latest 100)</h2>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User 1</TableHead>
-                    <TableHead>User 1 Flow</TableHead>
-                    <TableHead>User 2</TableHead>
-                    <TableHead>User 2 Flow</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Prom Date</TableHead>
-                    <TableHead>Created At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {matchesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12">
-                        <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Loader2 className="w-5 h-5 animate-spin" />
-                          Loading matches…
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : matches.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No matches found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    matches.map((item, idx) => {
-                      const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
-                      const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
-                      const user2Name = item.user2Profile?.name || item.match.user2Email || "Unknown";
-                      const user2Email = item.match.user2Email || item.user2Profile?.email || "N/A";
-                      const user1Flow = getFlowType(item.user1Profile);
-                      const user2Flow = getFlowType(item.user2Profile);
-                      const status = item.match.status || "active";
-                      const isPromDate = item.match.isPromDate ?? false;
-
-                      return (
-                        <TableRow key={item.match.id || idx}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{user1Name}</div>
-                              <div className="text-sm text-muted-foreground">{user1Email}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{user1Flow}</TableCell>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{user2Name}</div>
-                              <div className="text-sm text-muted-foreground">{user2Email}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{user2Flow}</TableCell>
-                          <TableCell>
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-medium ${
-                                status === "active"
-                                  ? "bg-green-500/20 text-green-700 dark:text-green-400"
-                                  : status === "unmatched"
-                                  ? "bg-gray-500/20 text-gray-700 dark:text-gray-400"
-                                  : "bg-red-500/20 text-red-700 dark:text-red-400"
-                              }`}
-                            >
-                              {status}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            {isPromDate ? (
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-primary/20 text-primary">
-                                Yes
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">No</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDate(item.match.createdAt)}
+          {/* Tables Tab */}
+          {activeTab === "tables" && (
+            <>
+              {/* Prom Dates Table */}
+              <div className="mt-6">
+                <h2 className="text-xl font-semibold mb-4">Prom Dates</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Confirmed prom dates from all flows: Looking Flow (prom ask accepted), Partner Flow IIMA, and Partner Flow Non-IIMA
+                </p>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User 1</TableHead>
+                        <TableHead>User 2</TableHead>
+                        <TableHead>IIMA Couple</TableHead>
+                        <TableHead>Created At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {promDates.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            No prom dates found
                           </TableCell>
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                      ) : (
+                        promDates.map((item, idx) => {
+                          const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
+                          const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
+                          // For outside partners, user2Profile is undefined, use partnerEmail/partnerName from user1Profile
+                          const user2Name = item.promDateType === "partner-outside"
+                            ? (item.user1Profile?.partnerName || item.match.user2Email || "Unknown")
+                            : (item.user2Profile?.name || item.match.user2Email || "Unknown");
+                          const user2Email = item.promDateType === "partner-outside"
+                            ? (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A")
+                            : (item.match.user2Email || item.user2Profile?.email || "N/A");
+                          const isIIMA = isIIMACouple(item.match, item.user1Profile, item.user2Profile, item.promDateType);
+
+                          return (
+                            <TableRow key={item.match.id || idx}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{user1Name}</div>
+                                  <div className="text-sm text-muted-foreground">{user1Email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{user2Name}</div>
+                                  <div className="text-sm text-muted-foreground">{user2Email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {isIIMA ? (
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-green-500/20 text-green-700 dark:text-green-400">
+                                    Yes
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-400">
+                                    No
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {formatDate(item.match.createdAt)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  Total prom dates: {promDates.length}
+                </div>
+              </div>
+
+              {/* Active Matches Table */}
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold mb-4">Active Matches</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Active matches that are not yet confirmed as prom dates
+                </p>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User 1</TableHead>
+                        <TableHead>User 2</TableHead>
+                        <TableHead>Prom Ask</TableHead>
+                        <TableHead>Created At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeMatches.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            No active matches found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        activeMatches.map((item, idx) => {
+                          const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
+                          const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
+                          const user2Name = item.user2Profile?.name || item.match.user2Email || "Unknown";
+                          const user2Email = item.match.user2Email || item.user2Profile?.email || "N/A";
+                          const hasPromAsk = item.hasPromAsk ?? false;
+
+                          return (
+                            <TableRow key={item.match.id || idx}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{user1Name}</div>
+                                  <div className="text-sm text-muted-foreground">{user1Email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{user2Name}</div>
+                                  <div className="text-sm text-muted-foreground">{user2Email}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {hasPromAsk ? (
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                                    Asked
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-400">
+                                    Not Asked
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {formatDate(item.match.createdAt)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="mt-4 text-sm text-muted-foreground">
+                  Total active matches: {activeMatches.length}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Advanced Metrics Tab */}
+          {activeTab === "metrics" && (
+            !advancedMetrics ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading advanced metrics...</p>
+                {error && (
+                  <p className="text-destructive mt-2">Error: {error}</p>
+                )}
+              </div>
+            ) : (
+            <div className="space-y-6">
+              {/* Conversion Funnel Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("conversion") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("conversion") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Conversion Funnel Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Like-to-Match Rate</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.likeToMatchRate.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Match-to-Prom Date Rate</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.matchToPromDateRate.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Prom Ask Acceptance</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {advancedMetrics.promAskAcceptanceRate.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Match Request Acceptance</div>
+                    <div className="text-lg font-semibold text-pink-600">
+                      {advancedMetrics.matchRequestAcceptanceRate.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Engagement Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("engagement") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("engagement") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Engagement Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Active (Last 7 Days)</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.activeUsersLast7Days}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Daily Active Users</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.dailyActiveUsers}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Weekly Active Users</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {advancedMetrics.weeklyActiveUsers}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Users with Photos</div>
+                    <div className="text-lg font-semibold text-pink-600">
+                      {advancedMetrics.usersWithPhotos}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      ({stats ? ((advancedMetrics.usersWithPhotos / stats.totalUsers) * 100).toFixed(1) : 0}%)
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Users Who Sent Messages</div>
+                    <div className="text-lg font-semibold text-orange-600">
+                      {advancedMetrics.usersWhoSentMessages}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time-based Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("timebased") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("timebased") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Time-based Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Avg Time to Match</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.avgTimeToMatchHours.toFixed(1)}h
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Avg Time to Prom Date</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.avgTimeToPromDateHours.toFixed(1)}h
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">New Users Today</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {advancedMetrics.newUsersToday}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">New Users This Week</div>
+                    <div className="text-lg font-semibold text-pink-600">
+                      {advancedMetrics.newUsersThisWeek}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Recent Activity (24h)</div>
+                    <div className="text-lg font-semibold text-orange-600">
+                      {advancedMetrics.recentActivity24h}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quality Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("quality") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("quality") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <UserCheck className="w-5 h-5" />
+                  Quality Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Matches with Conversations</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.matchesWithConversations}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      ({advancedMetrics.matchesWithConversationsPercent.toFixed(1)}%)
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Prom Dates (Looking Flow)</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.promDatesFromLookingFlow}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Unmatch Rate</div>
+                    <div className="text-lg font-semibold text-red-600">
+                      {advancedMetrics.unmatchRate.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Avg Profile Completeness</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {advancedMetrics.avgProfileCompleteness.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cohort-specific Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("cohort") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("cohort") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Cohort-specific Metrics
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground mb-2">Most Active Cohorts</div>
+                    <div className="space-y-2">
+                      {advancedMetrics.mostActiveCohorts.map((item) => (
+                        <div key={item.cohort} className="flex justify-between items-center text-sm p-2 bg-background/50 rounded">
+                          <span className="font-medium">{item.cohort}</span>
+                          <div className="flex gap-4">
+                            <span className="text-muted-foreground">
+                              {item.likes} likes, {item.matches} matches
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prom Ask Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("promask") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("promask") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Heart className="w-5 h-5" />
+                  Prom Ask Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Total Prom Asks Sent</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.totalPromAsksSent}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Pending</div>
+                    <div className="text-lg font-semibold text-orange-600">
+                      {advancedMetrics.promAsksPending}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Accepted</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.promAsksAccepted}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Declined</div>
+                    <div className="text-lg font-semibold text-red-600">
+                      {advancedMetrics.promAsksDeclined}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Discovery Feed Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("discovery") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("discovery") && (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Discovery Feed Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Average Discovery Score</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.avgDiscoveryScore.toFixed(3)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">High Scores (&gt;0.7)</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.discoveryScoreDistribution.high}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Medium Scores (0.4-0.7)</div>
+                    <div className="text-lg font-semibold text-yellow-600">
+                      {advancedMetrics.discoveryScoreDistribution.medium}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Low Scores (&lt;0.4)</div>
+                    <div className="text-lg font-semibold text-red-600">
+                      {advancedMetrics.discoveryScoreDistribution.low}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Profiles Never Shown</div>
+                    <div className="text-lg font-semibold text-gray-600">
+                      {advancedMetrics.profilesNeverShown}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flow Distribution Metrics */}
+              <div className={`p-4 bg-muted/50 rounded-lg ${metricsLoadingSections.has("flow") ? "opacity-50" : ""}`}>
+                {metricsLoadingSections.has("flow") ? (
+                  <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Calculating...
+                  </div>
+                ) : null}
+                <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Flow Distribution Metrics
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Looking Flow</div>
+                    <div className="text-lg font-semibold text-blue-600">
+                      {advancedMetrics.usersByFlowType.looking}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Partner Flow (IIMA)</div>
+                    <div className="text-lg font-semibold text-green-600">
+                      {advancedMetrics.usersByFlowType.partnerIIMA}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Partner Flow (Outside)</div>
+                    <div className="text-lg font-semibold text-purple-600">
+                      {advancedMetrics.usersByFlowType.partnerOutside}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Flow Changes</div>
+                    <div className="text-lg font-semibold text-orange-600">
+                      {advancedMetrics.flowChanges}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Partner Invite Success Rate</div>
+                    <div className="text-lg font-semibold text-pink-600">
+                      {advancedMetrics.partnerInviteSuccessRate.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="mt-4 text-sm text-muted-foreground">
-              {matchesLoading ? "Loading matches…" : `Showing ${matches.length} matches (latest 100)`}
-            </div>
-          </div>
+            )
+          )}
         </div>
       </div>
     </div>
