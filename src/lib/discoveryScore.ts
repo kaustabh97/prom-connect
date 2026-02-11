@@ -228,6 +228,19 @@ export function sortDiscoveryProfiles(
 }
 
 /**
+ * Simple seeded RNG (mulberry32) so the same seed produces the same shuffle.
+ * Used to keep feed order stable when only profile data (e.g. photoUrls) updates.
+ */
+function createSeededRandom(seed: number): () => number {
+  return function next() {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
  * Apply tiered randomness to an already-sorted list of profiles.
  *
  * Idea:
@@ -240,18 +253,25 @@ export function sortDiscoveryProfiles(
  * - [10, 25)  → shuffle within next 15
  * - [25, 50)  → shuffle within next 25
  * - [50, end) → fully shuffle the rest
+ *
+ * If seed is provided, the shuffle is deterministic for that seed so the order
+ * stays stable when only profile fields (e.g. photoUrls) change — avoids a
+ * visible "blip" where a different profile briefly appears after load.
  */
 export function applyTieredRandomization(
-  profiles: DiscoveryProfileFull[]
+  profiles: DiscoveryProfileFull[],
+  seed?: number
 ): DiscoveryProfileFull[] {
   const result = [...profiles];
   const n = result.length;
   if (n <= 1) return result;
 
+  const random = seed != null ? createSeededRandom(seed) : Math.random;
+
   // Helper: in-place Fisher–Yates shuffle for a slice
   function shuffleSlice(start: number, end: number) {
     for (let i = end - 1; i > start; i--) {
-      const j = start + Math.floor(Math.random() * (i - start + 1));
+      const j = start + Math.floor(random() * (i - start + 1));
       const tmp = result[i];
       result[i] = result[j];
       result[j] = tmp;
@@ -272,4 +292,18 @@ export function applyTieredRandomization(
   }
 
   return result;
+}
+
+/**
+ * Stable numeric seed from a list of profile IDs so the same set of IDs
+ * produces the same feed order across re-renders (e.g. when only photoUrls update).
+ */
+export function seedFromProfileIds(ids: string[]): number {
+  const str = ids.join(",");
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h << 5) - h + str.charCodeAt(i);
+    h |= 0;
+  }
+  return h;
 }

@@ -20,7 +20,7 @@ import {
   FILTER_STORAGE_KEY,
   areSexualPreferencesMutuallyCompatible,
 } from "@/lib/dating";
-import { sortDiscoveryProfiles, applyTieredRandomization } from "@/lib/discoveryScore";
+import { sortDiscoveryProfiles, applyTieredRandomization, seedFromProfileIds } from "@/lib/discoveryScore";
 import { getUserProfileById } from "@/lib/dataAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -522,9 +522,10 @@ export default function Discover() {
       viewerId: currentProfileId,
       preferenceWeight: 0.25, // 25% preference, 75% global quality (tunable)
     });
-    // Apply tiered randomness so each reload shows a slightly different order,
-    // with randomness increasing as the user goes deeper into the list.
-    return applyTieredRandomization(sorted);
+    // Seed from profile IDs so the same set of IDs gets the same shuffle. This keeps order
+    // stable when only profile data (e.g. photoUrls) updates, avoiding a brief wrong-profile blip.
+    const seed = seedFromProfileIds(sorted.map((p) => p.id));
+    return applyTieredRandomization(sorted, seed);
   }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
