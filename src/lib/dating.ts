@@ -15,6 +15,8 @@ export interface DiscoveryProfileFull {
   bio: string;
   tags: string[];
   photoUrls: string[]; // main first; empty = placeholder
+  /** IIMA email address for this profile (if available). */
+  email?: string;
   // From onboarding
   cohort?: string;
   intention?: string;

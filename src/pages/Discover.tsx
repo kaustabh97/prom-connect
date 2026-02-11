@@ -57,6 +57,7 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     bio: backendProfile.bio || "",
     tags: backendProfile.tags || [],
     photoUrls: [],
+    email: backendProfile.email ?? undefined,
     profilePicKey: backendProfile.profilePicKey || undefined,
     cohort: backendProfile.cohort || undefined,
     intention: backendProfile.intention || undefined,

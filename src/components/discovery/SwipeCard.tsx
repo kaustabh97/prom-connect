@@ -157,6 +157,15 @@ const SwipeCard = forwardRef<HTMLDivElement, SwipeCardProps>(
                 </section>
               )}
 
+              {profile.email && (
+                <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
+                  <h3 className="text-sm font-bold text-foreground mb-2">IIMA email</h3>
+                  <p className="text-xs text-muted-foreground break-all">
+                    {profile.email}
+                  </p>
+                </section>
+              )}
+
               {profile.tags?.length > 0 && (
                 <section className="rounded-2xl bg-card/60 border border-border/50 p-4">
                   <h3 className="text-sm font-bold text-foreground mb-3">My interests</h3>
