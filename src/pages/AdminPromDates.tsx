@@ -872,6 +872,343 @@ export default function AdminPromDates() {
     }
   };
 
+  const calculateAdvancedMetrics = (
+    allProfiles: Schema["UserProfile"]["type"][],
+    allMatches: Schema["Match"]["type"][],
+    allLikes: Schema["Like"]["type"][],
+    allConversations: Schema["Conversation"]["type"][],
+    allMessages: Schema["Message"]["type"][],
+    allMatchRequests: Schema["MatchRequest"]["type"][],
+    allPromAsks: Schema["PromAskRequest"]["type"][],
+    likedBy: Record<string, Set<string>>,
+    mutualLikes: number,
+    unmatchedMatches: number,
+    usersByCohort: Record<string, number>
+  ) => {
+    try {
+      // 1. Conversion Funnel Metrics
+      const totalLikesCount = allLikes.length;
+      const totalMatchesCount = allMatches.length;
+      const promDatesCount = allMatches.filter(m => m.isPromDate === true).length;
+      const likeToMatchRate = totalLikesCount > 0 ? (mutualLikes / totalLikesCount) * 100 : 0;
+      const matchToPromDateRate = totalMatchesCount > 0 ? (promDatesCount / totalMatchesCount) * 100 : 0;
+      
+      const promAsksAccepted = allPromAsks.filter(a => a.status === "accepted").length;
+      const promAsksTotal = allPromAsks.length;
+      const promAskAcceptanceRate = promAsksTotal > 0 ? (promAsksAccepted / promAsksTotal) * 100 : 0;
+      
+      const matchRequestAccepted = allMatchRequests.filter(r => r.status === "accepted").length;
+      const matchRequestTotal = allMatchRequests.length;
+      const matchRequestAcceptanceRate = matchRequestTotal > 0 ? (matchRequestAccepted / matchRequestTotal) * 100 : 0;
+
+      // 2. Engagement Metrics
+      const now = Date.now();
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const oneDayAgo = now - 24 * 60 * 60 * 1000;
+      
+      // Active users: users who have updatedAt or createdAt in last 7 days, or sent messages
+      const activeUserIds = new Set<string>();
+      allProfiles.forEach(p => {
+        if (p.updatedAt && new Date(p.updatedAt).getTime() >= sevenDaysAgo) activeUserIds.add(p.id!);
+        if (p.createdAt && new Date(p.createdAt).getTime() >= sevenDaysAgo) activeUserIds.add(p.id!);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allMessages.forEach((m: any) => {
+        if (m.senderId) activeUserIds.add(m.senderId);
+      });
+      const activeUsersLast7Days = activeUserIds.size;
+
+      // Daily active users (users active today)
+      const dauIds = new Set<string>();
+      allProfiles.forEach(p => {
+        if (p.updatedAt && isToday(p.updatedAt)) dauIds.add(p.id!);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allMessages.forEach((m: any) => {
+        if (m.sentAt && isToday(m.sentAt) && m.senderId) dauIds.add(m.senderId);
+      });
+      const dailyActiveUsers = dauIds.size;
+
+      // Weekly active users
+      const wauIds = new Set<string>();
+      allProfiles.forEach(p => {
+        if (p.updatedAt && isThisWeek(p.updatedAt)) wauIds.add(p.id!);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allMessages.forEach((m: any) => {
+        if (m.sentAt && isThisWeek(m.sentAt) && m.senderId) wauIds.add(m.senderId);
+      });
+      const weeklyActiveUsers = wauIds.size;
+
+      const usersWithPhotos = allProfiles.filter(p => p.profilePicKey && p.profilePicKey.trim() !== "").length;
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const usersWhoSentMessages = new Set(allMessages.map((m: any) => m.senderId).filter(Boolean)).size;
+
+      // 3. Time-based Metrics
+      // Calculate average time from first like to match
+      const matchTimes: number[] = [];
+      allMatches.forEach(match => {
+        if (!match.createdAt) return;
+        const matchTime = new Date(match.createdAt).getTime();
+        const user1Id = match.user1Id;
+        const user2Id = match.user2Id;
+        
+        // Find first like between these two users
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const relevantLikes = allLikes.filter((l: any) => 
+          (l.fromUserId === user1Id && l.toUserId === user2Id) ||
+          (l.fromUserId === user2Id && l.toUserId === user1Id)
+        );
+        
+        if (relevantLikes.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const firstLikeTime = Math.min(...relevantLikes.map((l: any) => 
+            l.createdAt ? new Date(l.createdAt).getTime() : matchTime
+          ));
+          const hoursDiff = (matchTime - firstLikeTime) / (1000 * 60 * 60);
+          if (hoursDiff >= 0 && hoursDiff < 10000) { // Sanity check: less than ~1 year
+            matchTimes.push(hoursDiff);
+          }
+        }
+      });
+      const avgTimeToMatchHours = matchTimes.length > 0 
+        ? matchTimes.reduce((a, b) => a + b, 0) / matchTimes.length 
+        : 0;
+
+      // Calculate average time from match to prom date
+      const promDateTimes: number[] = [];
+      allMatches.filter(m => m.isPromDate === true).forEach(promMatch => {
+        if (!promMatch.createdAt) return;
+        const promDateTime = new Date(promMatch.createdAt).getTime();
+        
+        // Find when the match was created (before prom date confirmation)
+        // For looking flow, check prom ask acceptance time
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const promAsk = allPromAsks.find((a: any) => 
+          a.matchId === promMatch.id && a.status === "accepted"
+        );
+        
+        if (promAsk && promAsk.createdAt) {
+          const matchCreatedTime = new Date(promAsk.createdAt).getTime();
+          const hoursDiff = (promDateTime - matchCreatedTime) / (1000 * 60 * 60);
+          if (hoursDiff >= 0 && hoursDiff < 10000) {
+            promDateTimes.push(hoursDiff);
+          }
+        } else {
+          // For partner flow, use match creation time
+          const matchCreatedTime = new Date(promMatch.createdAt).getTime();
+          // Assume prom date confirmed immediately for partner flow
+          promDateTimes.push(0);
+        }
+      });
+      const avgTimeToPromDateHours = promDateTimes.length > 0
+        ? promDateTimes.reduce((a, b) => a + b, 0) / promDateTimes.length
+        : 0;
+
+      const newUsersToday = allProfiles.filter(p => isToday(p.createdAt)).length;
+      const newUsersThisWeek = allProfiles.filter(p => isThisWeek(p.createdAt)).length;
+      
+      // Recent activity: users active in last 24 hours
+      const recentActivityIds = new Set<string>();
+      allProfiles.forEach(p => {
+        if (p.updatedAt && isLast24Hours(p.updatedAt)) recentActivityIds.add(p.id!);
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allMessages.forEach((m: any) => {
+        if (m.sentAt && isLast24Hours(m.sentAt) && m.senderId) recentActivityIds.add(m.senderId);
+      });
+      const recentActivity24h = recentActivityIds.size;
+
+      // 4. Quality Metrics
+      const matchesWithConversations = allMatches.filter(m => {
+        const conv = allConversations.find(c => c.matchId === m.id);
+        return conv && allMessages.some(msg => msg.conversationId === conv.id);
+      }).length;
+      const matchesWithConversationsPercent = totalMatchesCount > 0 
+        ? (matchesWithConversations / totalMatchesCount) * 100 
+        : 0;
+
+      // Prom dates from looking flow (have accepted prom ask)
+      const lookingFlowPromDateIds = new Set(
+        allPromAsks
+          .filter(a => a.status === "accepted" && a.matchId)
+          .map(a => a.matchId!)
+      );
+      const promDatesFromLookingFlow = allMatches.filter(m => 
+        m.isPromDate === true && lookingFlowPromDateIds.has(m.id!)
+      ).length;
+
+      const unmatchRate = totalMatchesCount > 0 
+        ? (unmatchedMatches / totalMatchesCount) * 100 
+        : 0;
+
+      // Profile completeness: count filled fields
+      const completenessScores: number[] = [];
+      allProfiles.forEach(p => {
+        const fields = [
+          "bio", "cohort", "gender", "intention", "hometown",
+          "alcoholPreference", "smokingPreference", "foodPreference", 
+          "favouritePlace", "teaOrCoffee", "mountainOrBeach",
+          "profilePicKey"
+        ];
+        let filled = 0;
+        fields.forEach(field => {
+          const value = (p as any)[field];
+          if (value != null && typeof value === "string" && value.trim() !== "") filled++;
+        });
+        completenessScores.push(filled / fields.length);
+      });
+      const avgProfileCompleteness = completenessScores.length > 0
+        ? (completenessScores.reduce((a, b) => a + b, 0) / completenessScores.length) * 100
+        : 0;
+
+      // 6. Cohort-specific Metrics
+      // Create a map of userId to cohort for quick lookup
+      const userIdToCohort: Record<string, string> = {};
+      allProfiles.forEach(p => {
+        if (p.id) {
+          userIdToCohort[p.id] = p.cohort || "Unknown";
+        }
+      });
+
+      const matchesByCohort: Record<string, number> = {};
+      const promDatesByCohort: Record<string, number> = {};
+      const likesByCohort: Record<string, number> = {};
+      
+      allMatches.forEach(m => {
+        // Get cohorts from both users in the match
+        const user1Cohort = m.user1Id ? (userIdToCohort[m.user1Id] || "Unknown") : "Unknown";
+        const user2Cohort = m.user2Id ? (userIdToCohort[m.user2Id] || "Unknown") : "Unknown";
+        
+        // Count match for both cohorts
+        matchesByCohort[user1Cohort] = (matchesByCohort[user1Cohort] || 0) + 1;
+        if (user1Cohort !== user2Cohort) {
+          matchesByCohort[user2Cohort] = (matchesByCohort[user2Cohort] || 0) + 1;
+        }
+        
+        if (m.isPromDate) {
+          promDatesByCohort[user1Cohort] = (promDatesByCohort[user1Cohort] || 0) + 1;
+          if (user1Cohort !== user2Cohort) {
+            promDatesByCohort[user2Cohort] = (promDatesByCohort[user2Cohort] || 0) + 1;
+          }
+        }
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allLikes.forEach((l: any) => {
+        const fromCohort = l.fromUserId ? (userIdToCohort[l.fromUserId] || "Unknown") : "Unknown";
+        likesByCohort[fromCohort] = (likesByCohort[fromCohort] || 0) + 1;
+      });
+
+      // Most active cohorts
+      const mostActiveCohorts: Array<{ cohort: string; likes: number; matches: number }> = [];
+      Object.entries(usersByCohort).forEach(([cohort, userCount]) => {
+        if (cohort !== "Unknown") {
+          mostActiveCohorts.push({
+            cohort,
+            likes: likesByCohort[cohort] || 0,
+            matches: matchesByCohort[cohort] || 0,
+          });
+        }
+      });
+      mostActiveCohorts.sort((a, b) => (b.likes + b.matches) - (a.likes + a.matches));
+
+      // 7. Prom Ask Metrics
+      const totalPromAsksSent = allPromAsks.length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promAsksPending = allPromAsks.filter((a: any) => a.status === "pending").length;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const promAsksDeclined = allPromAsks.filter((a: any) => a.status === "declined").length;
+
+      // 9. Discovery Feed Metrics
+      const scoresWithValues = allProfiles
+        .map(p => p.discoveryScore)
+        .filter((s): s is number => s != null && typeof s === "number");
+      const avgDiscoveryScore = scoresWithValues.length > 0
+        ? scoresWithValues.reduce((a, b) => a + b, 0) / scoresWithValues.length
+        : 0;
+
+      const discoveryScoreDistribution = {
+        high: scoresWithValues.filter(s => s > 0.7).length,
+        medium: scoresWithValues.filter(s => s >= 0.4 && s <= 0.7).length,
+        low: scoresWithValues.filter(s => s < 0.4).length,
+      };
+
+      // Profiles never shown (simplified - would need exposure tracking)
+      const profilesNeverShown = profilesInDiscovery - scoresWithValues.length;
+
+      // 10. Flow Distribution Metrics
+      const usersByFlowType = {
+        looking: usersLookingFlow,
+        partnerIIMA: allProfiles.filter(p => {
+          const hasPartner = (p.partnerStatus ?? "").includes("Already found");
+          const partnerEmail = (p.partnerEmail ?? "").trim();
+          return hasPartner && partnerEmail.endsWith("@iima.ac.in");
+        }).length,
+        partnerOutside: allProfiles.filter(p => {
+          const hasPartner = (p.partnerStatus ?? "").includes("Already found");
+          const partnerEmail = (p.partnerEmail ?? "").trim();
+          return hasPartner && partnerEmail !== "" && !partnerEmail.endsWith("@iima.ac.in");
+        }).length,
+      };
+
+      // Flow changes: users who have updatedAt significantly after createdAt
+      let flowChanges = 0;
+      allProfiles.forEach(p => {
+        if (p.createdAt && p.updatedAt) {
+          const created = new Date(p.createdAt).getTime();
+          const updated = new Date(p.updatedAt).getTime();
+          // If updated more than 1 hour after creation, likely a flow change
+          if (updated > created + 60 * 60 * 1000) {
+            flowChanges++;
+          }
+        }
+      });
+
+      const partnerInviteSuccessRate = matchRequestTotal > 0
+        ? (matchRequestAccepted / matchRequestTotal) * 100
+        : 0;
+
+      setAdvancedMetrics({
+        likeToMatchRate,
+        matchToPromDateRate,
+        promAskAcceptanceRate,
+        matchRequestAcceptanceRate,
+        activeUsersLast7Days,
+        dailyActiveUsers,
+        weeklyActiveUsers,
+        usersWithPhotos,
+        usersWhoSentMessages,
+        avgTimeToMatchHours,
+        avgTimeToPromDateHours,
+        newUsersToday,
+        newUsersThisWeek,
+        recentActivity24h,
+        matchesWithConversations,
+        matchesWithConversationsPercent,
+        promDatesFromLookingFlow,
+        unmatchRate,
+        avgProfileCompleteness,
+        matchesByCohort,
+        promDatesByCohort,
+        mostActiveCohorts: mostActiveCohorts.slice(0, 5),
+        totalPromAsksSent,
+        promAsksPending,
+        promAsksAccepted,
+        promAsksDeclined,
+        avgDiscoveryScore,
+        discoveryScoreDistribution,
+        profilesNeverShown,
+        usersByFlowType,
+        flowChanges,
+        partnerInviteSuccessRate,
+      });
+    } catch (err) {
+      logError(err, { component: "AdminPromDates", operation: "calculateAdvancedMetrics" });
+    }
+  };
+
   // Helper function to fetch all records with pagination
   const fetchAllWithPagination = async <T,>(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -75,6 +75,9 @@ export default function FiltersModal({
           <p className="text-sm text-muted-foreground">
             Customize your discovery preferences
           </p>
+          <p className="mt-1 text-xs text-gold-200/90">
+            Age and who you’re interested in are strict filters. The other choices just help us decide who to show you first – they don’t hide people.
+          </p>
         </DialogHeader>
 
         <div className="space-y-6 py-4">

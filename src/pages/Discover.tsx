@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import SparkleBackground from "@/components/SparkleBackground";
 import DiscoverFeed from "@/components/discovery/DiscoverFeed";
@@ -18,8 +18,9 @@ import {
   type DiscoveryProfileFull,
   mapSexualOrientationToGenders,
   FILTER_STORAGE_KEY,
+  areSexualPreferencesMutuallyCompatible,
 } from "@/lib/dating";
-import { sortDiscoveryProfiles } from "@/lib/discoveryScore";
+import { sortDiscoveryProfiles, applyTieredRandomization } from "@/lib/discoveryScore";
 import { getUserProfileById } from "@/lib/dataAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,12 +45,10 @@ const client = generateClient<Schema>();
 
 
 /**
- * Transform backend UserProfile to DiscoveryProfileFull format
+ * Transform backend UserProfile to DiscoveryProfileFull format.
+ * Photos start empty — resolved progressively in background after profiles are displayed.
  */
 function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]): DiscoveryProfileFull {
-  // Start empty; S3 URLs added in fetch loop when profilePicKey exists
-  const photoUrls: string[] = [];
-
   return {
     id: backendProfile.id || "",
     name: backendProfile.name || "Anonymous",
@@ -57,7 +56,9 @@ function transformBackendProfile(backendProfile: Schema["UserProfile"]["type"]):
     gender: backendProfile.gender || "",
     bio: backendProfile.bio || "",
     tags: backendProfile.tags || [],
-    photoUrls,
+    photoUrls: [],
+    email: backendProfile.email ?? undefined,
+    profilePicKey: backendProfile.profilePicKey || undefined,
     cohort: backendProfile.cohort || undefined,
     intention: backendProfile.intention || undefined,
     hometown: backendProfile.hometown || undefined,
@@ -236,169 +237,183 @@ export default function Discover() {
     }
   }, [currentProfileId, promDate, navigate]);
 
-  // Fetch profiles from backend
+  // Track photo resolution so we can cancel it when a new fetch starts
+  const photoResolutionCancelRef = useRef<() => void>(() => {});
+
+  // Fetch profiles from backend — parallelized for speed
   useEffect(() => {
+    // Cancel any in-flight photo resolution from a previous fetch
+    photoResolutionCancelRef.current();
+    let cancelled = false;
+    photoResolutionCancelRef.current = () => { cancelled = true; };
+
     const fetchProfiles = async () => {
       try {
         setLoading(true);
         setError(null);
         setPendingOutgoingRequest(null);
         logInfo("Fetching discovery profiles", { component: "Discover", operation: "fetchProfiles" });
+        const t0 = performance.now();
 
-        // Load already-liked profile ids so we exclude them from the feed
-        await loadLikesFromBackend();
-        
-        // Get current user to exclude their profile
+        // ── Step 1: Get current user (needed by everything) ────────────
         const currentUser = await getUserProfileFromCognito();
         const currentUserEmail = currentUser?.email;
-
-        // Check for pending outgoing partner request (sender has requested, waiting for partner to accept)
         const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
         const opts = authMode ? { authMode } : undefined;
-        const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
-        const { data: myProfile } = myProfileId
-          ? await getUserProfileById(myProfileId, opts)
-          : { data: null };
-        const resolvedMyProfileId = myProfile?.id ?? "";
-        setCurrentProfileId(resolvedMyProfileId);
-        if (resolvedMyProfileId) {
-          try {
-            const { data: outgoing } =
-              // @ts-ignore - Amplify list accepts (input, options)
-              await client.models.MatchRequest.listMatchRequestByFromUserId(
-                { fromUserId: resolvedMyProfileId },
-                opts
-              );
-            const pending = (outgoing ?? []).find((r) => r.status === "pending");
-            if (pending) {
-              const toEmail = pending.toEmail ?? "";
-              setPendingOutgoingRequest({
-                id: pending.id ?? "",
-                toEmail,
-                partnerDisplayName: toEmail.split("@")[0] || "your partner",
-              });
-            }
-          } catch (err) {
-            logError(err, { component: "Discover", operation: "fetchPendingRequest", extra: { profileId: resolvedMyProfileId } });
-          }
-          // Who liked me (for like reciprocity boost in sort)
-          try {
-            const { data: likesToMe } = await client.models.Like.listLikeByToUserId(
-              { toUserId: resolvedMyProfileId },
-              opts
-            );
-            const ids = new Set((likesToMe ?? []).map((l) => l.fromUserId).filter(Boolean) as string[]);
-            setLikedMeIds(ids);
-          } catch (err) {
-            logError(err, { component: "Discover", operation: "fetchLikedMe", extra: { profileId: resolvedMyProfileId } });
-            setLikedMeIds(new Set());
-          }
-        } else {
-          setLikedMeIds(new Set());
-        }
-
-        // Fetch all MatchRequests with status pending (users in "request pending" – exclude from discovery)
-        // Paginate to get all match requests
-        let requestPendingUserIds = new Set<string>();
-        try {
-          let matchRequestsNextToken: string | undefined;
-          do {
-            // @ts-ignore - list(options) second arg for authMode
-            const { data: matchRequests, nextToken } = await client.models.MatchRequest.list(
-              { nextToken: matchRequestsNextToken },
-              opts
-            );
-            (matchRequests ?? [])
-              .filter((r) => r.status === "pending" && r.fromUserId)
-              .forEach((r) => requestPendingUserIds.add(r.fromUserId!));
-            matchRequestsNextToken = nextToken ?? undefined;
-          } while (matchRequestsNextToken);
-        } catch (err) {
-          logError(err, { component: "Discover", operation: "fetchMatchRequests" });
-        }
-
-        // Fetch ALL profiles with pagination (ensures we get complete dataset)
-        // Pagination loop: continue fetching until nextToken is undefined
         const listOpts = !GOOGLE_LOGIN_CHECK ? { authMode: "apiKey" as const } : undefined;
-        const allProfiles: NonNullable<Awaited<ReturnType<typeof client.models.UserProfile.list>>["data"]> = [];
-        let nextToken: string | undefined;
-        let pageCount = 0;
-        do {
-          // @ts-ignore - list(options) second arg for authMode
-          const res = await client.models.UserProfile.list({ nextToken }, listOpts);
-          if (res.errors?.length) {
-            logError(res.errors[0], { component: "Discover", operation: "fetchProfiles", extra: { errors: res.errors } });
-            setError("Failed to load profiles. Please try again.");
-            setProfiles([]);
-            return;
-          }
-          allProfiles.push(...(res.data ?? []));
-          nextToken = res.nextToken ?? undefined;
-          pageCount += 1;
-        } while (nextToken);
-        
-        logInfo("Fetched all profiles with pagination", { 
-          component: "Discover", 
-          operation: "fetchProfiles", 
-          extra: { totalProfiles: allProfiles.length, pagesFetched: pageCount } 
-        });
+        const myProfileId = currentUserEmail ? getIdFromEmail(currentUserEmail.trim()) : null;
 
-        const backendProfiles = allProfiles;
+        // ── Step 2: Run ALL independent fetches in parallel ────────────
+        // Previously these ran sequentially — parallelising them is the biggest win.
+        const [
+          _likesLoaded,
+          myProfileResult,
+          allProfilesResult,
+          matchRequestPendingIds,
+          outgoingPending,
+          likedMeResult,
+          reportedIds,
+        ] = await Promise.all([
+          // 1. Load already-liked profile IDs (populates module-level Set in useMatch)
+          loadLikesFromBackend().catch((err) => {
+            logError(err, { component: "Discover", operation: "loadLikes" });
+          }),
 
-        if (backendProfiles.length === 0) {
+          // 2. My profile
+          myProfileId
+            ? getUserProfileById(myProfileId, opts).then((r) => r.data ?? null).catch((err) => {
+                logError(err, { component: "Discover", operation: "fetchMyProfile" });
+                return null;
+              })
+            : Promise.resolve(null),
+
+          // 3. ALL user profiles (paginated) — the single heaviest call
+          (async () => {
+            type ProfileRow = NonNullable<Awaited<ReturnType<typeof client.models.UserProfile.list>>["data"]>[number];
+            const all: ProfileRow[] = [];
+            let nextToken: string | undefined;
+            let pages = 0;
+            do {
+              // @ts-ignore - list(options) second arg for authMode
+              const res = await client.models.UserProfile.list({ nextToken }, listOpts);
+              if (res.errors?.length) throw res.errors[0];
+              all.push(...(res.data ?? []));
+              nextToken = res.nextToken ?? undefined;
+              pages++;
+            } while (nextToken);
+            logInfo("Fetched all profiles", { component: "Discover", operation: "fetchProfiles", extra: { total: all.length, pages } });
+            return all;
+          })(),
+
+          // 4. ALL match requests → pending user IDs (to exclude from feed)
+          (async () => {
+            const ids = new Set<string>();
+            try {
+              let nextToken: string | undefined;
+              do {
+                // @ts-ignore
+                const { data, nextToken: nt } = await client.models.MatchRequest.list({ nextToken }, opts);
+                (data ?? []).filter((r: { status?: string; fromUserId?: string }) => r.status === "pending" && r.fromUserId)
+                  .forEach((r: { fromUserId: string }) => ids.add(r.fromUserId));
+                nextToken = nt ?? undefined;
+              } while (nextToken);
+            } catch (err) {
+              logError(err, { component: "Discover", operation: "fetchMatchRequests" });
+            }
+            return ids;
+          })(),
+
+          // 5. My outgoing match request
+          myProfileId
+            ? (async () => {
+                try {
+                  // @ts-ignore
+                  const { data } = await client.models.MatchRequest.listMatchRequestByFromUserId({ fromUserId: myProfileId }, opts);
+                  return (data ?? []).find((r: { status?: string }) => r.status === "pending") ?? null;
+                } catch (err) {
+                  logError(err, { component: "Discover", operation: "fetchPendingRequest" });
+                  return null;
+                }
+              })()
+            : Promise.resolve(null),
+
+          // 6. Who liked me (for reciprocity sort boost)
+          myProfileId
+            ? (async () => {
+                try {
+                  const { data } = await client.models.Like.listLikeByToUserId({ toUserId: myProfileId }, opts);
+                  return new Set((data ?? []).map((l) => l.fromUserId).filter(Boolean) as string[]);
+                } catch (err) {
+                  logError(err, { component: "Discover", operation: "fetchLikedMe" });
+                  return new Set<string>();
+                }
+              })()
+            : Promise.resolve(new Set<string>()),
+
+          // 7. My reports (to exclude reported profiles)
+          myProfileId
+            ? (async () => {
+                try {
+                  const { data } = await client.models.Report.listReportByReporterUserId({ reporterUserId: myProfileId }, listOpts);
+                  const ids = new Set<string>();
+                  (data ?? []).forEach((r) => { if (r.reportedProfileId) ids.add(r.reportedProfileId); });
+                  return ids;
+                } catch (err) {
+                  logError(err, { component: "Discover", operation: "fetchMyReports" });
+                  return new Set<string>();
+                }
+              })()
+            : Promise.resolve(new Set<string>()),
+        ]);
+
+        if (cancelled) return;
+
+        // ── Step 3: Process parallel results ───────────────────────────
+        const myProfile = myProfileResult;
+        setCurrentProfileId(myProfile?.id ?? "");
+
+        if (outgoingPending) {
+          const toEmail = (outgoingPending as { toEmail?: string }).toEmail ?? "";
+          setPendingOutgoingRequest({
+            id: (outgoingPending as { id?: string }).id ?? "",
+            toEmail,
+            partnerDisplayName: toEmail.split("@")[0] || "your partner",
+          });
+        }
+
+        setLikedMeIds(likedMeResult);
+
+        if (allProfilesResult.length === 0) {
           setProfiles([]);
           return;
         }
 
-        // Reported by me: exclude from discovery (report/block)
-        let reportedProfileIds = new Set<string>();
-        if (resolvedMyProfileId) {
-          try {
-            const { data: myReports } = await client.models.Report.listReportByReporterUserId(
-              { reporterUserId: resolvedMyProfileId },
-              listOpts
-            );
-            (myReports ?? []).forEach((r) => {
-              if (r.reportedProfileId) reportedProfileIds.add(r.reportedProfileId);
-            });
-          } catch (err) {
-            logError(err, { component: "Discover", operation: "fetchMyReports", extra: { profileId: resolvedMyProfileId } });
-          }
-        }
+        // ── Step 4: Filter, transform, set profiles WITHOUT photos ─────
+        const filteredBackend = allProfilesResult.filter((p) => {
+          if (
+            p.email === currentUserEmail ||
+            p.onboardingCompleted !== true ||
+            p.excludeFromDiscovery === true ||
+            p.bio?.trim().startsWith("Partner:") ||
+            matchRequestPendingIds.has(p.id ?? "") ||
+            reportedIds.has(p.id ?? "")
+          ) return false;
+          if (!myProfile) return true;
+          return areSexualPreferencesMutuallyCompatible(
+            myProfile.gender ?? null, myProfile.sexualOrientation ?? null,
+            p.gender ?? null, p.sexualOrientation ?? null,
+          );
+        });
 
-        // Filter: exclude current user, only completed onboarding, exclude prom date, request pending, reported
-        const filteredBackend = backendProfiles.filter(
-          (p) =>
-            p.email !== currentUserEmail &&
-            p.onboardingCompleted === true &&
-            p.excludeFromDiscovery !== true &&
-            !p.bio?.trim().startsWith("Partner:") &&
-            !requestPendingUserIds.has(p.id ?? "") &&
-            !reportedProfileIds.has(p.id ?? "")
-        );
-
-        // Transform to DiscoveryProfileFull format (same length as filteredBackend)
-        const transformedProfiles = filteredBackend.map(transformBackendProfile);
-
-        // Resolve S3 URLs for profile photos (profilePicKey → presigned getUrl)
-        for (let i = 0; i < filteredBackend.length; i++) {
-          const profilePicKey = filteredBackend[i].profilePicKey;
-          if (profilePicKey) {
-            try {
-              const { url } = await getUrl({
-                path: profilePicKey,
-                options: { bucket: "userPhotos" },
-              });
-              transformedProfiles[i].photoUrls = [url];
-            } catch (err) {
-              logWarn("Profile photo URL unavailable", { component: "Discover", operation: "fetchProfiles", extra: { profileId: filteredBackend[i]?.id, profilePicKey } });
-            }
-          }
-        }
-
-        const validProfiles = transformedProfiles.filter((p) => p.id && p.name);
+        const validProfiles = filteredBackend.map(transformBackendProfile).filter((p) => p.id && p.name);
         setProfiles(validProfiles);
-        logInfo("Discovery profiles loaded", { component: "Discover", operation: "fetchProfiles", extra: { count: validProfiles.length } });
+        // ↑ UI now shows profile cards (with placeholder initials for photos)
+
+        const elapsed = Math.round(performance.now() - t0);
+        logInfo("Discovery profiles loaded — photos loading in background", {
+          component: "Discover", operation: "fetchProfiles",
+          extra: { count: validProfiles.length, elapsedMs: elapsed },
+        });
       } catch (err) {
         logError(err, { component: "Discover", operation: "fetchProfiles" });
         setError(err instanceof Error ? err.message : "Failed to load profiles");
@@ -409,7 +424,73 @@ export default function Discover() {
     };
 
     fetchProfiles();
+    return () => { cancelled = true; };
   }, [refreshKey]); // Fetch on mount and when nav requests refresh
+
+  // ── Progressive photo resolution (runs AFTER profiles are displayed) ──
+  // Resolves S3 presigned URLs in batches so the user sees cards immediately
+  // while photos stream in. First batch (visible cards) loads fastest.
+  useEffect(() => {
+    if (loading || profiles.length === 0) return;
+
+    // Collect profiles that still need a photo resolved
+    const needsPhoto = profiles.filter((p) => p.profilePicKey && p.photoUrls.length === 0);
+    if (needsPhoto.length === 0) return;
+
+    let cancelled = false;
+    // Wire into the cancel ref so a new data-fetch aborts this too
+    const prevCancel = photoResolutionCancelRef.current;
+    photoResolutionCancelRef.current = () => { cancelled = true; prevCancel(); };
+
+    const FIRST_BATCH = 5;   // visible / near-visible cards
+    const BATCH_SIZE  = 10;  // subsequent batches
+
+    const resolveOne = async (profilePicKey: string) => {
+      const { url } = await getUrl({ path: profilePicKey, options: { bucket: "userPhotos" } });
+      return url.toString();
+    };
+
+    const applyBatch = (resolved: Map<string, string>) => {
+      if (resolved.size === 0 || cancelled) return;
+      setProfiles((prev) =>
+        prev.map((p) => {
+          const url = resolved.get(p.id);
+          return url ? { ...p, photoUrls: [url] } : p;
+        })
+      );
+    };
+
+    const resolveAll = async () => {
+      const ids = needsPhoto.map((p) => p.id);
+      const keyMap = new Map(needsPhoto.map((p) => [p.id, p.profilePicKey!]));
+
+      for (let i = 0; i < ids.length; ) {
+        if (cancelled) return;
+        const batchSize = i === 0 ? FIRST_BATCH : BATCH_SIZE;
+        const batch = ids.slice(i, i + batchSize);
+        i += batchSize;
+
+        const results = await Promise.allSettled(
+          batch.map(async (id) => ({ id, url: await resolveOne(keyMap.get(id)!) }))
+        );
+        if (cancelled) return;
+
+        const resolved = new Map<string, string>();
+        for (const r of results) {
+          if (r.status === "fulfilled") resolved.set(r.value.id, r.value.url);
+        }
+        applyBatch(resolved);
+      }
+    };
+
+    resolveAll().catch((err) =>
+      logWarn("Background photo resolution error", { component: "Discover", operation: "resolvePhotos", extra: { error: String(err) } })
+    );
+
+    return () => { cancelled = true; };
+    // Only trigger when loading transitions to false or profile count changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, profiles.length]);
 
   // Create stable filter dependencies to avoid unnecessary re-sorting
   // Serialize filter values that affect sorting (not the entire object reference)
@@ -436,11 +517,14 @@ export default function Discover() {
     // This ensures: Straight women see men, Straight men see women, Gay/Lesbian see same gender, Bisexual/Queer see all
     const filtered = applyFilters(profiles, filters);
     // Use lower preference weight (0.25) for better balance between global quality and preferences
-    return sortDiscoveryProfiles(filtered, filters, {
+    const sorted = sortDiscoveryProfiles(filtered, filters, {
       likedMeIds,
       viewerId: currentProfileId,
       preferenceWeight: 0.25, // 25% preference, 75% global quality (tunable)
     });
+    // Apply tiered randomness so each reload shows a slightly different order,
+    // with randomness increasing as the user goes deeper into the list.
+    return applyTieredRandomization(sorted);
   }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
@@ -621,7 +705,26 @@ export default function Discover() {
         <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
           {loading ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12">
-              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <div className="flex flex-col items-center gap-5">
+                {/* Heart with fill-up animation: outline always visible, fill sweeps up in sync */}
+                <div className="relative w-14 h-14 animate-heartbeat drop-shadow-[0_0_20px_hsl(43_74%_66%_/_0.45)]">
+                  {/* Outline heart (always visible) */}
+                  <Heart
+                    className="absolute inset-0 w-full h-full text-gold-400"
+                    fill="none"
+                    strokeWidth={1.8}
+                  />
+                  {/* Filled heart that sweeps upward */}
+                  <Heart
+                    className="absolute inset-0 w-full h-full text-gold-400 animate-heart-fill"
+                    fill="currentColor"
+                    strokeWidth={1.8}
+                  />
+                </div>
+                <p className="text-sm font-medium tracking-wide text-gold-300/80">
+                  Matching you with someone special…
+                </p>
+              </div>
             </div>
           ) : error ? (
             <div className="flex-1 flex items-center justify-center min-h-0 py-12 px-4">

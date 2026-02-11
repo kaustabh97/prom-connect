@@ -15,6 +15,8 @@ export interface DiscoveryProfileFull {
   bio: string;
   tags: string[];
   photoUrls: string[]; // main first; empty = placeholder
+  /** IIMA email address for this profile (if available). */
+  email?: string;
   // From onboarding
   cohort?: string;
   intention?: string;
@@ -55,6 +57,8 @@ export interface DiscoveryProfileFull {
   pollCasualOrDressed?: string;
   /** Backend-computed discovery score 0–1 (email match, age sanity, popularity). Updated by cron. */
   discoveryScore?: number | null;
+  /** S3 key for profile photo — used for deferred/progressive photo loading. */
+  profilePicKey?: string;
 }
 
 // ============================================================================
@@ -117,8 +121,8 @@ export function mapSexualOrientationToGenders(
     return [...GENDER_OPTIONS]; // Default: all genders
   }
 
-  const orientation = sexualOrientation.toLowerCase().trim();
-  const gender = userGender.toLowerCase().trim();
+  const orientation = (sexualOrientation || "").toLowerCase().trim();
+  const gender = (userGender || "").toLowerCase().trim();
 
   // Straight: interested in opposite gender
   if (orientation === "straight") {
@@ -288,4 +292,39 @@ export function applyFilters(
     // Age and Preferences (cohort, intention) are not applied
     return true;
   });
+}
+
+/**
+ * Check if two profiles are mutually compatible based on sexual orientation and gender.
+ *
+ * This ensures we only show people who are interested in each other's genders.
+ * Example:
+ * - Straight man → interested in women only
+ * - Straight woman → interested in men only
+ * - Gay man → interested in men only
+ * - Lesbian woman → interested in women only
+ * - Bisexual / Queer / Pansexual / Other → interested in all genders
+ *
+ * If either side is missing gender or sexual orientation, we default to "compatible"
+ * to avoid over-filtering legacy / incomplete profiles.
+ */
+export function areSexualPreferencesMutuallyCompatible(
+  viewerGender: string | null | undefined,
+  viewerSexualOrientation: string | null | undefined,
+  profileGender: string | null | undefined,
+  profileSexualOrientation: string | null | undefined
+): boolean {
+  const viewerNorm = viewerGender ? normalizeGender(viewerGender) : null;
+  const profileNorm = profileGender ? normalizeGender(profileGender) : null;
+
+  // If we don't know one or both genders, don't block the match purely on missing data
+  if (!viewerNorm || !profileNorm) return true;
+
+  const viewerTargets = mapSexualOrientationToGenders(viewerSexualOrientation, viewerNorm);
+  const profileTargets = mapSexualOrientationToGenders(profileSexualOrientation, profileNorm);
+
+  const viewerWantsProfile = viewerTargets.includes(profileNorm);
+  const profileWantsViewer = profileTargets.includes(viewerNorm);
+
+  return viewerWantsProfile && profileWantsViewer;
 }

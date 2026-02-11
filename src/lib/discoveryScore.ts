@@ -226,3 +226,50 @@ export function sortDiscoveryProfiles(
   
   return sorted;
 }
+
+/**
+ * Apply tiered randomness to an already-sorted list of profiles.
+ *
+ * Idea:
+ * - Keep overall ranking by score (best profiles are still near the top)
+ * - Within position bands, shuffle to introduce randomness per reload
+ * - Use larger bands deeper in the list so randomness increases as user goes further
+ *
+ * Current tiers (by index in the sorted list):
+ * - [0, 10)   → shuffle within top 10
+ * - [10, 25)  → shuffle within next 15
+ * - [25, 50)  → shuffle within next 25
+ * - [50, end) → fully shuffle the rest
+ */
+export function applyTieredRandomization(
+  profiles: DiscoveryProfileFull[]
+): DiscoveryProfileFull[] {
+  const result = [...profiles];
+  const n = result.length;
+  if (n <= 1) return result;
+
+  // Helper: in-place Fisher–Yates shuffle for a slice
+  function shuffleSlice(start: number, end: number) {
+    for (let i = end - 1; i > start; i--) {
+      const j = start + Math.floor(Math.random() * (i - start + 1));
+      const tmp = result[i];
+      result[i] = result[j];
+      result[j] = tmp;
+    }
+  }
+
+  const tiers = [
+    { start: 0, end: Math.min(10, n) },   // first 10
+    { start: 10, end: Math.min(25, n) },  // next 15
+    { start: 25, end: Math.min(50, n) },  // next 25
+    { start: 50, end: n },                // rest
+  ];
+
+  for (const { start, end } of tiers) {
+    if (end - start > 1 && start < n) {
+      shuffleSlice(start, end);
+    }
+  }
+
+  return result;
+}
