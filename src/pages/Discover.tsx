@@ -20,7 +20,7 @@ import {
   FILTER_STORAGE_KEY,
   areSexualPreferencesMutuallyCompatible,
 } from "@/lib/dating";
-import { sortDiscoveryProfiles } from "@/lib/discoveryScore";
+import { sortDiscoveryProfiles, applyTieredRandomization } from "@/lib/discoveryScore";
 import { getUserProfileById } from "@/lib/dataAccess";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -454,11 +454,14 @@ export default function Discover() {
     // This ensures: Straight women see men, Straight men see women, Gay/Lesbian see same gender, Bisexual/Queer see all
     const filtered = applyFilters(profiles, filters);
     // Use lower preference weight (0.25) for better balance between global quality and preferences
-    return sortDiscoveryProfiles(filtered, filters, {
+    const sorted = sortDiscoveryProfiles(filtered, filters, {
       likedMeIds,
       viewerId: currentProfileId,
       preferenceWeight: 0.25, // 25% preference, 75% global quality (tunable)
     });
+    // Apply tiered randomness so each reload shows a slightly different order,
+    // with randomness increasing as the user goes deeper into the list.
+    return applyTieredRandomization(sorted);
   }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId]);
 
   // Queue: exclude already passed/liked and skipped profiles so we don't show them again
