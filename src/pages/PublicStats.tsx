@@ -3,12 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Users, Heart, MessageCircle, CheckCircle2, ArrowLeft, HelpCircle, Loader2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { usePublicStats } from "@/hooks/usePublicStats";
 import { ChartContainer } from "@/components/ui/chart";
 import { PieChart, Pie, Cell } from "recharts";
@@ -45,18 +40,20 @@ function StatCard({
       <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-muted-foreground">
         {label}
         {tooltip && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" className="inline-flex text-muted-foreground hover:text-foreground" aria-label="More info">
-                  <HelpCircle className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                {tooltip}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex text-muted-foreground hover:text-foreground"
+                aria-label="More info about this stat"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="center" className="max-w-xs text-left text-sm">
+              {tooltip}
+            </PopoverContent>
+          </Popover>
         )}
       </p>
     </div>
