@@ -109,13 +109,14 @@ export default function Discover() {
   const [error, setError] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { filters, setFilters } = useFilters();
-  const { recordSwipe, loadLikesFromBackend, hasPassed, hasLiked, tick } = useMatch();
+  const { recordSwipe, loadLikesFromBackend, hasPassed, hasLiked, getPassedIds, tick } = useMatch();
   const [matchPopupOpen, setMatchPopupOpen] = useState(false);
   const [matchedProfile, setMatchedProfile] = useState<DiscoveryProfileFull | null>(null);
   const [matchedMatchId, setMatchedMatchId] = useState<string | null>(null);
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentProfileId, setCurrentProfileId] = useState<string>("");
+  const [viewerGender, setViewerGender] = useState<string>("");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [likedMeIds, setLikedMeIds] = useState<Set<string>>(new Set());
 
@@ -371,6 +372,7 @@ export default function Discover() {
         // ── Step 3: Process parallel results ───────────────────────────
         const myProfile = myProfileResult;
         setCurrentProfileId(myProfile?.id ?? "");
+        setViewerGender(myProfile?.gender ?? "");
 
         if (outgoingPending) {
           const toEmail = (outgoingPending as { toEmail?: string }).toEmail ?? "";
@@ -507,6 +509,9 @@ export default function Discover() {
     return Array.from(likedMeIds).sort().join(',');
   }, [likedMeIds]);
 
+  // Stable key for passed/skipped IDs so sort only updates when skip set changes
+  const passedIdsKey = useMemo(() => Array.from(getPassedIds()).sort().join(','), [getPassedIds, tick]);
+
   // Apply filters then sort per viewer: combined score (global + their prefs), liked-me, per-viewer tie-breaker
   // Filters applied: gender (based on user's sexual orientation), age range, cohort/intention preferences
   // Gender filtering: Women see Men (if straight), Men see Women (if straight), etc.
@@ -522,20 +527,20 @@ export default function Discover() {
       likedMeIds,
       viewerId: currentProfileId,
       preferenceWeight: 0.25, // 25% preference, 75% global quality (tunable)
+      skippedByIds: getPassedIds(),
+      viewerGender,
     });
     // Seed from profile IDs so the same set of IDs gets the same shuffle. This keeps order
     // stable when only profile data (e.g. photoUrls) updates, avoiding a brief wrong-profile blip.
     const seed = seedFromProfileIds(sorted.map((p) => p.id));
     return applyTieredRandomization(sorted, seed);
-  }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId]);
+  }, [profiles, filters, filterSortKey, likedMeIds, likedMeIdsKey, currentProfileId, passedIdsKey, viewerGender]);
 
-  // Queue: exclude already passed/liked and skipped profiles so we don't show them again
-  // Include 'tick' in dependencies so queue recomputes when swipes are recorded
+  // Queue: exclude only liked profiles (so we don't show them again). Skipped profiles are
+  // deprioritized in sort and reappear lower in the list when the user comes back.
   const displayQueue = useMemo(() => {
-    return filteredProfiles.filter(
-      (p) => !hasPassed(p.id) && !hasLiked(p.id)
-    );
-  }, [filteredProfiles, hasPassed, hasLiked, tick]);
+    return filteredProfiles.filter((p) => !hasLiked(p.id));
+  }, [filteredProfiles, hasLiked, tick]);
 
   // Clamp currentIndex when queue shrinks (e.g. after pass/like)
   useEffect(() => {

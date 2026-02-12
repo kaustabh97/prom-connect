@@ -9,7 +9,7 @@ import { GOOGLE_LOGIN_CHECK } from "@/config";
 
 const client = generateClient<Schema>();
 
-/** In-memory for UX (passes + likes); likes persisted to backend */
+/** In-memory for UX (passes + likes); likes and passes are persisted to backend. */
 const passedIds = new Set<string>();
 const likedIds = new Set<string>();
 const matches: { user1Id: string; user2Id: string }[] = [];
@@ -56,7 +56,35 @@ export function useMatch() {
         allLikes.forEach((like) => {
           if (like.toUserId) likedIds.add(like.toUserId);
         });
-        logInfo("Likes loaded from backend", { component: "useMatch", operation: "loadLikesFromBackend", extra: { count: allLikes.length } });
+        logInfo("Likes loaded from backend", {
+          component: "useMatch",
+          operation: "loadLikesFromBackend",
+          extra: { count: allLikes.length },
+        });
+      }
+
+      // Fetch all Passes (skips) where fromUserId = current user (paginate to get full list)
+      let allPasses: { toUserId?: string | null }[] = [];
+      let passNextToken: string | undefined;
+      do {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (client.models.Pass as any).list(
+          { filter: { fromUserId: { eq: currentUserProfile.id } }, nextToken: passNextToken },
+          opts
+        );
+        const page = result.data ?? [];
+        allPasses = allPasses.concat(page);
+        passNextToken = result.nextToken ?? undefined;
+      } while (passNextToken);
+      if (allPasses.length > 0) {
+        allPasses.forEach((pass) => {
+          if (pass.toUserId) passedIds.add(pass.toUserId);
+        });
+        logInfo("Passes loaded from backend", {
+          component: "useMatch",
+          operation: "loadLikesFromBackend",
+          extra: { count: allPasses.length },
+        });
       }
     } catch (err) {
       logError(err, { component: "useMatch", operation: "loadLikes" });
@@ -144,8 +172,33 @@ export function useMatch() {
 
         matches.push({ user1Id: fromUserId, user2Id: profileId });
       } else {
-        logInfo("Recording pass", { component: "useMatch", operation: "recordSwipe", extra: { profileId } });
+        logInfo("Recording pass", {
+          component: "useMatch",
+          operation: "recordSwipe",
+          extra: { profileId },
+        });
         passedIds.add(profileId);
+        try {
+          const authProfile = await getUserProfileFromCognito();
+          if (authProfile?.email) {
+            const authMode = !GOOGLE_LOGIN_CHECK ? ("apiKey" as const) : undefined;
+            const opts = authMode ? { authMode } : undefined;
+            const currentUserProfileId = getIdFromEmail(authProfile.email.trim());
+            const { data: currentUserProfile } = await client.models.UserProfile.get(
+              { id: currentUserProfileId },
+              opts
+            );
+            if (currentUserProfile?.id) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (client.models.Pass as any).create(
+                { fromUserId: currentUserProfile.id, toUserId: profileId },
+                opts
+              );
+            }
+          }
+        } catch (err) {
+          logError(err, { component: "useMatch", operation: "savePass", extra: { profileId } });
+        }
       }
 
       setTick((t) => t + 1);
@@ -156,6 +209,7 @@ export function useMatch() {
 
   const hasPassed = useCallback((profileId: string) => passedIds.has(profileId), []);
   const hasLiked = useCallback((profileId: string) => likedIds.has(profileId), []);
+  const getPassedIds = useCallback(() => new Set(passedIds), []);
   const getMatches = useCallback(() => [...matches], []);
 
   return {
@@ -163,6 +217,7 @@ export function useMatch() {
     loadLikesFromBackend,
     hasPassed,
     hasLiked,
+    getPassedIds,
     getMatches,
     viewerUserId: "current-user",
     tick,

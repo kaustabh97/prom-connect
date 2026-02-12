@@ -85,6 +85,44 @@ function explorationSeed(profileId: string, viewerId?: string): number {
   return (h % 1000) / 1000;
 }
 
+/** Normalize for viewer/profile gender comparison (woman/man). */
+function isWoman(g: string): boolean {
+  return (g || "").trim().toLowerCase() === "woman";
+}
+function isMan(g: string): boolean {
+  return (g || "").trim().toLowerCase() === "man";
+}
+
+/**
+ * Score penalty for a profile the viewer has skipped (pass).
+ * Women deprioritize men by ~15 positions (random 10–20); men deprioritize women by 5–10.
+ * Returns 0 if no skip penalty applies.
+ */
+function getSkipPenalty(
+  profileId: string,
+  profileGender: string,
+  viewerGender: string,
+  viewerId: string,
+  skippedByIds: Set<string>
+): number {
+  if (!skippedByIds.has(profileId)) return 0;
+  const vWoman = isWoman(viewerGender);
+  const vMan = isMan(viewerGender);
+  const pWoman = isWoman(profileGender);
+  const pMan = isMan(profileGender);
+  // Woman viewer skipped this man → deprioritize by 10–20 positions (~0.10–0.20 score)
+  if (vWoman && pMan) {
+    const t = explorationSeed(profileId + "skip", viewerId);
+    return 0.10 + t * 0.10;
+  }
+  // Man viewer skipped this woman → deprioritize by 5–10 positions (~0.05–0.10 score)
+  if (vMan && pWoman) {
+    const t = explorationSeed(profileId + "skip", viewerId);
+    return 0.05 + t * 0.05;
+  }
+  return 0;
+}
+
 /**
  * Profile exposure tracking for fair distribution (exploration/exploitation).
  */
@@ -170,6 +208,8 @@ export function effectiveDiscoveryScore(
  * @param options.preferenceWeight - Weight for preference match (0-1). Default: DEFAULT_PREFERENCE_MATCH_WEIGHT
  * @param options.exposureMap - Map tracking profile exposure for fair distribution
  * @param options.enableExploration - Whether to apply exploration boost (epsilon-greedy). Default: true
+ * @param options.skippedByIds - Profile IDs the viewer has passed/skipped (deprioritized in sort)
+ * @param options.viewerGender - Viewer's gender (Woman/Man) for skip penalty: women deprioritize men ~15 pos, men deprioritize women 5–10
  */
 export function sortDiscoveryProfiles(
   profiles: DiscoveryProfileFull[],
@@ -180,6 +220,8 @@ export function sortDiscoveryProfiles(
     preferenceWeight?: number;
     exposureMap?: Map<string, ProfileExposure>;
     enableExploration?: boolean;
+    skippedByIds?: Set<string>;
+    viewerGender?: string;
   }
 ): DiscoveryProfileFull[] {
   const likedMe = options?.likedMeIds ?? new Set<string>();
@@ -187,6 +229,8 @@ export function sortDiscoveryProfiles(
   const preferenceWeight = options?.preferenceWeight ?? DEFAULT_PREFERENCE_MATCH_WEIGHT;
   const exposureMap = options?.exposureMap;
   const enableExploration = options?.enableExploration ?? true;
+  const skippedByIds = options?.skippedByIds ?? new Set<string>();
+  const viewerGender = options?.viewerGender ?? "";
   
   // Create a copy to avoid mutating the original array
   const sorted = [...profiles].sort((a, b) => {
@@ -202,9 +246,13 @@ export function sortDiscoveryProfiles(
     const exposureBoostA = enableExploration ? getExposureBoost(a.id, exposureMap) : 0;
     const exposureBoostB = enableExploration ? getExposureBoost(b.id, exposureMap) : 0;
     
-    // Final scores with boosts
-    const scoreA = Math.min(1, baseScoreA + likedBoostA + exposureBoostA);
-    const scoreB = Math.min(1, baseScoreB + likedBoostB + exposureBoostB);
+    // Apply skip penalty: profiles the viewer passed appear lower (women: ~15 pos, men: ~5–10 pos)
+    const skipPenaltyA = getSkipPenalty(a.id, a.gender ?? "", viewerGender, viewerId, skippedByIds);
+    const skipPenaltyB = getSkipPenalty(b.id, b.gender ?? "", viewerGender, viewerId, skippedByIds);
+    
+    // Final scores with boosts and skip penalty (penalty subtracts)
+    const scoreA = Math.min(1, Math.max(0, baseScoreA + likedBoostA + exposureBoostA - skipPenaltyA));
+    const scoreB = Math.min(1, Math.max(0, baseScoreB + likedBoostB + exposureBoostB - skipPenaltyB));
     
     // Primary sort: by effective score (with boosts)
     if (Math.abs(scoreA - scoreB) > 0.001) {

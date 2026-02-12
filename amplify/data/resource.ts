@@ -145,6 +145,18 @@ const schema = a.schema({
     ])
     .authorization((allow) => [allow.publicApiKey()]),
 
+  /** Pass: user A (fromUserId) passed/skipped user B (toUserId). Used to deprioritize in discovery feed. */
+  Pass: a
+    .model({
+      fromUserId: a.string().required(),
+      toUserId: a.string().required(),
+      createdAt: a.datetime(),
+    })
+    .secondaryIndexes((index) => [
+      index("fromUserId"),   // Query "who I passed" for discovery deprioritization
+    ])
+    .authorization((allow) => [allow.publicApiKey()]),
+
   /** Report: user A (reporterUserId) reported user B (reportedProfileId). Used to exclude from discovery. */
   Report: a
     .model({
