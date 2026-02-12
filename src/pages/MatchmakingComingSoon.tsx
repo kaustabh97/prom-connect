@@ -40,7 +40,7 @@ export default function MatchmakingComingSoon() {
             We&apos;re getting things ready so you can find your prom date. 
             Until then, polish up that profile — first impressions matter!
           </p>
-          {count !== null && <FomoCounter count={count} hasMore={hasMore} animate delay={0} />}
+          {count !== null && <FomoCounter count={count} hasMore={hasMore} animate delay={0} source="MatchmakingComingSoon" />}
           <div className="mb-8">
             <CountdownTimer targetDate={MATCHMAKING_GO_LIVE_DATE} label="Matchmaking begins in" />
           </div>
