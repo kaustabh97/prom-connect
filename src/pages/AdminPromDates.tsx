@@ -228,13 +228,6 @@ const isLast24Hours = (dateString?: string | null): boolean => {
   }
 };
 
-// Admin emails allowed to access the dashboard
-const ALLOWED_ADMIN_EMAILS = [
-  "p24kaustabh@iima.ac.in",
-  "p24dipak@iima.ac.in",
-  "p24sushruti@iima.ac.in",
-];
-
 type TabType = "overview" | "tables" | "metrics";
 
 export default function AdminPromDates() {
