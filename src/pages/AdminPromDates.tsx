@@ -234,7 +234,6 @@ export default function AdminPromDates() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [promDates, setPromDates] = useState<MatchWithUserDetails[]>([]);
-  const [activeMatches, setActiveMatches] = useState<MatchWithUserDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -1282,14 +1281,19 @@ export default function AdminPromDates() {
         opts
       ) as Schema["UserProfile"]["type"][];
 
-      // Find profiles with partnerEmail set (non-IIMA partner flow prom dates)
-      // These don't have Match records, so we'll create virtual entries for them
-      const outsidePartnerProfiles = allProfiles.filter(
-        (p) =>
-          (p.partnerEmail ?? "").trim() !== "" &&
-          !(p.partnerEmail ?? "").endsWith("@iima.ac.in") &&
-          (p.partnerStatus ?? "").includes("Already found")
-      );
+      // Non-IIMA partner flow prom dates: no Match record. Either they entered partner name only (bio "Partner: Name")
+      // or non-IIMA partnerEmail. Include profiles that have partner in bio or non-IIMA partnerEmail, and are not IIMA.
+      const outsidePartnerProfiles = allProfiles.filter((p) => {
+        const partnerEmail = (p.partnerEmail ?? "").trim();
+        const hasNonIIMAPartnerEmail = partnerEmail !== "" && !partnerEmail.endsWith("@iima.ac.in");
+        const bioStartsPartner = typeof p.bio === "string" && p.bio.trim().startsWith("Partner:");
+        const hasPartnerStatus = (p.partnerStatus ?? "").includes("Already found");
+        return (
+          (hasNonIIMAPartnerEmail || bioStartsPartner) &&
+          !partnerEmail.endsWith("@iima.ac.in") &&
+          (hasPartnerStatus || bioStartsPartner)
+        );
+      });
 
       logInfo("Fetched matches", { 
         component: "AdminPromDates", 
@@ -1371,50 +1375,42 @@ export default function AdminPromDates() {
         });
       }
 
-      // Add outside partner prom dates (no Match record, just UserProfile with partnerEmail)
+      // Add outside partner prom dates (no Match record). Partner name from bio "Partner: Name" or partnerEmail.
       for (const profile of outsidePartnerProfiles) {
-        // Check if this profile already has a Match record (shouldn't happen, but check anyway)
         const existingMatch = matchesWithDetails.find(
           (m) => m.match.user1Id === profile.id || m.match.user2Id === profile.id
         );
         if (!existingMatch) {
-          // Create a virtual match entry for display purposes
+          const partnerNameFromBio = typeof profile.bio === "string"
+            ? profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()
+            : undefined;
+          const partnerDisplay = partnerNameFromBio || (profile.partnerEmail ?? "").trim() || "Partner";
           matchesWithDetails.push({
             match: {
               id: `outside-${profile.id}`,
               user1Id: profile.id!,
-              user2Id: "", // No second user in Match record
+              user2Id: "",
               user1Email: profile.email ?? "",
-              user2Email: profile.partnerEmail ?? "",
+              user2Email: (profile.partnerEmail ?? "").trim() || "(outside)",
               status: "active",
               isPromDate: true,
               createdAt: profile.updatedAt ?? profile.createdAt ?? new Date().toISOString(),
             } as Schema["Match"]["type"],
-            user1Profile: profile,
-            user2Profile: undefined, // Partner is outside, no profile record
+            user1Profile: { ...profile, partnerName: partnerDisplay } as Schema["UserProfile"]["type"],
+            user2Profile: undefined,
             promDateType: "partner-outside",
           });
         }
       }
 
-      // Separate into prom dates and active matches
       const promDatesList = matchesWithDetails.filter((m) => m.match.isPromDate === true);
-      const activeMatchesList = matchesWithDetails.filter(
-        (m) => m.match.status === "active" && m.match.isPromDate !== true
-      );
-
-      // Sort by createdAt descending (newest first)
       const sortByDate = (a: MatchWithUserDetails, b: MatchWithUserDetails) => {
         const dateA = a.match.createdAt ? new Date(a.match.createdAt).getTime() : 0;
         const dateB = b.match.createdAt ? new Date(b.match.createdAt).getTime() : 0;
         return dateB - dateA;
       };
-
       promDatesList.sort(sortByDate);
-      activeMatchesList.sort(sortByDate);
-
       setPromDates(promDatesList);
-      setActiveMatches(activeMatchesList);
     } catch (err) {
       logError(err, { component: "AdminPromDates", operation: "fetchMatches" });
       setError(err instanceof Error ? err.message : "Failed to fetch matches");
@@ -1496,21 +1492,14 @@ export default function AdminPromDates() {
           user1Name: pd.user1Profile?.name || pd.match.user1Email || "Unknown",
           user1Email: pd.match.user1Email || pd.user1Profile?.email || "N/A",
           user2Name: pd.promDateType === "partner-outside"
-            ? (pd.user1Profile?.partnerName || pd.match.user2Email || "Unknown")
+            ? (pd.user1Profile?.partnerName ?? (typeof pd.user1Profile?.bio === "string" && pd.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? pd.match.user2Email || "Unknown")
             : (pd.user2Profile?.name || pd.match.user2Email || "Unknown"),
           user2Email: pd.promDateType === "partner-outside"
-            ? (pd.user1Profile?.partnerEmail || pd.match.user2Email || "N/A")
+            ? (pd.match.user2Email === "(outside)" ? "N/A" : (pd.user1Profile?.partnerEmail || pd.match.user2Email || "N/A"))
             : (pd.match.user2Email || pd.user2Profile?.email || "N/A"),
+          source: pd.promDateType === "partner-outside" ? "Non-IIMA partner" : pd.promDateType === "partner-iima" ? "IIMA partner" : "Discovery",
           isIIMACouple: isIIMACouple(pd.match, pd.user1Profile, pd.user2Profile, pd.promDateType),
           createdAt: pd.match.createdAt,
-        })),
-        activeMatches: activeMatches.map(am => ({
-          user1Name: am.user1Profile?.name || am.match.user1Email || "Unknown",
-          user1Email: am.match.user1Email || am.user1Profile?.email || "N/A",
-          user2Name: am.user2Profile?.name || am.match.user2Email || "Unknown",
-          user2Email: am.match.user2Email || am.user2Profile?.email || "N/A",
-          hasPromAsk: am.hasPromAsk ?? false,
-          createdAt: am.match.createdAt,
         })),
       };
 
@@ -2208,6 +2197,7 @@ export default function AdminPromDates() {
                       <TableRow>
                         <TableHead>User 1</TableHead>
                         <TableHead>User 2</TableHead>
+                        <TableHead>Source</TableHead>
                         <TableHead>IIMA Couple</TableHead>
                         <TableHead>Created At</TableHead>
                       </TableRow>
@@ -2215,7 +2205,7 @@ export default function AdminPromDates() {
                     <TableBody>
                       {promDates.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                             No prom dates found
                           </TableCell>
                         </TableRow>
@@ -2223,14 +2213,18 @@ export default function AdminPromDates() {
                         promDates.map((item, idx) => {
                           const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
                           const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
-                          // For outside partners, user2Profile is undefined, use partnerEmail/partnerName from user1Profile
                           const user2Name = item.promDateType === "partner-outside"
-                            ? (item.user1Profile?.partnerName || item.match.user2Email || "Unknown")
+                            ? (item.user1Profile?.partnerName ?? (typeof item.user1Profile?.bio === "string" && item.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? item.match.user2Email || "Unknown")
                             : (item.user2Profile?.name || item.match.user2Email || "Unknown");
                           const user2Email = item.promDateType === "partner-outside"
-                            ? (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A")
+                            ? (item.match.user2Email === "(outside)" ? "N/A" : (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A"))
                             : (item.match.user2Email || item.user2Profile?.email || "N/A");
                           const isIIMA = isIIMACouple(item.match, item.user1Profile, item.user2Profile, item.promDateType);
+                          const sourceLabel = item.promDateType === "partner-outside"
+                            ? "Non-IIMA partner"
+                            : item.promDateType === "partner-iima"
+                              ? "IIMA partner"
+                              : "Discovery";
 
                           return (
                             <TableRow key={item.match.id || idx}>
@@ -2245,6 +2239,9 @@ export default function AdminPromDates() {
                                   <div className="font-medium">{user2Name}</div>
                                   <div className="text-sm text-muted-foreground">{user2Email}</div>
                                 </div>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-sm">{sourceLabel}</span>
                               </TableCell>
                               <TableCell>
                                 {isIIMA ? (
@@ -2269,77 +2266,6 @@ export default function AdminPromDates() {
                 </div>
                 <div className="mt-4 text-sm text-muted-foreground">
                   Total prom dates: {promDates.length}
-                </div>
-              </div>
-
-              {/* Active Matches Table */}
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold mb-4">Active Matches</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Active matches that are not yet confirmed as prom dates
-                </p>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>User 1</TableHead>
-                        <TableHead>User 2</TableHead>
-                        <TableHead>Prom Ask</TableHead>
-                        <TableHead>Created At</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeMatches.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                            No active matches found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        activeMatches.map((item, idx) => {
-                          const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
-                          const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
-                          const user2Name = item.user2Profile?.name || item.match.user2Email || "Unknown";
-                          const user2Email = item.match.user2Email || item.user2Profile?.email || "N/A";
-                          const hasPromAsk = item.hasPromAsk ?? false;
-
-                          return (
-                            <TableRow key={item.match.id || idx}>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{user1Name}</div>
-                                  <div className="text-sm text-muted-foreground">{user1Email}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{user2Name}</div>
-                                  <div className="text-sm text-muted-foreground">{user2Email}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {hasPromAsk ? (
-                                  <span className="px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-700 dark:text-blue-400">
-                                    Asked
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-1 rounded text-xs font-medium bg-gray-500/20 text-gray-700 dark:text-gray-400">
-                                    Not Asked
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {formatDate(item.match.createdAt)}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="mt-4 text-sm text-muted-foreground">
-                  Total active matches: {activeMatches.length}
                 </div>
               </div>
             </>
