@@ -1492,7 +1492,7 @@ export default function AdminPromDates() {
           user1Name: pd.user1Profile?.name || pd.match.user1Email || "Unknown",
           user1Email: pd.match.user1Email || pd.user1Profile?.email || "N/A",
           user2Name: pd.promDateType === "partner-outside"
-            ? (pd.user1Profile?.partnerName ?? (typeof pd.user1Profile?.bio === "string" && pd.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? pd.match.user2Email || "Unknown")
+            ? ((pd.user1Profile?.partnerName ?? (typeof pd.user1Profile?.bio === "string" && pd.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? pd.match.user2Email) || "Unknown")
             : (pd.user2Profile?.name || pd.match.user2Email || "Unknown"),
           user2Email: pd.promDateType === "partner-outside"
             ? (pd.match.user2Email === "(outside)" ? "N/A" : (pd.user1Profile?.partnerEmail || pd.match.user2Email || "N/A"))
@@ -2214,7 +2214,7 @@ export default function AdminPromDates() {
                           const user1Name = item.user1Profile?.name || item.match.user1Email || "Unknown";
                           const user1Email = item.match.user1Email || item.user1Profile?.email || "N/A";
                           const user2Name = item.promDateType === "partner-outside"
-                            ? (item.user1Profile?.partnerName ?? (typeof item.user1Profile?.bio === "string" && item.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? item.match.user2Email || "Unknown")
+                            ? ((item.user1Profile?.partnerName ?? (typeof item.user1Profile?.bio === "string" && item.user1Profile.bio.trim().match(/^Partner:\s*(.+)/)?.[1]?.trim()) ?? item.match.user2Email) || "Unknown")
                             : (item.user2Profile?.name || item.match.user2Email || "Unknown");
                           const user2Email = item.promDateType === "partner-outside"
                             ? (item.match.user2Email === "(outside)" ? "N/A" : (item.user1Profile?.partnerEmail || item.match.user2Email || "N/A"))
